@@ -16,5 +16,5 @@ class Performance:
     def __str__(self):
         # light blue colored score text
         if self.__did_eval:
-            return f'\033[94m{self.__metric}: {self.__score}{self.__unit}\033[0m'
-        return f"\033[94mNot evaluated!\033[0m"
+            return f'{self.__metric}: {self.__score:.2f}{self.__unit}'
+        return f"Not evaluated!"

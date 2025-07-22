@@ -28,7 +28,13 @@ class BaseModule(metaclass=ABCMeta):
         # TODO: connect to the next module
         if not isinstance(_next, BaseModule):
             raise ModuleConnectionException(str(type(_next)))
+
         self.__next_module = _next
+
+        piv: BaseModule = self
+        while piv.__next_module:
+            piv = piv.__next_module
+        # or head에 >> 로 여러개 연결지을 수 있도록 여기서 next_module을 쭉 들어가서 마지막 뒤에 새로운 모듈 연결되게 만들까? 그러면 컨테이너에서 모듈 연결할 때 reduce도 사용 가능해보임
         return self
 
     def __chain_call(self, *args, **kwargs):

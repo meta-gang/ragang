@@ -8,4 +8,4 @@ class MyRetrievalModule(RetrievalModule):
 
 class MyGenerationModule(GenerationModule):
     def execute(self, data: tuple[str, str]) -> str:
-        return f"Generated: {data[0]} + {data[1]}"
+        return f"[Generated: {data[0]} + {data[1]}]"
