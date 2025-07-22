@@ -17,7 +17,7 @@ class LinearRagContainer:
         return modules[0]
 
     def run(self, query: str) -> str:
-        result = self.__head_module._BaseModule__execute(query)
+        result = self.__head_module._BaseModule__execute(query)  # private method 강제 호출보단 다른 방식으로 접근하는 방식 고안
         if self.__metric:
             self.performance = self.__metric.evaluate(query, result)
         else:
@@ -29,7 +29,7 @@ class LinearRagContainer:
         while piv:
             print(ANSIStyler.style(f"{piv.__class__.__name__}", fore_color='yellow'))
             print(ANSIStyler.style(f"\t{piv.performance}", fore_color='blue'))
-            piv = piv._BaseModule__next_module
+            piv = piv._BaseModule__next_module  # private method 강제 호출보단 다른 방식으로 접근하는 방식 고안
 
         print(ANSIStyler.style(f"End to End RAG performance", fore_color='light-yellow', font_style='bold'))
         print(ANSIStyler.style(f"\t{self.performance}", fore_color='light-blue'))
