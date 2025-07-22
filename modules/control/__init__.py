@@ -1,2 +1,2 @@
-from .loop import LoopModule
-from .condition import ConditionModule
+from .loop_module import LoopModule
+from .condition_module import ConditionModule
