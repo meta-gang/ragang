@@ -2,7 +2,8 @@ from typing import List, Any
 import numpy as np
 from scipy.stats import kendalltau
 from sklearn.metrics.pairwise import cosine_similarity
-
+from common.bases.abstracts.base_module import BaseMetric
+from common.bases.datas.performance_dataclass import Performance
 
 """
 input 데이터: 쿼리와 검색된 문서 모두 평가 진행 전에 텍스트 전처리(특수문자 제거, 공백 개수 통일, 불용어 제거, 어간 추출, 토큰화 등) 돼 있어야 함
@@ -30,7 +31,205 @@ class Performance:
 
 
 
+# Keyword Matching
+class KeywordMatchingMetric(BaseMetric):
+    """
+    Keyword Matching 평가 : 단순히 쿼리 & 문서 간 키워드 매칭 비율의 평균 (= 쿼리 단어가 각 문서 별로 차지하는 비율의 평균)
+    
+    방법:
+        * ( 쿼리와 문서에서 동일한 토큰 수 / 토큰화된 문서의 길이 )의 평균
+        * % 값이 높을수록 쿼리와 문서 간 키워드 매칭이 잘 이루어짐
+    
+    Parameters
+    ----------
+    query : str
+        사용자 쿼리 (예: "어느 지역 사과가 제일 맛있어?")
 
+    retrieved_documents : List[str]
+        검색 시스템이 반환한 문서 별 텍스트 리스트 (예: ["충주 사과가 아주 맛있다.", "집앞 가게에서 산 사과가 맛있더라.", ...])
+
+    Returns
+    -------
+    Performance
+        Keyword Matching 점수를 담은 Performance 객체
+    """
+    def evaluate(self, query: str, retrieved_documents: list[str]) -> Performance:
+        # 검색된 문서가 없는 경우, Performance 점수 = 0
+        if not retrieved_documents:
+            return Performance(score=0.0, unit=' There is no retrieved document', metric='Embedding Similarity Metric')
+        
+        tokenized_query = set(query.split())
+        scores = []
+
+        for doc in retrieved_documents:
+            tokenized_doc = doc.split()
+
+            if not tokenized_doc:
+                continue  # 빈 문서 무시
+            
+            matched_word_cnt = sum(1 for token in tokenized_doc if token in tokenized_query)
+            score_per_doc = matched_word_cnt / len(tokenized_doc)
+            scores.append(score_per_doc)
+
+        score = sum(scores) / len(scores) * 100 if scores else 0.0
+        return Performance(score=score, unit='%', metric='Keyword Matching Metric')
+
+
+
+# Jaccard Similarity
+class JaccardSimilarityMetric(BaseMetric):
+    """
+    Jaccard 유사도 평가 : 쿼리와 문서 별 토큰의 교집합 / 쿼리와 문서 별 토큰의 합집합
+    
+    방법:
+        * ( 토큰화 된 쿼리와 토큰화 된 문서 별 토큰 중 교집합 토큰의 개수 / 토큰화 된 쿼리와 토큰화 된 문서 별 토큰 중 합집합 토큰의 개수 )의 평균
+        * % 값이 높을수록 쿼리와 문서 간 Jaccard 유사도가 높음
+        * Keyword Matching이 문서 토큰에 대한 쿼리 토큰의 일치 비율의 평균이었다면, 자카드 유사도는 문서 토큰과 쿼리 토큰의 합집합에 대한 문서 토큰과 쿼리 토큰의 교집합의 비율임
+    
+    Parameters
+    ----------
+    query : str
+        사용자 쿼리 (예: "어느 지역 사과가 제일 맛있어?")
+
+    retrieved_documents : List[str]
+        검색 시스템이 반환한 문서 별 텍스트 리스트 (예: ["충주 사과가 아주 맛있다.", "집앞 가게에서 산 사과가 맛있더라.", ...])
+
+    Returns
+    -------
+    Performance
+        Jaccard 유사도 점수를 담은 Performance 객체
+    """
+    def evaluate(self, query: str, retrieved_documents: list[str]) -> Performance:
+        if not retrieved_documents:
+            return Performance(score=0.0, unit=' There is no retrieved document', metric='Jaccard Similarity Metric')
+
+        # 쿼리 토큰화
+        tokenized_query = set(query.split())
+        scores = []
+
+        for doc in retrieved_documents:
+            tokenized_doc = set(doc.split())
+            if not tokenized_doc:
+                continue
+
+            # 자카드 유사도 계산: 쿼리 & 문서 별 토큰의 교집합 / 쿼리 & 검색된 문서 별 토큰의 합집합
+            intersection = tokenized_query & tokenized_doc
+            union = tokenized_query | tokenized_doc
+            score_per_doc = len(intersection) / len(union) if union else 0.0
+            scores.append(score_per_doc)
+
+        avg_score = sum(scores) / len(scores) * 100 if scores else 0.0
+        return Performance(score=avg_score, unit='%', metric='Jaccard Similarity Metric')
+    
+
+
+# Cosine Similarity: 쿼리 & 문서 간 임베딩 코사인 유사도의 평균
+# 가정1. 사용자가 get_embedding()을 쓰던 어떤 방법을 써서 매개변수로 해당 벡터가 담긴 넘파이 배열 전달 가정
+# 가정2. 쿼리와 문서가 동일한 임베딩 모델로 벡터화 된 상태로, 서로의 벡터 크기가 동일
+class CosineSimilarityMetric(BaseMetric):
+    """
+    Cosine 유사도 평가 : 쿼리와 문서 임베딩 벡터 간 코사인 유사도의 평균
+    
+    방법:
+        * ( 임베딩 된 쿼리와 임베딩 된 문서 별 코사인 유사도 값 )의 평균
+        * Cosine 유사도 값이 높을수록 쿼리와 문서 간 관련 정도가 높음
+    
+    Parameters
+    ----------
+    query : np.ndarray
+        사용자 쿼리의 벡터 임베딩 (예: [1.01, 0.9, -0.1])
+
+    retrieved_documents : List[np.ndarray]
+        검색 시스템이 반환한 문서 별 텍스트의 벡터 임베딩 (예: [[1.01, 0.9, -0.1], [0.05, 2.8, -3.1]])
+
+    Returns
+    -------
+    Performance
+        Cosine 유사도 점수를 담은 Performance 객체
+    """
+    def evaluate(self, query: np.ndarray, retrieved_documents: list[np.ndarray]) -> Performance:
+        # 검색된 문서가 없는 경우, Performance 점수 = 0
+        if not retrieved_documents:
+            return Performance(score=0.0, unit=' There is no retrieved document', metric='Embedding Similarity Metric')
+
+        # score = 쿼리 & 문서 간 코사인 유사도 평균
+        scores = [self.cosine_similarity(query, doc) for doc in retrieved_documents]
+        score = sum(scores) / len(scores) if scores else 0.0
+        return Performance(score=score, unit=' (-1 ~ 1)', metric='Embedding Similarity Metric')
+    
+    # 코사인 유사도 계산 함수
+    def cosine_similarity(self, vec_a, vec_b):
+        dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
+        norm_a = sum(a ** 2 for a in vec_a) ** 0.5
+        norm_b = sum(b ** 2 for b in vec_b) ** 0.5
+        return dot_product / (norm_a * norm_b) if norm_a and norm_b else 0.0
+    
+
+
+# Euclidean Distance: 쿼리 & 문서 간 유클리드 거리의 평균
+# 가정1. 사용자가 get_embedding()을 쓰던 어떤 방법을 써서 매개변수로 해당 벡터가 담긴 넘파이 배열 전달 가정
+# 가정2. 쿼리와 문서가 동일한 임베딩 모델로 벡터화 된 상태로, 서로의 벡터 크기가 동일
+class EuclideanDistanceMetric(BaseMetric):
+    def evaluate(self, query: np.ndarray, retrieved_documents: list[np.ndarray]) -> Performance:
+        # 검색된 문서가 없는 경우
+        if not retrieved_documents:
+            return Performance(score=0.0, unit=' There is no retrieved document', metric='Euclidean Distance Metric')
+
+        # score = 쿼리 & 문서 간 유클리드 거리 평균
+        scores = [self.euclidean_distance(query, doc) for doc in retrieved_documents]
+        score = float(np.mean(scores)) if scores else 0.0
+        return Performance(score=score, unit='', metric='Euclidean Distance Metric')
+
+    def euclidean_distance(self, vec_a: np.ndarray, vec_b: np.ndarray) -> float:
+        return float(np.linalg.norm(vec_a - vec_b))
+    
+
+
+# Manhattan Distance: 쿼리 & 문서 간 맨하탄 거리의 평균(고차원 벡터에 더 적합)
+# 가정1. 사용자가 get_embedding()을 쓰던 어떤 방법을 써서 매개변수로 해당 벡터가 담긴 넘파이 배열 전달 가정
+# 가정2. 쿼리와 문서가 동일한 임베딩 모델로 벡터화 된 상태로, 서로의 벡터 크기가 동일
+class ManhattanDistanceMetric(BaseMetric):
+    def evaluate(self, query: np.ndarray, retrieved_documents: list[np.ndarray]) -> Performance:
+        # 검색된 문서가 없는 경우
+        if not retrieved_documents:
+            return Performance(score=0.0, unit=' There is no retrieved document', metric='Manhattan Distance Metric')
+        
+        # score = 쿼리 & 문서 간 맨하탄 거리 평균
+        scores = [self.manhattan_distance(query, doc) for doc in retrieved_documents]
+        score = float(np.mean(scores)) if scores else 0.0
+        return Performance(score=score, unit='', metric='Manhattan Distance Metric')
+    
+    def manhattan_distance(self, vec_a: np.ndarray, vec_b: np.ndarray) -> float:
+        return float(np.sum(np.abs(vec_a - vec_b)))
+
+
+# Negative Rejection Rate: 쿼리와 무관한(코사인 유사도 <= 0) 문서의 비율
+# 가정1. 사용자가 get_embedding()을 쓰던 어떤 방법을 써서 매개변수로 해당 벡터가 담긴 넘파이 배열 전달 가정
+# 가정2. 쿼리와 문서가 동일한 임베딩 모델로 벡터화 된 상태로, 서로의 벡터 크기가 동일
+class NegativeRejectionRateMetric(BaseMetric):
+    def evaluate(self, query: np.ndarray, retrieved_documents: list[np.ndarray])-> Performance:
+        # 검색된 문서가 없는 경우
+        if not retrieved_documents:
+            return Performance(score=0.0, unit=' There is no retrieved document', metric='Negative Rejection Rate Metric')
+
+        # score = 쿼리와 무관한 retrieved_documents의 비율
+        # 코사인 유사도 <= 0인 문서는 관련없으므로 해당 문서들의 비율 백분율 계산
+        # 쿼리와 관련 없는 문서 수 / 전체 문서 수 * 100
+        irr_documents=0
+        for doc in retrieved_documents:
+            if self.cosine_similarity(query, doc) <= 0:
+                irr_documents += 1
+
+        score = (irr_documents / len(retrieved_documents))*100 if retrieved_documents else 0.0
+
+        return Performance(score=score, unit='%', metric='Negative Rejection Rate Metric')
+    
+    # 코사인 유사도 계산 함수
+    def cosine_similarity(self, vec_a, vec_b):
+        dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
+        norm_a = sum(a ** 2 for a in vec_a) ** 0.5
+        norm_b = sum(b ** 2 for b in vec_b) ** 0.5
+        return dot_product / (norm_a * norm_b) if norm_a and norm_b else 0.0
 
 
 
