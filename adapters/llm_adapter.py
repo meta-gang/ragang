@@ -17,7 +17,7 @@ class BaseLLMAdapter(ABC):
         pass
 
 class LocalLLMAdapter(BaseLLMAdapter):
-    """Adapter for local LLM APIs (e.g., Ollama)."""
+    """Adapter for local LLM APIs (e.g., LLaMON)."""
     def request(self, prompt: str, query: str) -> dict:
         """Sends a request to a local LLM API."""
         payload = {
@@ -57,7 +57,10 @@ class OpenAIAdapter(BaseLLMAdapter):
         try:
             response = requests.post(self.api_url, headers=self.headers, json=payload)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            #extracting text from the response in json format
+            response_text = data["choices"][0]["message"]["content"]
+            return {"text" : response_text, "raw" : data}
         except requests.exceptions.RequestException as e:
             print(f"An error occurred while calling the OpenAI API: {e}")
             return {"error": str(e)}
@@ -91,7 +94,10 @@ class GeminiAdapter(BaseLLMAdapter):
         try:
             response = requests.post(self.api_url, headers=self.headers, params=params, json=payload)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            #extracting text from the response in json format
+            response_text = data["candidates"][0]["content"]["parts"][0]["text"]
+            return {"text" : response_text, "raw" : data}
         except requests.exceptions.RequestException as e:
             print(f"An error occurred while calling the Gemini API: {e}")
             error_details = response.json() if response.content else {}
