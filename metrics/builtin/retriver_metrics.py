@@ -36,7 +36,11 @@ class Performance:
 
 def ranking_consistency_kendall_tau(ranking1: List[int], ranking2: List[int]) -> Performance:
     """
-    랭킹 일관성 평가 (Kendall's Tau) : 두 개의 랭킹 리스트 간의 순위 일관성을 켄달 타우(Kendall's Tau) 계수로 계산
+    랭킹 일관성 평가 (Kendall's Tau) : 두 개의 랭킹 리스트(ex. 정답 랭킹, 모델이 반환한 랭킹) 간의 순위 일관성을 켄달 타우(Kendall's Tau) 계수로 계산
+    방법 :
+        * 두 리스트의 순서쌍을 비교하여, 순서가 일치하는 쌍(동의쌍)과 불일치하는 쌍(불일치쌍)의 비율을 계산한다.
+        * 켄달 타우 계수는 -1에서 1 사이의 값을 가지며, 1에 가까울수록 두 랭킹이 일치함을 의미한다.
+    사용 예 : 검색 결과의 랭킹 품질을 평가할 때 사용한다.
     Parameters
     ----------
     ranking1 : List[int]
@@ -53,10 +57,13 @@ def ranking_consistency_kendall_tau(ranking1: List[int], ranking2: List[int]) ->
 
 def diversity_metric(doc_embeddings: List[np.ndarray]) -> Performance:
     """
-    결과 다양성 평가 (예시: 문서 내 중복 단어/문장 비율, 토픽 다양성 등)
+    결과 다양성 평가 (예시: 문서 내 중복 단어/문장 비율, 토픽 다양성 등) : 검색된 문서들의 임베딩을 이용해, 결과가 얼마나 다양한지 평가
     
-    검색된 문서들의 임베딩을 기반으로 다양성을 평가한다. (문서 간의 평균 코사인 유사도의 반대 값(1 - 유사도)으로 다양성을 측정)
-    점수가 1에 가까울수록 다양성이 높다.
+    방법 :
+        * 모든 문서 임베딩 쌍의 코사인 유사도를 계산
+        * 평균 유사도를 구한 뒤, 1 - 평균 유사도로 다양성 점수를 산출
+        * 값이 1에 가까울수록 문서들이 서로 다르다는 의미(다양성이 높음)
+    사용 예 : 검색 결과가 한쪽에 치우치지 않고 다양한 주제를 포함하는지 평가할 때 사용
     
     Parameters
     ----------
@@ -68,11 +75,14 @@ def diversity_metric(doc_embeddings: List[np.ndarray]) -> Performance:
     Performance
         계산된 다양성 점수를 담은 Performance 객체
     """
+    
+    """
     # (단순 텍스트 기반 비교 - 매개변 수 retrieved_documents: List[str] 받아와야 함)
     # # TODO: 실제 다양성 평가 로직 구현 (예: 토픽 모델링, 유사도 기반 다양성) 
     # unique_docs = set(retrieved_documents)
     # diversity_score = len(unique_docs) / len(retrieved_documents) if retrieved_documents else 0
     # return Performance(score=diversity_score, unit='', metric='Diversity')
+    """
     
     # 문서가 2개 미만이면 다양성을 측정할 수 없음
     if len(doc_embeddings) < 2:
@@ -94,8 +104,15 @@ def diversity_metric(doc_embeddings: List[np.ndarray]) -> Performance:
 
 def random_document_injection_effect(query: str, retrieved_documents: List[str], ground_truth: List[str]) -> Performance:
     """
-    검색 결과에 무작위 문서를 삽입했을 때 정밀도(Precision)가 얼마나 하락하는지 측정한다.
+    검색 결과에 무작위(관련없는) 문서를 삽입했을 때 정밀도(Precision)가 얼마나 하락하는지 측정한다.
     이 점수가 낮을수록 무작위 문서(노이즈)에 강건하다는 의미!
+    
+    방법:
+        * 원래 검색 결과의 정밀도를 계산
+        * 무작위 문서를 추가한 뒤 정밀도를 다시 계산
+        * 두 점수의 차이(하락폭)를 반환
+        * 값이 작을수록(0에 가까울수록) 시스템이 노이즈에 강건함을 의미
+    사용 예 : 검색 시스템의 노이즈(무관한 문서) 내성 평가
 
     Parameters
     ----------
@@ -125,6 +142,12 @@ def random_document_injection_effect(query: str, retrieved_documents: List[str],
 def precision_metric(retrieved_documents: List[str], ground_truth: List[str]) -> Performance:
     """
     정밀도 평가 : 얼마나 많은 검색된 문서가 실제로 정답에 해당하는지를 평가
+    
+    방법:
+        * 정답 문서 수 / 검색된 문서 수
+        * 값이 1에 가까울수록 검색 결과가 정확함을 의미
+    사용 예 : 검색 시스템의 정확도를 평가할 때 사용
+    
     Parameters
     ----------
     retrieved_documents : List[str]
@@ -147,9 +170,11 @@ def precision_metric(retrieved_documents: List[str], ground_truth: List[str]) ->
 def generalized_embedding_coverage_error(query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
     """
     GECE: Query와 Retrieval이 서로 골고루 덮고 있는가
-    # TODO: 실제 GECE 계산 로직 구현
-    # 예시: 평균 거리 기반 커버리지 : 쿼리 임베딩과 검색된 문서 임베딩들 간의 평균 유클리드 거리를 계산한다.
-    이 거리가 작을수록 검색 결과가 쿼리와 가깝다는 의미로, 커버리지가 좋다고 평가할 수 있다.
+    원리 : 쿼리 임베딩과 검색된 문서 임베딩들 간의 평균 유클리드 거리를 계산하여, 검색 결과가 쿼리와 얼마나 가까운지(커버리지)를 평가합니다.
+    방법:
+        * 각 문서 임베딩과 쿼리 임베딩의 거리를 모두 구해 평균을 낸다.
+        * 값이 작을수록 검색 결과가 쿼리와 가깝다는 의미(커버리지가 좋음)
+    사용 예: 임베딩 공간에서 쿼리와 검색 결과의 근접성 평가.
     Parameters
     ----------
     query_embedding : np.ndarray
@@ -171,8 +196,12 @@ def generalized_embedding_coverage_error(query_embedding: np.ndarray, doc_embedd
 
 def embedding_consine_similarity_evaluation(query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
     """
-    임베딩 코사인 유사도 기반 공간 커버러지/균일성 평가 : 쿼리와 문서 임베딩 간의 코사인 유사도를 기반으로 일관성을 평가
-    가장 유사도가 높은 문서(local)와 전체 평균 유사도(high)의 평균을 계산한다.
+    임베딩 코사인 유사도 기반 공간 커버러지/균일성 평가 : 쿼리 임베딩과 검색된 문서 임베딩들 간의 코사인 유사도를 기반으로, 검색 결과의 일관성과 커버리지를 평가한다.
+    방법:
+        * 쿼리 임베딩과 각 문서 임베딩의 코사인 유사도를 모두 계산
+        * 가장 높은 유사도(local)와 전체 평균 유사도(high)를 구해, 두 값을 평균내어 반환
+        * 값이 1에 가까울수록 쿼리와 검색 결과가 임베딩 공간에서 잘 맞닿아 있음을 의미
+    사용 예 : 임베딩 기반 검색 시스템의 일관성 및 커버리지 평가.
     Parameters
     ----------
     query_embedding : np.ndarray
