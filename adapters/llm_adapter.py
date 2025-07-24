@@ -22,12 +22,12 @@ class LocalLLMAdapter(BaseLLMAdapter):
         """Sends a request to a local LLM API."""
         payload = {
             "model": self.model_name,
-            "prompt": f"{prompt}\n\n{query}" # A common format for local models
+            "prompt": f"{prompt}\n\n{query}" # needs to be adopted according to the actual payload format
         }
         try:
             response = requests.post(self.api_url, json=payload)
             response.raise_for_status()
-            return response.json()
+            return response.json()    # return format needs to be modified to align with other classes
         except requests.exceptions.RequestException as e:
             print(f"An error occurred while calling the local LLM API: {e}")
             return {"error": str(e)}
