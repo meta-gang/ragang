@@ -1,9 +1,7 @@
 import requests
 import os
 from abc import ABC, abstractmethod
-from dotenv import load_dotenv
 
-load_dotenv()
 
 class BaseLLMAdapter(ABC):
     """Abstract base class for LLM adapters."""
@@ -34,12 +32,10 @@ class LocalLLMAdapter(BaseLLMAdapter):
 
 class OpenAIAdapter(BaseLLMAdapter):
     """Adapter for the OpenAI API."""
-    def __init__(self, model_name: str, api_key: str = None, api_url: str = "https://api.openai.com/v1/chat/completions"):
+    def __init__(self, model_name: str, api_key: str, api_url: str = "https://api.openai.com/v1/chat/completions"):
         super().__init__(model_name, api_url)
-        if api_key is None:
-            api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            raise ValueError("API key is required for OpenAIAdapter. Pass it as an argument or set the OPENAI_API_KEY environment variable.")
+            raise ValueError("API key is required for OpenAIAdapter.")
         self.headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
@@ -67,11 +63,9 @@ class OpenAIAdapter(BaseLLMAdapter):
 
 class GeminiAdapter(BaseLLMAdapter):
     """Adapter for the Google Gemini API."""
-    def __init__(self, model_name: str, api_key: str = None, api_version: str = "v1beta"):
-        if api_key is None:
-            api_key = os.getenv("GEMINI_API_KEY")
+    def __init__(self, model_name: str, api_key: str, api_version: str = "v1beta"):
         if not api_key:
-            raise ValueError("API key is required for GeminiAdapter. Pass it as an argument or set the GEMINI_API_KEY environment variable.")
+            raise ValueError("API key is required for GeminiAdapter.")
         # The model name is part of the URL for Gemini
         api_url = f"https://generativelanguage.googleapis.com/{api_version}/models/{model_name}:generateContent"
         super().__init__(model_name, api_url)
