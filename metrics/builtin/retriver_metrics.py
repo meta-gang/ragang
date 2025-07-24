@@ -1,6 +1,7 @@
 from typing import List, Any
 import numpy as np
 from scipy.stats import kendalltau
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 """
@@ -18,6 +19,7 @@ output 데이터 : metric 결과(정답률, recall, precision 등 원하는 평�
 
 """
 class Performance:
+    """평가 결과의 표준 형식을 정의하는 클래스"""
     def __init__(self, score: float, unit: str, metric: str):
         self.score = score
         self.unit = unit
@@ -26,66 +28,169 @@ class Performance:
     def __repr__(self):
         return f"Performance(score={self.score}, unit='{self.unit}', metric='{self.metric}')"
 
+
+
+
+
+
+
 def ranking_consistency_kendall_tau(ranking1: List[int], ranking2: List[int]) -> Performance:
     """
-    랭킹 일관성 평가 (Kendall's Tau)
-    ranking1, ranking2: 각 문서의 랭킹 리스트 (ex. [1,2,3])
+    랭킹 일관성 평가 (Kendall's Tau) : 두 개의 랭킹 리스트 간의 순위 일관성을 켄달 타우(Kendall's Tau) 계수로 계산
+    Parameters
+    ----------
+    ranking1 : List[int]
+        첫 번째 랭킹 리스트 (예: [1, 2, 3, 4])
+    ranking2 : List[int]
+        두 번째 랭킹 리스트 (예: [1, 3, 2, 4])
+
+    Returns
+    -------
+    Performance : 계산된 켄달 타우 점수를 담은 Performance 객체
     """
     tau, _ = kendalltau(ranking1, ranking2)
     return Performance(score=tau, unit='', metric='Kendall\'s Tau')
 
-def diversity_metric(retrieved_documents: List[str]) -> Performance:
+def diversity_metric(doc_embeddings: List[np.ndarray]) -> Performance:
     """
     결과 다양성 평가 (예시: 문서 내 중복 단어/문장 비율, 토픽 다양성 등)
+    
+    검색된 문서들의 임베딩을 기반으로 다양성을 평가한다. (문서 간의 평균 코사인 유사도의 반대 값(1 - 유사도)으로 다양성을 측정)
+    점수가 1에 가까울수록 다양성이 높다.
+    
+    Parameters
+    ----------
+    doc_embeddings : List[np.ndarray]
+        검색된 각 문서의 임베딩 벡터 리스트
+
+    Returns
+    -------
+    Performance
+        계산된 다양성 점수를 담은 Performance 객체
     """
-    # TODO: 실제 다양성 평가 로직 구현 (예: 토픽 모델링, 유사도 기반 다양성)
-    unique_docs = set(retrieved_documents)
-    diversity_score = len(unique_docs) / len(retrieved_documents) if retrieved_documents else 0
+    # (단순 텍스트 기반 비교 - 매개변 수 retrieved_documents: List[str] 받아와야 함)
+    # # TODO: 실제 다양성 평가 로직 구현 (예: 토픽 모델링, 유사도 기반 다양성) 
+    # unique_docs = set(retrieved_documents)
+    # diversity_score = len(unique_docs) / len(retrieved_documents) if retrieved_documents else 0
+    # return Performance(score=diversity_score, unit='', metric='Diversity')
+    
+    # 문서가 2개 미만이면 다양성을 측정할 수 없음
+    if len(doc_embeddings) < 2:
+        return Performance(score=0.0, unit='', metric='Diversity')
+
+    # 모든 문서 쌍 간의 코사인 유사도 계산
+    similarity_matrix = cosine_similarity(doc_embeddings)
+    
+    # 대각선(자기 자신과의 유사도=1)을 제외한 상삼각행렬의 평균을 계산
+    # 이는 모든 문서 쌍의 유사도 평균과 같음
+    indices = np.triu_indices(len(doc_embeddings), k=1)
+    mean_similarity = np.mean(similarity_matrix[indices])
+    
+    # 다양성 점수는 (1 - 평균 유사도)로 정의
+    diversity_score = 1 - mean_similarity
+    
     return Performance(score=diversity_score, unit='', metric='Diversity')
+
 
 def random_document_injection_effect(query: str, retrieved_documents: List[str], ground_truth: List[str]) -> Performance:
     """
-    무작위 문서 삽입 시 성능 변화 평가
+    검색 결과에 무작위 문서를 삽입했을 때 정밀도(Precision)가 얼마나 하락하는지 측정한다.
+    이 점수가 낮을수록 무작위 문서(노이즈)에 강건하다는 의미!
+
+    Parameters
+    ----------
+    query : str
+        사용자 쿼리 (현재 로직에서는 미사용, 확장성을 위해 유지)
+    retrieved_documents : List[str]
+        원본 검색 결과 문서 리스트
+    ground_truth : List[str]
+        실제 정답 문서 리스트
+
+    Returns
+    -------
+    Performance
+        성능 하락폭(effect) 점수를 담은 Performance 객체
     """
-    # 기존 성능
     original_precision = precision_metric(retrieved_documents, ground_truth)
+    
     # 무작위 문서 삽입
-    random_doc = "무작위 문서 텍스트"
+    random_doc = "이것은 시스템 테스트를 위한 무작위로 삽입된 관련 없는 문서입니다."
     injected_docs = retrieved_documents + [random_doc]
+    
     injected_precision = precision_metric(injected_docs, ground_truth)
-    effect = original_precision.score - injected_precision.score    # 차이가 작으면 무작위 문서가 성능에 큰 영향을 미치지 않음
+    
+    effect = original_precision.score - injected_precision.score
     return Performance(score=effect, unit='', metric='Random Doc Injection Effect')
 
 def precision_metric(retrieved_documents: List[str], ground_truth: List[str]) -> Performance:
     """
     정밀도 평가 : 얼마나 많은 검색된 문서가 실제로 정답에 해당하는지를 평가
+    Parameters
+    ----------
+    retrieved_documents : List[str]
+        검색 시스템이 반환한 문서(또는 ID)의 리스트
+    ground_truth : List[str]
+        실제 정답에 해당하는 문서(또는 ID)의 리스트
+
+    Returns
+    -------
+    Performance
+        계산된 정밀도 점수를 담은 Performance 객체
     """
-    # retrived_documents : 검색된 문서, ground_truth: 정답 문서
-    relevant = set(retrieved_documents) & set(ground_truth) 
-    # precision : retrieved_documents에서 ground_truth에 있는 문서의 비율
-    precision = len(relevant) / len(retrieved_documents) if retrieved_documents else 0
+    if not retrieved_documents:
+        return Performance(score=0.0, unit='', metric='Precision')
+    
+    relevant_items = set(retrieved_documents) & set(ground_truth)
+    precision = len(relevant_items) / len(retrieved_documents)
     return Performance(score=precision, unit='', metric='Precision')
 
 def generalized_embedding_coverage_error(query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
     """
     GECE: Query와 Retrieval이 서로 골고루 덮고 있는가
-    """
     # TODO: 실제 GECE 계산 로직 구현
-    # 예시: 평균 거리 기반 커버리지
-    
-    # query_embedding과 각 문서 임베딩 간의 거리 계산
-    distances = [np.linalg.norm(query_embedding - doc_emb) for doc_emb in doc_embeddings]   
+    # 예시: 평균 거리 기반 커버리지 : 쿼리 임베딩과 검색된 문서 임베딩들 간의 평균 유클리드 거리를 계산한다.
+    이 거리가 작을수록 검색 결과가 쿼리와 가깝다는 의미로, 커버리지가 좋다고 평가할 수 있다.
+    Parameters
+    ----------
+    query_embedding : np.ndarray
+        쿼리의 임베딩 벡터
+    doc_embeddings : List[np.ndarray]
+        검색된 각 문서의 임베딩 벡터 리스트
+
+    Returns
+    -------
+    Performance
+        계산된 평균 거리(coverage_error)를 담은 Performance 객체
+    """
+    if not doc_embeddings:
+        return Performance(score=0.0, unit='distance', metric='GECE')
+        
+    distances = [np.linalg.norm(query_embedding - doc_emb) for doc_emb in doc_embeddings]
     coverage_error = np.mean(distances)
-    return Performance(score=coverage_error, unit='', metric='GECE')
+    return Performance(score=coverage_error, unit='distance', metric='GECE')
 
 def embedding_consine_similarity_evaluation(query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
     """
-    임베딩 코사인 유사도 기반 공간 커버러지/균일성 평가
+    임베딩 코사인 유사도 기반 공간 커버러지/균일성 평가 : 쿼리와 문서 임베딩 간의 코사인 유사도를 기반으로 일관성을 평가
+    가장 유사도가 높은 문서(local)와 전체 평균 유사도(high)의 평균을 계산한다.
+    Parameters
+    ----------
+    query_embedding : np.ndarray
+        쿼리의 임베딩 벡터
+    doc_embeddings : List[np.ndarray]
+        검색된 각 문서의 임베딩 벡터 리스트
+
+    Returns
+    -------
+    Performance
+        계산된 일관성 점수를 담은 Performance 객체
     """
-    # TODO: 실제 코사인 유사도 기반 평가 로직 구현
-    from sklearn.metrics.pairwise import cosine_similarity
+    if not doc_embeddings:
+        return Performance(score=0.0, unit='cosine_similarity', metric='Embedding Consistency E')
+
     sims = cosine_similarity([query_embedding], doc_embeddings)[0]
-    local_score = np.max(sims)  # 가장 가까운 문서
-    high_score = np.mean(sims)  # 전체 평균
-    # 반환 예시: local/high 평균값
-    return Performance(score=(local_score + high_score) / 2, unit='', metric='Embedding Consistency E')
+    local_score = np.max(sims)  # 가장 가까운 문서와의 유사도
+    high_score = np.mean(sims)  # 전체 문서와의 평균 유사도
+    
+    final_score = (local_score + high_score) / 2
+    return Performance(score=final_score, unit='cosine_similarity', metric='Embedding Consistency E')
