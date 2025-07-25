@@ -49,6 +49,7 @@ class LocalEmbeddingAdapter(BaseEmbeddingAdapter):
             
         return np.array([embeddings])
 
+
 class OpenAIEmbeddingAdapter(BaseEmbeddingAdapter):
     """Adapter for the OpenAI embedding API."""
     def __init__(self, api_key: str, model_name: str = "text-embedding-ada-002", api_url: str = "https://api.openai.com/v1/embeddings"):
@@ -83,6 +84,7 @@ class GeminiEmbeddingAdapter(BaseEmbeddingAdapter):
         api_url = f"https://generativelanguage.googleapis.com/{api_version}/models/{self.model_name}:batchEmbedContents"
         super().__init__(api_url, model_name)
         self.api_key = api_key
+
         self.headers = {
             "Content-Type": "application/json"
         }
