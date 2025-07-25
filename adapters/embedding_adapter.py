@@ -24,7 +24,8 @@ class BaseEmbeddingAdapter(ABC):
 
 class LocalEmbeddingAdapter(BaseEmbeddingAdapter):
     """Adapter for local embedding model.
-    Note that the API request format(url, payload, etc) implemented here is for ollama"""
+    Note that the API request format(url, payload, etc) implemented here is for ollama only.
+    You may have to check the exact requirement."""
 
     def __init__(self, api_url, model_name):
         url = f"http://{api_url}/api/embeddings"
