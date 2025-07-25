@@ -2,9 +2,19 @@ from typing import List, Any
 import numpy as np
 from scipy.stats import kendalltau
 from sklearn.metrics.pairwise import cosine_similarity
+import os
+from dotenv import load_dotenv
+
+# --- 공통 기반 클래스 및 어댑터 import ---
 from common.bases.abstracts.base_module import BaseMetric
 from common.bases.datas.performance_dataclass import Performance
-from konlpy.tag import Okt
+from adapters.llm_adapter import BaseLLMAdapter, LocalLLMAdapter
+from adapters.embedding_adapter import BaseEmbeddingAdapter, LocalEmbeddingAdapter
+
+
+# .env 파일에서 환경 변수 불러오기
+load_dotenv()
+gemini_api_key = os.getenv("GEMINI_API_KEY")
 
 """
 input 데이터: 쿼리와 검색된 문서 모두 평가 진행 전에 텍스트 전처리(특수문자 제거, 공백 개수 통일, 불용어 제거, 어간 추출, 토큰화 등) 돼 있어야 함
@@ -284,46 +294,54 @@ class PrecisionMetric(BaseMetric):
 # random_document_injection_effect
 class RandomDocumentInjectionEffect(BaseMetric):
     """
-    검색 결과에 무작위(관련없는) 문서를 삽입했을 때 정밀도(Precision)가 얼마나 하락하는지 측정한다.
-    이 점수가 낮을수록 무작위 문서(노이즈)에 강건하다는 의미!
-    
-    방법:
-        * 원래 검색 결과의 정밀도를 계산
-        * 무작위 문서를 추가한 뒤 정밀도를 다시 계산
-        * 두 점수의 차이(하락폭)를 반환
-        * 값이 작을수록(0에 가까울수록) 시스템이 노이즈에 강건함을 의미
-    사용 예 : 검색 시스템의 노이즈(무관한 문서) 내성 평가
-
-    Parameters
-    ----------
-    query : str
-        사용자 쿼리 (현재 로직에서는 미사용, 확장성을 위해 유지)
-    retrieved_documents : List[str]
-        원본 검색 결과 문서 리스트
-    ground_truth : List[str]
-        실제 정답 문서 리스트
-
-    Returns
-    -------
-    Performance
-        성능 하락폭(effect) 점수를 담은 Performance 객체
+    검색 결과에 LLM이 생성한 '그럴듯한 노이즈 문서'를 삽입했을 때 정밀도가 얼마나 하락하는지 측정
     """
-    def __init__(self):
-        # 정밀도 계산을 위해 PrecisionMetric 클래스를 내부적으로 사용
-        self.precision_calculator = PrecisionMetric()
+    def __init__(self, precision_metric: PrecisionMetric, embedding_adapter: BaseEmbeddingAdapter = None):
+        """
+        Parameters
+        ----------
+        precision_metric : PrecisionMetric
+            정밀도 계산에 사용할 PrecisionMetric 객체 (mode, threshold가 설정된 상태)
+        embedding_adapter : BaseEmbeddingAdapter, optional
+            'embedding' 모드 사용 시, 텍스트를 임베딩할 어댑터. 기본값은 None.
+        """
+        self.precision_calculator = precision_metric
+        self.embedding_adapter = embedding_adapter
+        if self.precision_calculator.mode == 'embedding' and not self.embedding_adapter:
+            raise ValueError("'embedding' 모드에서는 embedding_adapter가 반드시 필요합니다.")
 
-    def evaluate(self, retrieved_documents: List[str], ground_truth: List[str], query: str = None) -> Performance:
-        # query 파라미터는 현재 로직에서 사용되지 않으나 확장성을 위해 유지
+    def evaluate(self, query: str, retrieved_documents: List[Any], ground_truth: List[Any], llm_adapter: BaseLLMAdapter) -> Performance:
         original_precision = self.precision_calculator.evaluate(retrieved_documents, ground_truth)
         
-        # 무작위 문서 삽입
-        random_doc = "이것은 시스템 테스트를 위한 무작위로 삽입된 관련 없는 문서입니다."
-        injected_docs = retrieved_documents + [random_doc]
+        prompt = "Based on the user's query below, write a short, plausible-looking document that uses similar keywords but does NOT contain the real answer. Respond only with the document text."
+        response_data = llm_adapter.request(prompt=prompt, query=query)
         
-        injected_precision = self.precision_calculator.evaluate(injected_docs, ground_truth)
+        adversarial_doc_text = ""
+        if "error" not in response_data and response_data.get("text"):
+            adversarial_doc_text = response_data["text"].strip()
+        else:
+            print("Warning: Failed to generate adversarial document. Using a generic random document instead.")
+            adversarial_doc_text = "This is a generic irrelevant document for system testing."
+
+        injected_precision_score = original_precision.score
+        if self.precision_calculator.mode == 'token':
+            injected_docs = retrieved_documents + [adversarial_doc_text]
+            injected_precision = self.precision_calculator.evaluate(injected_docs, ground_truth)
+            injected_precision_score = injected_precision.score
+        elif self.precision_calculator.mode == 'embedding':
+            embeddings = self.embedding_adapter.create_embeddings([adversarial_doc_text])
+            
+            if embeddings.size == 0: 
+                print("Error: Failed to embed the adversarial document. Skipping injection for this test.")
+                # injected_precision_score는 original_precision.score와 동일하게 유지
+            else:
+                adversarial_embedding = embeddings[0]
+                injected_embs = retrieved_documents + [adversarial_embedding]
+                injected_precision = self.precision_calculator.evaluate(injected_embs, ground_truth)
+                injected_precision_score = injected_precision.score
         
-        effect = original_precision.score - injected_precision.score
-        return Performance(score=effect, unit='', metric='Random Doc Injection Effect')
+        effect = original_precision.score - injected_precision_score
+        return Performance(score=effect, unit='precision_drop', metric='Random Doc Injection Effect')
 
 
 # ranking_consistency_kendall_tau
