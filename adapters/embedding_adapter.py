@@ -4,6 +4,10 @@ import requests
 
 class BaseEmbeddingAdapter(ABC):
     """Abstract base class for text embedding model adapters."""
+    def __init__(self, api_url: str, model_name: str):
+        self.api_url = api_url
+        self.model_name = model_name
+
 
     @abstractmethod
     def create_embeddings(self, texts: list[str]) -> np.ndarray:
@@ -20,9 +24,6 @@ class BaseEmbeddingAdapter(ABC):
 
 class LocalEmbeddingAdapter(BaseEmbeddingAdapter):
     """Adapter for local embedding models."""
-    def __init__(self, api_url: str, model_name: str):
-        self.api_url = api_url
-        self.model_name = model_name
 
     def create_embeddings(self, texts: list[str]) -> np.ndarray:
         payload = {
@@ -41,11 +42,10 @@ class LocalEmbeddingAdapter(BaseEmbeddingAdapter):
 class OpenAIEmbeddingAdapter(BaseEmbeddingAdapter):
     """Adapter for the OpenAI embedding API."""
     def __init__(self, api_key: str, model_name: str = "text-embedding-ada-002", api_url: str = "https://api.openai.com/v1/embeddings"):
+        super().__init__(api_url, model_name)
         if not api_key:
             raise ValueError("API key is required for OpenAIEmbeddingAdapter.")
         self.api_key = api_key
-        self.model_name = model_name
-        self.api_url = api_url
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
