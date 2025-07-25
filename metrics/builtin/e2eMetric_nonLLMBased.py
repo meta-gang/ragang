@@ -1,19 +1,21 @@
 import numpy as np
 from common.bases.datas.performance_dataclass import Performance
 from common.bases.abstracts.base_metric import BaseMetric
+from adapters.embedding_adapter import BaseEmbeddingAdapter
 
 """
-Cosine Similarity를 계산하기 위한 class
+Cosine Similarity를 계산하기 위한 함수
 """
-class cosine_similarity:
-    def __init__(self, vec1, vec2):
-        self.vec1 = vec1
-        self.vec2 = vec2
-        norm1 = np.linalg.norm(vec1)
-        norm2 = np.linalg.norm(vec2)
-        if norm1 == 0 or norm2 == 0:
-            return 0.0
-        return np.dot(vec1, vec2) / (norm1 * norm2)
+def cosine_similarity(vec1, vec2):
+    vec1 = np.asarray(vec1)
+    vec2 = np.asarray(vec2)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    return float(np.dot(vec1, vec2) / (norm1 * norm2))
+
+
 
 
 """
@@ -23,16 +25,11 @@ Type: Non-LLM Metric, cosine-similarity, E2E Metric
 Explanation: 생성된 답변과 Query 간 cosine 유사도를 계산
 """
 class AnswerQuerySimilarity(BaseMetric):
-    def __init__(self, data: list, ans: str, query: str, model):
-        self.data = data
-        self.ans = ans
-        self.query = query
-        self.EmvbeddingModel = model
+    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
+        self.embedding_adapter = embedding_adapter
     
-    def evaluate(self, ip, op) -> Performance:
-        quer_vec = self.EmvbeddingModel.encode([self.query])[0]
-        ans_vec = self.EmvbeddingModel.encode([self.ans])[0]
-        quer_vec = quer_vec.reshape(1, -1)
-        ans_vec = ans_vec.reshape(1, -1)
-        aqs_score = cosine_similarity(quer_vec, ans_vec)
+    def evaluate(self, query: str, gen: str) -> Performance:
+        embeddings = self.embedding_adapter.create_embedding([query, gen])
+        query_vec, ans_vec = embeddings[0], embeddings[1]
+        aqs_score = cosine_similarity(query_vec, ans_vec)
         return Performance(score=aqs_score, unit='', metric='AQS')
