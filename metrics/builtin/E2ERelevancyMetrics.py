@@ -4,6 +4,55 @@ from adapters.llm_adapter import BaseLLMAdapter
 from adapters.embedding_adapter import BaseEmbeddingAdapter
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+"""
+Name : End to end relevancy metric via Yes/No judgement
+Target : Q-A Relevancy
+Type : End to end, LLM-as-a-judge
+Explanation : 사용자 질문과 생성된 답안을 LLM에게 주어 relevancy를 기준으로 Yes/No를 답하는 메트릭입니다.
+"""
+class E2ESimpleRelevancyMetric(BaseMetric):
+    def __init__(self, llm_adapter : BaseLLMAdapter):
+        self.llm_adapter = llm_adapter
+
+    def evaluate(self, query: str, gen: str) -> Performance:
+
+        prompt = (   #todo : prompt needs to be refined. especially the rubric has to be specified more.
+            "You are given a question and a final response.\n"
+            "Your task is to judge whether the response aligns with the intention of the question.\n"
+
+            "Judge the response using the following rubric:\n\n"
+            "Y → The response is fully relevant and well-aligned with the input question, addressing all the information required from the question directly and appropriately.\n\n"
+            "N → The response is totally irrelevant or does not address the input question.\n"
+            "Note that whether the answer itself to be correct or not is not a matter here."
+            "The only factor you consider is whether the response correctly addresses the type of required information aksed in the question."
+            "Output only the judgement without explanation.\n\n"
+            
+            "Example 1:\n"
+            "Question:\nWhat is the capital of France?\n"
+            "Response:\nIt's a man-made factor of production, meaning it's created by humans rather than being a natural resource\n"
+            "Judgement: N\n\n"
+            
+            "Example 2:\n"
+            "Question:\nWhat is the capital of France?\n"
+            "Response:\nParis, Lyon, and Strasbourg are the most famous cities of France.\n"
+            "Judgement: N\n\n"
+            
+            "Example 3:\n"
+            "Question:\nWhat is the capital of France?\n"
+            "Response:\nThe capital of France is Paris.\n"
+            "Judgement: Y\n\n"
+        )
+        user_query = f"Question:\n{query}\n\nResponse:\n{gen}\nJudgement: "
+
+
+        response = self.llm_adapter.request(prompt, user_query)
+        try:
+            score = 1 if response["text"] == "Y" else 0
+        except ValueError:
+            score = 0.0  # Default to 0 if the response is not a valid form
+        return Performance(score=score, unit="", metric="Yes/No Relevancy")
+
+
 
 
 """
@@ -53,7 +102,7 @@ class E2ESimpleRelevancyMetric(BaseMetric):
             score = float(response["text"])/2
         except ValueError:
             score = 0.0  # Default to 0 if the response is not a valid number
-        return Performance(score=score, unit="", metric="A2Q Relevancy")
+        return Performance(score=score, unit="", metric="Simple Score Relevancy")
 
 
 
