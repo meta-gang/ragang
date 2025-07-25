@@ -2,20 +2,7 @@ import numpy as np
 from common.bases.datas.performance_dataclass import Performance
 from common.bases.abstracts.base_metric import BaseMetric
 from adapters.embedding_adapter import BaseEmbeddingAdapter
-
-"""
-Cosine Similarity를 계산하기 위한 함수
-"""
-def cosine_similarity(vec1, vec2):
-    vec1 = np.asarray(vec1)
-    vec2 = np.asarray(vec2)
-    norm1 = np.linalg.norm(vec1)
-    norm2 = np.linalg.norm(vec2)
-    if norm1 == 0 or norm2 == 0:
-        return 0.0
-    return float(np.dot(vec1, vec2) / (norm1 * norm2))
-
-
+from common.utils.tools import CosineSimilarity
 
 
 """
@@ -31,7 +18,7 @@ class AnswerContextSimilarity(BaseMetric):
         chunk_vecs = self.embedding_adapter.create_embedding(context)
         similarity = []
         for chunk_vec in chunk_vecs:
-            sim = cosine_similarity(chunk_vec, ans_vec)
+            sim = CosineSimilarity.compute(chunk_vec, ans_vec)
             similarity.append(abs(sim))
         acs_score = float(np.mean(similarity))
         return Performance(score=acs_score, unit='', metric='ACS')
@@ -52,7 +39,7 @@ class AnswerCentricSimilarityVariance(BaseMetric):
         chunk_vecs = self.embedding_adapter.create_embedding(context)
         angles = []
         for chunk_vec in chunk_vecs:
-            cos_sim = cosine_similarity(chunk_vec, ans_vec)
+            cos_sim = CosineSimilarity.compute(chunk_vec, ans_vec)
             angle = np.arccos(np.clip(cos_sim, -1.0, 1.0))
             angles.append(angle)
         mean_angle = np.mean(angles)
