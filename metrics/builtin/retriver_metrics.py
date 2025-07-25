@@ -4,6 +4,7 @@ from scipy.stats import kendalltau
 from sklearn.metrics.pairwise import cosine_similarity
 from common.bases.abstracts.base_module import BaseMetric
 from common.bases.datas.performance_dataclass import Performance
+from konlpy.tag import Okt
 
 """
 input 데이터: 쿼리와 검색된 문서 모두 평가 진행 전에 텍스트 전처리(특수문자 제거, 공백 개수 통일, 불용어 제거, 어간 추출, 토큰화 등) 돼 있어야 함
@@ -19,17 +20,6 @@ output 데이터 : metric 결과(정답률, recall, precision 등 원하는 평�
     return Performance(score=0.78, unit='', metric='LLM as a judge')
 
 """
-class Performance:
-    """평가 결과의 표준 형식을 정의하는 클래스"""
-    def __init__(self, score: float, unit: str, metric: str):
-        self.score = score
-        self.unit = unit
-        self.metric = metric
-
-    def __repr__(self):
-        return f"Performance(score={self.score}, unit='{self.unit}', metric='{self.metric}')"
-
-
 
 # Keyword Matching
 class KeywordMatchingMetric(BaseMetric):
@@ -232,76 +222,67 @@ class NegativeRejectionRateMetric(BaseMetric):
         return dot_product / (norm_a * norm_b) if norm_a and norm_b else 0.0
 
 
-
-def ranking_consistency_kendall_tau(ranking1: List[int], ranking2: List[int]) -> Performance:
+class PrecisionMetric(BaseMetric):
     """
-    랭킹 일관성 평가 (Kendall's Tau) : 두 개의 랭킹 리스트(ex. 정답 랭킹, 모델이 반환한 랭킹) 간의 순위 일관성을 켄달 타우(Kendall's Tau) 계수로 계산
-    방법 :
-        * 두 리스트의 순서쌍을 비교하여, 순서가 일치하는 쌍(동의쌍)과 불일치하는 쌍(불일치쌍)의 비율을 계산한다.
-        * 켄달 타우 계수는 -1에서 1 사이의 값을 가지며, 1에 가까울수록 두 랭킹이 일치함을 의미한다.
-    사용 예 : 검색 결과의 랭킹 품질을 평가할 때 사용한다.
+    정밀도 평가 : 얼마나 많은 검색된 문서가 실제로 정답에 해당하는지를 평가
+
+    방법:
+        * mode='token' : 각 검색 문서와 정답 문서 쌍마다 Jaccard 유사도(토큰 교집합/합집합 비율)를 계산, 유사도가 임계값(threshold) 이상이면 정답으로 간주
+        * mode='embedding' : 각 검색 문서 임베딩과 정답 문서 임베딩 쌍마다 코사인 유사도를 계산, 유사도가 임계값(threshold) 이상이면 정답으로 간주
+        * 정답 문서 수 / 검색된 문서 수
+        * 값이 1에 가까울수록 검색 결과가 정확함을 의미
+    사용 예 : 검색 시스템의 정확도를 평가할 때 사용
+
     Parameters
     ----------
-    ranking1 : List[int]
-        첫 번째 랭킹 리스트 (예: [1, 2, 3, 4])
-    ranking2 : List[int]
-        두 번째 랭킹 리스트 (예: [1, 3, 2, 4])
-
-    Returns
-    -------
-    Performance : 계산된 켄달 타우 점수를 담은 Performance 객체
-    """
-    tau, _ = kendalltau(ranking1, ranking2)
-    return Performance(score=tau, unit='', metric='Kendall\'s Tau')
-
-def diversity_metric(doc_embeddings: List[np.ndarray]) -> Performance:
-    """
-    결과 다양성 평가 (예시: 문서 내 중복 단어/문장 비율, 토픽 다양성 등) : 검색된 문서들의 임베딩을 이용해, 결과가 얼마나 다양한지 평가
-    
-    방법 :
-        * 모든 문서 임베딩 쌍의 코사인 유사도를 계산
-        * 평균 유사도를 구한 뒤, 1 - 평균 유사도로 다양성 점수를 산출
-        * 값이 1에 가까울수록 문서들이 서로 다르다는 의미(다양성이 높음)
-    사용 예 : 검색 결과가 한쪽에 치우치지 않고 다양한 주제를 포함하는지 평가할 때 사용
-    
-    Parameters
-    ----------
-    doc_embeddings : List[np.ndarray]
-        검색된 각 문서의 임베딩 벡터 리스트
+    retrieved : List[str] 또는 List[np.ndarray]
+        검색 시스템이 반환한 문서(또는 임베딩)의 리스트
+    ground_truth : List[str] 또는 List[np.ndarray]
+        실제 정답에 해당하는 문서(또는 임베딩)의 리스트
+    threshold : float, optional
+        유사도 임계값 (기본값: 0.5 for token, 0.95 for embedding)
+    mode : str, optional
+        'token' 또는 'embedding' (기본값: 'token')
 
     Returns
     -------
     Performance
-        계산된 다양성 점수를 담은 Performance 객체
+        계산된 정밀도 점수를 담은 Performance 객체
     """
-    
-    """
-    # (단순 텍스트 기반 비교 - 매개변 수 retrieved_documents: List[str] 받아와야 함)
-    # # TODO: 실제 다양성 평가 로직 구현 (예: 토픽 모델링, 유사도 기반 다양성) 
-    # unique_docs = set(retrieved_documents)
-    # diversity_score = len(unique_docs) / len(retrieved_documents) if retrieved_documents else 0
-    # return Performance(score=diversity_score, unit='', metric='Diversity')
-    """
-    
-    # 문서가 2개 미만이면 다양성을 측정할 수 없음
-    if len(doc_embeddings) < 2:
-        return Performance(score=0.0, unit='', metric='Diversity')
+    def __init__(self, threshold=0.5, mode='token'):
+        self.threshold = threshold
+        self.mode = mode
 
-    # 모든 문서 쌍 간의 코사인 유사도 계산
-    similarity_matrix = cosine_similarity(doc_embeddings)
-    
-    # 대각선(자기 자신과의 유사도=1)을 제외한 상삼각행렬의 평균을 계산
-    # 이는 모든 문서 쌍의 유사도 평균과 같음
-    indices = np.triu_indices(len(doc_embeddings), k=1)
-    mean_similarity = np.mean(similarity_matrix[indices])
-    
-    # 다양성 점수는 (1 - 평균 유사도)로 정의
-    diversity_score = 1 - mean_similarity
-    
-    return Performance(score=diversity_score, unit='', metric='Diversity')
+    def jaccard_similarity(self, a: str, b: str) -> float:
+        set_a = set(a.split())
+        set_b = set(b.split())
+        intersection = set_a & set_b
+        union = set_a | set_b
+        return len(intersection) / len(union) if union else 0.0
+
+    def evaluate(self, retrieved, ground_truth) -> Performance:
+        if not retrieved:
+            return Performance(score=0.0, unit='', metric='Precision', _eval=False)
+        relevant = 0
+        if self.mode == 'token':
+            for ret_doc in retrieved:
+                for gt_doc in ground_truth:
+                    if self.jaccard_similarity(ret_doc, gt_doc) >= self.threshold:
+                        relevant += 1
+                        break
+        elif self.mode == 'embedding':
+            for ret_emb in retrieved:
+                sims = cosine_similarity([ret_emb], ground_truth)[0]
+                if np.max(sims) >= self.threshold:
+                    relevant += 1
+        else:
+            raise ValueError("mode는 'token' 또는 'embedding'만 지원합니다.")
+        precision = relevant / len(retrieved)
+        return Performance(score=precision, unit='', metric='Precision')
 
 
-def random_document_injection_effect(query: str, retrieved_documents: List[str], ground_truth: List[str]) -> Performance:
+# random_document_injection_effect
+class RandomDocumentInjectionEffect(BaseMetric):
     """
     검색 결과에 무작위(관련없는) 문서를 삽입했을 때 정밀도(Precision)가 얼마나 하락하는지 측정한다.
     이 점수가 낮을수록 무작위 문서(노이즈)에 강건하다는 의미!
@@ -327,46 +308,88 @@ def random_document_injection_effect(query: str, retrieved_documents: List[str],
     Performance
         성능 하락폭(effect) 점수를 담은 Performance 객체
     """
-    original_precision = precision_metric(retrieved_documents, ground_truth)
-    
-    # 무작위 문서 삽입
-    random_doc = "이것은 시스템 테스트를 위한 무작위로 삽입된 관련 없는 문서입니다."
-    injected_docs = retrieved_documents + [random_doc]
-    
-    injected_precision = precision_metric(injected_docs, ground_truth)
-    
-    effect = original_precision.score - injected_precision.score
-    return Performance(score=effect, unit='', metric='Random Doc Injection Effect')
+    def __init__(self):
+        # 정밀도 계산을 위해 PrecisionMetric 클래스를 내부적으로 사용
+        self.precision_calculator = PrecisionMetric()
 
-def precision_metric(retrieved_documents: List[str], ground_truth: List[str]) -> Performance:
+    def evaluate(self, retrieved_documents: List[str], ground_truth: List[str], query: str = None) -> Performance:
+        # query 파라미터는 현재 로직에서 사용되지 않으나 확장성을 위해 유지
+        original_precision = self.precision_calculator.evaluate(retrieved_documents, ground_truth)
+        
+        # 무작위 문서 삽입
+        random_doc = "이것은 시스템 테스트를 위한 무작위로 삽입된 관련 없는 문서입니다."
+        injected_docs = retrieved_documents + [random_doc]
+        
+        injected_precision = self.precision_calculator.evaluate(injected_docs, ground_truth)
+        
+        effect = original_precision.score - injected_precision.score
+        return Performance(score=effect, unit='', metric='Random Doc Injection Effect')
+
+
+# ranking_consistency_kendall_tau
+class RankingConsistencyKendallTau(BaseMetric):
     """
-    정밀도 평가 : 얼마나 많은 검색된 문서가 실제로 정답에 해당하는지를 평가
+    랭킹 일관성 평가 (Kendall's Tau) : 두 개의 랭킹 리스트(ex. 정답 랭킹, 모델이 반환한 랭킹) 간의 순위 일관성을 켄달 타우(Kendall's Tau) 계수로 계산
+    방법 :
+        * 두 리스트의 순서쌍을 비교하여, 순서가 일치하는 쌍(동의쌍)과 불일치하는 쌍(불일치쌍)의 비율을 계산한다.
+        * 켄달 타우 계수는 -1에서 1 사이의 값을 가지며, 1에 가까울수록 두 랭킹이 일치함을 의미한다.
+    사용 예 : 검색 결과의 랭킹 품질을 평가할 때 사용한다.
+    Parameters
+    ----------
+    ranking1 : List[int]
+        첫 번째 랭킹 리스트 (예: [1, 2, 3, 4])
+    ranking2 : List[int]
+        두 번째 랭킹 리스트 (예: [1, 3, 2, 4])
+
+    Returns
+    -------
+    Performance : 계산된 켄달 타우 점수를 담은 Performance 객체
+    """
+    def evaluate(self, ranking1: List[int], ranking2: List[int]) -> Performance:
+        if len(ranking1) < 2 or len(ranking2) < 2:
+             return Performance(score=0.0, unit='', metric="Kendall's Tau", _eval=False)
+        tau, _ = kendalltau(ranking1, ranking2)
+        return Performance(score=tau, unit='(-1 to 1)', metric="Kendall's Tau")
+
+
+# diversity_metric
+class DiversityMetric(BaseMetric):
+    """
+    결과 다양성 평가 (예시: 문서 내 중복 단어/문장 비율, 토픽 다양성 등) : 검색된 문서들의 임베딩을 이용해, 결과가 얼마나 다양한지 평가
     
-    방법:
-        * 정답 문서 수 / 검색된 문서 수
-        * 값이 1에 가까울수록 검색 결과가 정확함을 의미
-    사용 예 : 검색 시스템의 정확도를 평가할 때 사용
+    방법 :
+        * 모든 문서 임베딩 쌍의 코사인 유사도를 계산
+        * 평균 유사도를 구한 뒤, 1 - 평균 유사도로 다양성 점수를 산출
+        * 값이 1에 가까울수록 문서들이 서로 다르다는 의미(다양성이 높음)
+    사용 예 : 검색 결과가 한쪽에 치우치지 않고 다양한 주제를 포함하는지 평가할 때 사용
     
     Parameters
     ----------
-    retrieved_documents : List[str]
-        검색 시스템이 반환한 문서(또는 ID)의 리스트
-    ground_truth : List[str]
-        실제 정답에 해당하는 문서(또는 ID)의 리스트
+    doc_embeddings : List[np.ndarray]
+        검색된 각 문서의 임베딩 벡터 리스트
 
     Returns
     -------
     Performance
-        계산된 정밀도 점수를 담은 Performance 객체
+        계산된 다양성 점수를 담은 Performance 객체
     """
-    if not retrieved_documents:
-        return Performance(score=0.0, unit='', metric='Precision')
-    
-    relevant_items = set(retrieved_documents) & set(ground_truth)
-    precision = len(relevant_items) / len(retrieved_documents)
-    return Performance(score=precision, unit='', metric='Precision')
+    def evaluate(self, doc_embeddings: List[np.ndarray]) -> Performance:
+        # 문서가 2개 미만이면 다양성을 측정할 수 없음
+        if len(doc_embeddings) < 2:
+            return Performance(score=0.0, unit='', metric='Diversity', _eval=False)
+        # 모든 문서 쌍 간의 코사인 유사도 계산
+        similarity_matrix = cosine_similarity(doc_embeddings)
+        # 대각선(자기 자신과의 유사도=1)을 제외한 상삼각행렬의 평균을 계산
+        # 이는 모든 문서 쌍의 유사도 평균과 같음
+        indices = np.triu_indices(len(doc_embeddings), k=1)
+        mean_similarity = np.mean(similarity_matrix[indices])
+        # 다양성 점수는 (1 - 평균 유사도)로 정의
+        diversity_score = 1 - mean_similarity
+        return Performance(score=diversity_score, unit='(0 to 1)', metric='Diversity')
 
-def generalized_embedding_coverage_error(query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
+
+# generalized_embedding_coverage_error
+class GeneralizedEmbeddingCoverageError(BaseMetric):
     """
     GECE: Query와 Retrieval이 서로 골고루 덮고 있는가
     원리 : 쿼리 임베딩과 검색된 문서 임베딩들 간의 평균 유클리드 거리를 계산하여, 검색 결과가 쿼리와 얼마나 가까운지(커버리지)를 평가합니다.
@@ -386,14 +409,17 @@ def generalized_embedding_coverage_error(query_embedding: np.ndarray, doc_embedd
     Performance
         계산된 평균 거리(coverage_error)를 담은 Performance 객체
     """
-    if not doc_embeddings:
-        return Performance(score=0.0, unit='distance', metric='GECE')
-        
-    distances = [np.linalg.norm(query_embedding - doc_emb) for doc_emb in doc_embeddings]
-    coverage_error = np.mean(distances)
-    return Performance(score=coverage_error, unit='distance', metric='GECE')
+    def evaluate(self, query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
+        if not doc_embeddings:
+            return Performance(score=0.0, unit='distance', metric='GECE', _eval=False)
+            
+        distances = [np.linalg.norm(query_embedding - doc_emb) for doc_emb in doc_embeddings]
+        coverage_error = np.mean(distances)
+        return Performance(score=coverage_error, unit='', metric='GECE')
 
-def embedding_consine_similarity_evaluation(query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
+
+# embedding_consine_similarity_evaluation
+class EmbeddingCosineSimilarityEvaluation(BaseMetric):
     """
     임베딩 코사인 유사도 기반 공간 커버러지/균일성 평가 : 쿼리 임베딩과 검색된 문서 임베딩들 간의 코사인 유사도를 기반으로, 검색 결과의 일관성과 커버리지를 평가한다.
     방법:
@@ -413,12 +439,13 @@ def embedding_consine_similarity_evaluation(query_embedding: np.ndarray, doc_emb
     Performance
         계산된 일관성 점수를 담은 Performance 객체
     """
-    if not doc_embeddings:
-        return Performance(score=0.0, unit='cosine_similarity', metric='Embedding Consistency E')
+    def evaluate(self, query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
+        if not doc_embeddings:
+            return Performance(score=0.0, unit='', metric='Embedding Consistency E', _eval=False)
 
-    sims = cosine_similarity([query_embedding], doc_embeddings)[0]
-    local_score = np.max(sims)  # 가장 가까운 문서와의 유사도
-    high_score = np.mean(sims)  # 전체 문서와의 평균 유사도
-    
-    final_score = (local_score + high_score) / 2
-    return Performance(score=final_score, unit='cosine_similarity', metric='Embedding Consistency E')
+        sims = cosine_similarity([query_embedding], doc_embeddings)[0]
+        local_score = np.max(sims)  # 가장 가까운 문서와의 유사도
+        high_score = np.mean(sims)  # 전체 문서와의 평균 유사도
+        
+        final_score = (local_score + high_score) / 2
+        return Performance(score=final_score, unit='', metric='Embedding Consistency E')
