@@ -6,11 +6,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 """
 Name : End to end relevancy metric via Yes/No judgement
-Target : Q-A Relevancy
+Target : Answer-Query Relevancy
 Type : End to end, LLM-as-a-judge
 Explanation : 사용자 질문과 생성된 답안을 LLM에게 주어 relevancy를 기준으로 Yes/No를 답하는 메트릭입니다.
 """
-class E2ESimpleRelevancyMetric(BaseMetric):
+class E2ESYNRelevancyMetric(BaseMetric):
     def __init__(self, llm_adapter : BaseLLMAdapter):
         self.llm_adapter = llm_adapter
 
@@ -57,11 +57,11 @@ class E2ESimpleRelevancyMetric(BaseMetric):
 
 """
 Name : End to end relevancy metric via simple scoring
-Target : Q-A Relevancy
+Target : Answer-Query Relevancy
 Type : End to end, LLM-as-a-judge
 Explanation : 사용자 질문과 생성된 답안을 LLM에게 주어 relevancy를 기준으로 0, 1, 2점 중에 채점하게 하는 간단한 메트릭입니다.
 """
-class E2ESimpleRelevancyMetric(BaseMetric):
+class E2EScoringRelevancyMetric(BaseMetric):
     def __init__(self, llm_adapter : BaseLLMAdapter):
         self.llm_adapter = llm_adapter
 
@@ -108,7 +108,7 @@ class E2ESimpleRelevancyMetric(BaseMetric):
 
 """
 Name : End to end relevancy metric via question generation
-Target : Q-A Relevancy
+Target : Answer-Query Relevancy
 Type : End to end, LLM generation, cosine-similarity
 Explanation : 생성된 답안을 기반으로 LLM에게 예상 질문 3개를 생성하게 합니다. 생성된 예상 질문을 실제 질문과 코사인 유사도를 기준으로 비교합니다.
 """
