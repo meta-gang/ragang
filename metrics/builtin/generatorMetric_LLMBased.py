@@ -212,6 +212,39 @@ class A2RSimpleScoringFaithfulnessMetric(BaseMetric):
 
         final_score = total_score / (len(claim_list) * 4) if claim_list else 0
         return Performance(score=final_score, unit="score", metric="Simple Scoring Faithfulness")
+    
+
+"""
+Name : Generator hallucination metric via Yes/No judgement
+Target : Answer-retrieval faithfulness
+Type : Generator, LLM-as-a-judge
+Explanation : 생성한 답안에 hallucination이 있는지 LLM에게 Yes/No를 답하게 하는 메트릭입니다. 최종 결과는 factual일 경우 1, hallucinated일 경우 0 입니다.
+"""
+class A2RHallucinationFaithfulnessMetric(BaseMetric):
+    def __init__(self, llm_adapter: BaseLLMAdapter):
+        self.llm_adapter = llm_adapter
+
+    def evaluate(self, query: str, reference: list[str], gen: str) -> Performance:
+        prompt = f"""In this task, you will be presented with a query, a reference text and an answer. 
+            The answer is generated to the question based on the reference text. The answer may contain false information. 
+            You must use the reference text to determine if the answer to the question contains false information, if the answer is a hallucination of facts. 
+            Your objective is to determine whether the answer text contains factual information and is not a hallucination. 
+            A 'hallucination' refers to an answer that is not based on the reference text or assumes information that is not available in the reference text. 
+            Your response should be a single word: either "factual" or "hallucinated", and it should not include any other text or characters. 
+            "hallucinated" indicates that the answer provides factually inaccurate information to the query based on the reference text. 
+            "factual" indicates that the answer to the question is correct relative to the reference text, and does not contain made up information. 
+            Please read the query and reference text carefully before determining your response.
+            # Query: {query}
+            # Reference text: {reference}
+            # Answer: {gen}
+            Is the answer above factual or hallucinated based on the query and reference text?"""
+
+        response = self.llm_adapter.request(prompt, "")
+        result = response["text"].strip().lower()
+
+        score = 1 if result == "factual" else 0
+
+        return Performance(score=score, unit="", metric="Hallucination (Factual/Hallucinated)")
 
 
 
