@@ -167,9 +167,28 @@ class CosineSimilarityMetric(BaseMetric):
 
 
 # Euclidean Distance: 쿼리 & 문서 간 유클리드 거리의 평균
-# 가정1. 사용자가 get_embedding()을 쓰던 어떤 방법을 써서 매개변수로 해당 벡터가 담긴 넘파이 배열 전달 가정
-# 가정2. 쿼리와 문서가 동일한 임베딩 모델로 벡터화 된 상태로, 서로의 벡터 크기가 동일
 class EuclideanDistanceMetric(BaseMetric):
+    """
+    유클리드 거리 평가 : 쿼리와 문서 임베딩 벡터 간 유클리드 거리의 평균
+    
+    방법:
+        * ( 임베딩 된 쿼리와 임베딩 된 문서 별 유클리드 거리 값 )의 평균
+        * 유클리드 거리의 평균값이 작을수록 쿼리와 문서 간 관련 정도가 높음
+    
+    Parameters
+        * 전제 조건: 쿼리와 문서의 임베딩 벡터가 넘파이 배열이어야 하며, 벡터 크기가 동일해야 함
+    ----------
+    query : np.ndarray
+        사용자 쿼리의 벡터 임베딩 (예: [1.01, 0.9, -0.1])
+
+    retrieved_documents : List[np.ndarray]
+        검색 시스템이 반환한 문서 별 텍스트의 벡터 임베딩 (예: [[1.01, 0.9, -0.1], [0.05, 2.8, -3.1]])
+
+    Returns
+    -------
+    Performance
+        유클리드 거리 점수를 담은 Performance 객체
+    """
     def evaluate(self, query: np.ndarray, retrieved_documents: list[np.ndarray]) -> Performance:
         # 검색된 문서가 없는 경우
         if not retrieved_documents:
@@ -186,9 +205,28 @@ class EuclideanDistanceMetric(BaseMetric):
 
 
 # Manhattan Distance: 쿼리 & 문서 간 맨하탄 거리의 평균(고차원 벡터에 더 적합)
-# 가정1. 사용자가 get_embedding()을 쓰던 어떤 방법을 써서 매개변수로 해당 벡터가 담긴 넘파이 배열 전달 가정
-# 가정2. 쿼리와 문서가 동일한 임베딩 모델로 벡터화 된 상태로, 서로의 벡터 크기가 동일
 class ManhattanDistanceMetric(BaseMetric):
+    """
+    맨하탄 거리 평가 : 쿼리와 문서 임베딩 벡터 간 맨하탄 거리의 평균
+    
+    방법:
+        * ( 임베딩 된 쿼리와 임베딩 된 문서 별 맨하탄 거리 값 )의 평균
+        * 맨하탄 거리의 평균값이 작을수록 쿼리와 문서 간 관련 정도가 높음
+    
+    Parameters
+    ----------
+        * 전제 조건: 쿼리와 문서의 임베딩 벡터가 넘파이 배열이어야 하며, 벡터 크기가 동일해야 함
+    query : np.ndarray
+        사용자 쿼리의 벡터 임베딩 (예: [1.01, 0.9, -0.1])
+
+    retrieved_documents : List[np.ndarray]
+        검색 시스템이 반환한 문서 별 텍스트의 벡터 임베딩 (예: [[1.01, 0.9, -0.1], [0.05, 2.8, -3.1]])
+
+    Returns
+    -------
+    Performance
+        맨하탄 거리 점수를 담은 Performance 객체
+    """
     def evaluate(self, query: np.ndarray, retrieved_documents: list[np.ndarray]) -> Performance:
         # 검색된 문서가 없는 경우
         if not retrieved_documents:
@@ -207,6 +245,27 @@ class ManhattanDistanceMetric(BaseMetric):
 # 가정1. 사용자가 get_embedding()을 쓰던 어떤 방법을 써서 매개변수로 해당 벡터가 담긴 넘파이 배열 전달 가정
 # 가정2. 쿼리와 문서가 동일한 임베딩 모델로 벡터화 된 상태로, 서로의 벡터 크기가 동일
 class NegativeRejectionRateMetric(BaseMetric):
+    """
+    NRR 평가 : 쿼리와 무관한 문서의 비율
+    
+    방법:
+        * ( 임베딩 된 쿼리와 검색된 문서의 코사인 유사도 값이 0보다 작은 검색된 문서의 수 / 전체 검색된 문서 수 )
+        * NRR 값이 작을수록 쿼리와 검색된 문서 간 관련 정도가 높음
+    
+    Parameters
+    ----------
+        * 전제 조건: 쿼리와 문서의 임베딩 벡터가 넘파이 배열이어야 하며, 벡터 크기가 동일해야 함
+    query : np.ndarray
+        사용자 쿼리의 벡터 임베딩 (예: [1.01, 0.9, -0.1])
+
+    retrieved_documents : List[np.ndarray]
+        검색 시스템이 반환한 문서 별 텍스트의 벡터 임베딩 (예: [[1.01, 0.9, -0.1], [0.05, 2.8, -3.1]])
+
+    Returns
+    -------
+    Performance
+        NRR 점수를 담은 Performance 객체
+    """
     def evaluate(self, query: np.ndarray, retrieved_documents: list[np.ndarray])-> Performance:
         # 검색된 문서가 없는 경우
         if not retrieved_documents:
@@ -341,7 +400,7 @@ class RandomDocumentInjectionEffect(BaseMetric):
                 injected_precision_score = injected_precision.score
         
         effect = original_precision.score - injected_precision_score
-        return Performance(score=effect, unit='precision_drop', metric='Random Doc Injection Effect')
+        return Performance(score=effect, unit=' precision_drop', metric='Random Doc Injection Effect')
 
 
 # ranking_consistency_kendall_tau
