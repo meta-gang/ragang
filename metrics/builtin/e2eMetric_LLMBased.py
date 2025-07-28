@@ -47,11 +47,10 @@ class E2ESYNRelevancyMetric(BaseMetric):
 
         response = self.llm_adapter.request(prompt, user_query)
         try:
-            score = 1 if response["text"] == "Y" else 0
-        except ValueError:
-            score = 0.0  # Default to 0 if the response is not a valid form
+            score = 1 if response["text"].strip().upper() == "Y" else 0
+        except (KeyError, AttributeError):
+            score = 0.0  # Default to 0 if the response is not in the expected format
         return Performance(score=score, unit="", metric="Yes/No Relevancy")
-
 
 
 
@@ -100,7 +99,7 @@ class E2EScoringRelevancyMetric(BaseMetric):
         response = self.llm_adapter.request(prompt, user_query)
         try:
             score = float(response["text"])/2
-        except ValueError:
+        except (ValueError, KeyError, TypeError):
             score = 0.0  # Default to 0 if the response is not a valid number
         return Performance(score=score, unit="", metric="Simple Score Relevancy")
 
@@ -136,7 +135,7 @@ class E2EQGenRelevancyMetric(BaseMetric):
             "Response:\nYes, the Great Wall of China is visible from space under certain conditions.\n"
             "Expected question:\nIs the Great Wall of China visible from space?\n\n"
         )
-        user_query = f"Response:\n{gen}\n\Expected question: "
+        user_query = f"Response:\n{gen}\nExpected question: "
 
         responses = []
         for _ in range(3):
@@ -176,3 +175,71 @@ class E2EQGenRelevancyMetric(BaseMetric):
     
 
 
+"""
+Name : End to end consistenct metric
+Target : Answer-Query consistency
+Type : End to end, cosine-similarity
+Explanation : 생성된 답변들 간의 코사인 유사도를 측정한다. 
+"""
+class e2eCosineConsistencyMetric(BaseMetric):
+    def __init__(self, embedding_adapter : BaseEmbeddingAdapter):
+        self.embedding_adapter = embedding_adapter
+
+    def evaluate(self, gens: list[str]) -> Performance:
+        if len(gens) < 2:
+            return Performance(score=1.0, unit="", metric="E2E Consistency")
+
+        try:
+            gen_vectors = self.embedding_adapter.create_embeddings(gens)
+            
+            similarity_matrix = cosine_similarity(gen_vectors)
+            
+            num_gens = len(gens)
+            # Sum of the upper triangle, excluding the diagonal
+            indices = np.triu_indices(num_gens, k=1)
+            total_cos = np.sum(similarity_matrix[indices])
+            num_pairs = len(indices[0])
+
+            if num_pairs == 0:
+                return Performance(score=1.0, unit="", metric="E2E Consistency")
+
+            score = total_cos / num_pairs
+        except Exception as e:
+            print(f"An error occurred during consistency calculation: {e}")
+            score = 0.0
+
+        return Performance(score=float(score), unit="", metric="E2E Consistency")
+
+
+"""
+Name : End to end consistenct metric
+Target : Answer-Query consistency
+Type : End to end, cosine-similarity
+Explanation : 입력된 쿼리와 생성된 답변들 간의 코사인 유사도의 분산을 구한다.
+"""
+class e2eCovarianceConsistencyMetric(BaseMetric):
+    def __init__(self, embedding_adapter : BaseEmbeddingAdapter):
+        self.embedding_adapter = embedding_adapter
+
+    def evaluate(self, query : str, gens: list[str]) -> Performance:
+        if not gens:
+            return Performance(score=0.0, unit="", metric="E2E Query-Answer Consistency Variance")
+        
+        try:
+            all_texts = [query] + gens
+            embeddings = self.embedding_adapter.create_embeddings(all_texts)
+
+            query_vector = embeddings[0:1]
+            gen_vectors = embeddings[1:]
+
+            if gen_vectors.shape[0] == 0:
+                return Performance(score=0.0, unit="", metric="E2E Query-Answer Consistency Variance")
+
+            cos_sims = cosine_similarity(query_vector, gen_vectors)[0]
+            
+            consistency_score = float(np.var(cos_sims))
+        except Exception as e:
+            print(f"An error occurred during consistency variance calculation: {e}")
+            consistency_score = 0.0
+
+        return Performance(score=consistency_score, unit="", metric="E2E Query-Answer Consistency Variance")
