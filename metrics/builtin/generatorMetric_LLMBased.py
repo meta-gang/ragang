@@ -1,9 +1,7 @@
 from common.bases.datas.performance_dataclass import Performance
 from common.bases.abstracts.base_metric import BaseMetric
 from adapters.llm_adapter import BaseLLMAdapter
-from adapters.embedding_adapter import BaseEmbeddingAdapter
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
+
 """
 Name : Generator faithfulness metric via Yes/No judgement on claims
 Target : Answer-retrieval faithfulness
@@ -104,8 +102,6 @@ class A2RYNFaithfulnessMetric(BaseMetric):
             except ValueError:
                 score = 0.0  # Default to 0 if the response is not a valid form
         return Performance(score=score/len(claim_list), unit="", metric="Yes/No Relevancy")
-
-
 
 
 
@@ -214,6 +210,7 @@ class A2RSimpleScoringFaithfulnessMetric(BaseMetric):
         return Performance(score=final_score, unit="score", metric="Simple Scoring Faithfulness")
     
 
+
 """
 Name : Generator hallucination metric via Yes/No judgement
 Target : Answer-retrieval faithfulness
@@ -249,7 +246,7 @@ class A2RHallucinationFaithfulnessMetric(BaseMetric):
 
 
 """
-Name : Generator faithfulness metric via Yes/No judgement on claims
+Name : Generator faithfulness metric via truthfulness judgement on claims
 Target : Answer-retrieval faithfulness
 Type : Generator, LLM-as-a-judge, claim-based
 Explanation : 생성한 답안을 claim 단위로 나누고 각 claim이 검색 문서와 모순되는지 LLM에게 Yes/No를 답하게 하는 메트릭입니다. 최종 결과는 모순이 없는 claim 수 / 전체 claim 수 입니다.
