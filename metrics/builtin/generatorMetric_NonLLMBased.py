@@ -14,8 +14,8 @@ class AnswerContextSimilarity(BaseMetric):
         self.embedding_adapter = embedding_adapter
 
     def evaluate(self, context: list, gen: str) -> Performance:
-        ans_vec = self.embedding_adapter.create_embedding([gen])[0]
-        chunk_vecs = self.embedding_adapter.create_embedding(context)
+        ans_vec = self.embedding_adapter.create_embeddings([gen])[0]
+        chunk_vecs = self.embedding_adapter.create_embeddings(context)
         similarity = []
         for chunk_vec in chunk_vecs:
             sim = CosineSimilarity.compute(chunk_vec, ans_vec)
@@ -35,8 +35,8 @@ class AnswerCentricSimilarityVariance(BaseMetric):
         self.embedding_adapter = embedding_adapter
 
     def evaluate(self, context: list, gen: str):
-        ans_vec = self.embedding_adapter.create_embedding([gen])[0]
-        chunk_vecs = self.embedding_adapter.create_embedding(context)
+        ans_vec = self.embedding_adapter.create_embeddings([gen])[0]
+        chunk_vecs = self.embedding_adapter.create_embeddings(context)
         angles = []
         for chunk_vec in chunk_vecs:
             cos_sim = CosineSimilarity.compute(chunk_vec, ans_vec)
@@ -60,8 +60,8 @@ class MutualInformation_KSG(BaseMetric):
         self.k = k
 
     def evaluate(self, context: list, generation: str) -> Performance:
-        context_embeddings = self.embedding_adapter.create_embedding(context)
-        gen_embedding = self.embedding_adapter.create_embedding([generation])[0]
+        context_embeddings = self.embedding_adapter.create_embeddings(context)
+        gen_embedding = self.embedding_adapter.create_embeddings([generation])[0]
 
         N = len(context_embeddings)
         if N == 0:
@@ -119,8 +119,8 @@ class RetrievalDeviationfromAnswer(BaseMetric):
         self.embedding_adapter = embedding_adapter
     
     def evaluate(self, context: list, gen: str) -> Performance:
-        chunk_vecs = self.embedding_adapter.create_embedding(context)
-        ans_vec = self.embedding_adapter.create_embedding([gen])[0]
+        chunk_vecs = self.embedding_adapter.create_embeddings(context)
+        ans_vec = self.embedding_adapter.create_embeddings([gen])[0]
 
         chunk_vecs = chunk_vecs / np.linalg.norm(chunk_vecs, axis=1, keepdims=True)
         ans_vec = ans_vec / np.linalg.norm(ans_vec)

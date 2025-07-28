@@ -16,7 +16,7 @@ class PairwiseCosineSimilarityVariance(BaseMetric):
         self.embedding_adapter = embedding_adapter
 
     def evaluate(self, context: list) -> Performance:
-        embeddings = self.embedding_adapter.create_embedding(context)
+        embeddings = self.embedding_adapter.create_embeddings(context)
         similarity = []
         for i in range(len(embeddings)):
             for j in range(i+1, len(embeddings)):
