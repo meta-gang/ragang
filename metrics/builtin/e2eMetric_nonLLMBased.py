@@ -18,4 +18,4 @@ class AnswerQuerySimilarity(BaseMetric):
         embeddings = self.embedding_adapter.create_embedding([query, gen])
         query_vec, ans_vec = embeddings[0], embeddings[1]
         aqs_score = CosineSimilarity.compute(query_vec, ans_vec)
-        return Performance(score=aqs_score, unit='', metric='AQS')
+        return Performance(score=aqs_score, unit="", metric="AQS")

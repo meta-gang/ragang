@@ -24,4 +24,4 @@ class PairwiseCosineSimilarityVariance(BaseMetric):
                 similarity.append(sim)
         mean = np.mean(similarity)
         variance = np.mean((np.array(similarity) - mean) ** 2)
-        return Performance(score=variance, unit='', metric='PCSV')
+        return Performance(score=variance, unit="", metric="PCSV")
