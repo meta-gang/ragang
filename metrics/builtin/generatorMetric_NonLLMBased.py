@@ -132,4 +132,52 @@ class RetrievalDeviationfromAnswer(BaseMetric):
         dispersion = np.mean(np.linalg.norm(diff_vecs - mean_diff, axis=1) ** 2)
         acd_score = 1 / (1 + dispersion)
 
-        return Performance(score=acd_score, unit="", metric="ACD")
+        return Performance(score=acd_score, unit="", metric="RDA")
+
+
+"""
+Retrieval top-k Mean, Answer Similarity
+Retrieval들 중 Query와 유사도가 높은 top-k개를 추출한다(Noise를 최대한 배제하기 위해)
+기존의 Retrieval과 선정한 top-k개의 chunk들의 평균을 계산하고 각 평균과 LLM이 생성한 답변 간
+cos유사도를 비교하여 점수로 나타낸다. 이때, Noise chunk가 Retrieval에 안 들어가 있을 수 있기 때문에
+tok-k Retrieval과 전체 Retrieval의 Query에 대한 cos유사도 차이 합을 보정변수로 사용한다.
+"""
+class RetrievaltopkMeanAnswerSimilarity(BaseMetric):
+    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
+        self.embedding_adapter = embedding_adapter
+
+    def evaluate(self, context: list, gen: str, query: str):
+        chunk_vecs = self.embedding_adapter.create_embeddings(context)
+        gen_vec = self.embedding_adapter.create_embeddings([gen])[0]
+        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+
+        similarities = [CosineSimilarity.compute(query_vec, vec) for vec in chunk_vecs]
+
+        sorted_indices = sorted(range(len(similarities)), key=lambda i: similarities[i], reverse=True)
+        sorted_similarities = [similarities[i] for i in sorted_indices]
+
+        drops = [sorted_similarities[i] - sorted_similarities[i + 1] for i in range(len(sorted_similarities) - 1)]
+        drop_index = drops.index(max(drops)) + 1
+        k = min(max(1, drop_index), len(chunk_vecs) - 1)
+
+        topk_vecs = [chunk_vecs[sorted_indices[i]] for i in range(k)]
+        topk_centroid = np.mean(topk_vecs, axis=0)
+        r_centroid = np.mean(chunk_vecs, axis=0)
+
+        cos_topk = max(CosineSimilarity.compute(gen_vec, topk_centroid), 0)
+        cos_all = max(CosineSimilarity.compute(gen_vec, r_centroid), 0)
+        base_score = 1 - (cos_all / (cos_topk + 1e-6))
+
+        mean_sim = np.mean(similarities)
+        std_sim = np.std(similarities) + 1e-6
+        norm_sim = CosineSimilarity.compute(topk_centroid, r_centroid)
+        z_score = (norm_sim - mean_sim) / std_sim
+        adjustment_weight = 1 / (1 + np.exp(-z_score))
+
+        final_score = base_score * adjustment_weight
+
+        return Performance(score=final_score, unit="", metric="RMAS-Z")
+
+
+
+
