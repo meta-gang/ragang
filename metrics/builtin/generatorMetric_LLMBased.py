@@ -567,10 +567,7 @@ class A2RHybridFaithfulnessMetric(BaseMetric):
             ]
             ```
             ---
-            <Answer>
-            {gen}
 
-            <Output>
             """
         )
         user_query = f"<Answer>\n{gen}\n\n<Output>\n"
@@ -693,7 +690,7 @@ class A2RHybridFaithfulnessMetric(BaseMetric):
             return Performance(score=0.0, unit="", metric="Hybrid Faithfulness")
 
         all_evaluations = []
-        truncated_docs = docs[:max_docs]
+        truncated_docs = docs[:max_docs]   # 상위 [max_docs]개만 포함
 
         for i in range(0, len(claims), self.claims_batch_size):
             batch = claims[i:i + self.claims_batch_size]
