@@ -1,3 +1,4 @@
+import re
 from abc import ABCMeta, abstractmethod
 
 from common.bases.abstracts.base_metric import BaseMetric
@@ -5,7 +6,7 @@ from common.bases.abstracts.base_module import BaseModule
 from common.bases.datas.flow_storage import FlowStorage
 from common.bases.datas.performance_dataclass import Performance
 from exceptions.frameworks.modules import DuplicateModuleIdException, FlowOutputException, \
-    MultipleStarterModuleException
+    MultipleStarterModuleException, InvalidModuleIdException
 from common.utils.ansi_styler import ANSIStyler
 
 
@@ -18,9 +19,14 @@ class BaseContainer(metaclass=ABCMeta):
         self.__connect_dependencies()
 
     def __validate_module_id(self, modules: list[BaseModule]) -> list[BaseModule]:
-        ids: list[str] = [module.module_id for module in modules]
+        ids: list[str] = []
+        for module in modules:  # check id format
+            if re.fullmatch(r'^[A-Za-z0-9_]+$', module.module_id) is None:  # only allows alphabet, number, underscore
+                raise InvalidModuleIdException(module.module_id)
+            ids.append(module.module_id)
         u_ids: set[str] = set(ids)
-        if len(ids) != len(u_ids):
+
+        if len(ids) != len(u_ids):  # check dup
             duplicate_ids: set[str] = u_ids.difference(set(ids))
             raise DuplicateModuleIdException(duplicate_ids)
         return modules
@@ -70,11 +76,13 @@ class BaseContainer(metaclass=ABCMeta):
                 print(ANSIStyler.style(f"\t'{mid}' Performance:", font_style='normal', fore_color='blue'))
                 for packet in packet_list:  # TODO: update after multi metric usage available
                     x_time = packet.x_time * 1000
-                    print(ANSIStyler.style(f"\t\t{packet.performance} ({x_time:.4f}ms)", font_style='normal', fore_color='yellow'))
+                    print(ANSIStyler.style(f"\t\t{packet.performance} ({x_time:.4f}ms)", font_style='normal',
+                                           fore_color='yellow'))
                     tot_x_time += x_time
 
             print(ANSIStyler.style(f"E2E Performance:", font_style='bold', fore_color='light-blue'))
-            print(ANSIStyler.style(f"\t{state.performance} ({tot_x_time:.4f}ms)", font_style='bold', fore_color='light-yellow'))
+            print(ANSIStyler.style(f"\t{state.performance} ({tot_x_time:.4f}ms)", font_style='bold',
+                                   fore_color='light-yellow'))
 
     @abstractmethod
     def show(self):

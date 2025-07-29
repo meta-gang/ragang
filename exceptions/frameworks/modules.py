@@ -8,6 +8,12 @@ class DuplicateModuleIdException(ValueError):
         super().__init__(f"Duplicate module ids '{module_ids}'")
 
 
+class InvalidModuleIdException(ValueError):
+    def __init__(self, module_id: str):
+        super().__init__(f"Invalid module id '{module_id}'.\n"
+                         f"Only combination of alphabets, numbers, and underscores are allowed.")
+
+
 class FlowOutputException(Exception):
     def __init__(self, msg: str = None):
         super().__init__(msg or
@@ -18,6 +24,7 @@ class MultipleStarterModuleException(Exception):
     def __init__(self, old_mid: str, new_mid: str):
         super().__init__(f"Cannot set multiple starter Module\n"
                          f"Trying to set '{new_mid}' as a starter module again, but module '{old_mid}' is already set as a starter module.")
+
 
 class StarterModuleException(Exception):
     def __init__(self, msg: str):
