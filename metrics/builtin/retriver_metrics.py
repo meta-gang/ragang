@@ -129,6 +129,10 @@ class CosineSimilarityMetric(BaseMetric):
     .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
+        """
+        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
+        :type embedding_adapter: BaseEmbeddingAdapter
+        """
         self.embedding_adapter = embedding_adapter
 
     def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
@@ -164,6 +168,10 @@ class EuclideanDistanceMetric(BaseMetric):
     .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
+        """
+        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
+        :type embedding_adapter: BaseEmbeddingAdapter
+        """
         self.embedding_adapter = embedding_adapter
 
     def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
@@ -197,6 +205,10 @@ class ManhattanDistanceMetric(BaseMetric):
     .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
+        """
+        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
+        :type embedding_adapter: BaseEmbeddingAdapter
+        """
         self.embedding_adapter = embedding_adapter
 
     def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
@@ -261,18 +273,27 @@ class PrecisionMetric(BaseMetric):
     :vartype mode: str
     :ivar threshold: 관련성을 판단하는 유사도 임계값
     :vartype threshold: float
+    :ivar embedding_adapter: 'embedding' 모드에서 사용될 임베딩 어댑터
+    :vartype embedding_adapter: BaseEmbeddingAdapter, optional
     """
-    def __init__(self, mode: str = 'token', threshold: float = 0.5):
+    def __init__(self, mode: str = 'token', threshold: float = 0.5, embedding_adapter: BaseEmbeddingAdapter = None):
         """
         :param mode: 'token' 또는 'embedding' 중 평가 모드를 선택합니다. 기본값은 'token'입니다.
         :type mode: str
         :param threshold: 유사도가 이 값 이상일 때 정답으로 간주합니다. 기본값은 0.5입니다.
         :type threshold: float
+        :param embedding_adapter: 'embedding' 모드에서 사용할 텍스트 임베딩 어댑터.
+        :type embedding_adapter: BaseEmbeddingAdapter, optional
+        :raises ValueError: 'embedding' 모드인데 embedding_adapter가 제공되지 않은 경우
         """
         if mode not in ['token', 'embedding']:
             raise ValueError("mode는 'token' 또는 'embedding'만 지원합니다.")
+        if mode == 'embedding' and not embedding_adapter:
+            raise ValueError("'embedding' 모드에서는 embedding_adapter가 반드시 필요합니다.")
+        
         self.mode = mode
         self.threshold = threshold
+        self.embedding_adapter = embedding_adapter
 
     def _jaccard_similarity(self, a: str, b: str) -> float:
         """두 텍스트 간의 Jaccard 유사도를 계산하는 헬퍼 함수입니다."""
@@ -281,17 +302,16 @@ class PrecisionMetric(BaseMetric):
         union = set_a.union(set_b)
         return len(intersection) / len(union) if union else 0.0
 
-    def evaluate(self, retrieved: List[Any], ground_truth: List[Any]) -> Performance:
+    def evaluate(self, retrieved: List[str], ground_truth: List[str]) -> Performance:
         """
         설정된 모드에 따라 정밀도 점수를 계산합니다.
 
-        :param retrieved: 검색된 문서(텍스트 또는 임베딩) 리스트
-        :type retrieved: List[Any]
-        :param ground_truth: 정답 문서(텍스트 또는 임베딩) 리스트
-        :type ground_truth: List[Any]
+        :param retrieved: 검색된 문서 텍스트 리스트
+        :type retrieved: List[str]
+        :param ground_truth: 정답 문서 텍스트 리스트
+        :type ground_truth: List[str]
         :return: 계산된 정밀도 점수를 담은 Performance 객체
         :rtype: Performance
-        :raises ValueError: 'mode'가 'token'이나 'embedding'이 아닐 경우
         """
         if not retrieved:
             return Performance(score=0.0, unit='0 to 1', metric='Precision')
@@ -302,9 +322,16 @@ class PrecisionMetric(BaseMetric):
                 is_relevant = any(self._jaccard_similarity(ret_doc, gt_doc) >= self.threshold for gt_doc in ground_truth)
                 if is_relevant:
                     relevant_count += 1
+        
         elif self.mode == 'embedding':
-            for ret_emb in retrieved:
-                sims = cosine_similarity([ret_emb], ground_truth)[0]
+            retrieved_embs = self.embedding_adapter.create_embeddings(retrieved)
+            ground_truth_embs = self.embedding_adapter.create_embeddings(ground_truth)
+            
+            if retrieved_embs.size == 0 or ground_truth_embs.size == 0:
+                 return Performance(score=0.0, unit='0 to 1', metric='Precision')
+
+            for ret_emb in retrieved_embs:
+                sims = cosine_similarity([ret_emb], ground_truth_embs)[0]
                 if np.max(sims) >= self.threshold:
                     relevant_count += 1
         
@@ -322,40 +349,43 @@ class RandomDocumentInjectionEffect(BaseMetric):
     :ivar precision_calculator: 정밀도 계산에 사용될 PrecisionMetric 객체
     :vartype precision_calculator: PrecisionMetric
     :ivar embedding_adapter: 'embedding' 모드에서 텍스트 임베딩에 사용될 어댑터
-    :vartype embedding_adapter: BaseEmbeddingAdapter
+    :vartype embedding_adapter: BaseEmbeddingAdapter, optional
+    :ivar llm_adapter: 노이즈 문서 생성에 사용될 LLM 어댑터
+    :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, precision_metric: PrecisionMetric, embedding_adapter: BaseEmbeddingAdapter = None):
+    def __init__(self, precision_metric: PrecisionMetric, llm_adapter: BaseLLMAdapter, embedding_adapter: BaseEmbeddingAdapter = None):
         """
         :param precision_metric: 정밀도 계산에 사용할 PrecisionMetric 객체 (mode, threshold가 설정된 상태)
         :type precision_metric: PrecisionMetric
+        :param llm_adapter: 노이즈 문서 생성에 사용할 LLM 어댑터
+        :type llm_adapter: BaseLLMAdapter
         :param embedding_adapter: 'embedding' 모드에서 사용할 텍스트 임베딩 어댑터. 기본값은 None.
         :type embedding_adapter: BaseEmbeddingAdapter, optional
         :raises ValueError: 'embedding' 모드인데 embedding_adapter가 제공되지 않은 경우
         """
         self.precision_calculator = precision_metric
+        self.llm_adapter = llm_adapter
         self.embedding_adapter = embedding_adapter
         if self.precision_calculator.mode == 'embedding' and not self.embedding_adapter:
             raise ValueError("'embedding' 모드에서는 embedding_adapter가 반드시 필요합니다.")
 
-    def evaluate(self, query: str, retrieved_documents: List[Any], ground_truth: List[Any], llm_adapter: BaseLLMAdapter) -> Performance:
+    def evaluate(self, query: str, retrieved_documents: List[str], ground_truth: List[str]) -> Performance:
         """
         노이즈 문서 주입 후 정밀도 하락폭을 계산합니다.
 
         :param query: 노이즈 문서 생성을 위한 사용자 원본 쿼리
         :type query: str
-        :param retrieved_documents: 원본 검색 결과 (텍스트 또는 임베딩) 리스트
-        :type retrieved_documents: List[Any]
-        :param ground_truth: 정답 (텍스트 또는 임베딩) 리스트
-        :type ground_truth: List[Any]
-        :param llm_adapter: 노이즈 문서 생성에 사용할 LLM 어댑터
-        :type llm_adapter: BaseLLMAdapter
+        :param retrieved_documents: 원본 검색 결과 텍스트 리스트
+        :type retrieved_documents: List[str]
+        :param ground_truth: 정답 텍스트 리스트
+        :type ground_truth: List[str]
         :return: 정밀도 하락폭(effect) 점수를 담은 Performance 객체
         :rtype: Performance
         """
         original_precision = self.precision_calculator.evaluate(retrieved_documents, ground_truth)
         
         prompt = "Based on the user's query below, write a short, plausible-looking document that uses similar keywords but does NOT contain the real answer. Respond only with the document text."
-        response_data = llm_adapter.request(prompt=prompt, query=query)
+        response_data = self.llm_adapter.request(prompt=prompt, query=query)
         
         adversarial_doc_text = ""
         if "error" not in response_data and response_data.get("text"):
@@ -364,22 +394,10 @@ class RandomDocumentInjectionEffect(BaseMetric):
             print("Warning: Failed to generate adversarial document. Using a generic random document instead.")
             adversarial_doc_text = "This is a generic irrelevant document for system testing."
 
-        injected_precision_score = original_precision.score
-        if self.precision_calculator.mode == 'token':
-            injected_docs = retrieved_documents + [adversarial_doc_text]
-            injected_precision = self.precision_calculator.evaluate(injected_docs, ground_truth)
-            injected_precision_score = injected_precision.score
-        elif self.precision_calculator.mode == 'embedding':
-            embeddings = self.embedding_adapter.create_embeddings([adversarial_doc_text])
-            if embeddings.size == 0: 
-                print("Error: Failed to embed the adversarial document. Skipping injection for this test.")
-            else:
-                adversarial_embedding = embeddings[0]
-                injected_embs = retrieved_documents + [adversarial_embedding]
-                injected_precision = self.precision_calculator.evaluate(injected_embs, ground_truth)
-                injected_precision_score = injected_precision.score
+        injected_docs = retrieved_documents + [adversarial_doc_text]
+        injected_precision = self.precision_calculator.evaluate(injected_docs, ground_truth)
         
-        effect = original_precision.score - injected_precision_score
+        effect = original_precision.score - injected_precision.score
         return Performance(score=effect, unit='precision_drop', metric='Random Doc Injection Effect')
 
 
@@ -407,21 +425,33 @@ class RankingConsistencyKendallTau(BaseMetric):
 
 
 class DiversityMetric(BaseMetric):
-    """검색된 문서들의 임베딩을 기반으로 다양성을 평가합니다.
+    """검색된 문서들의 텍스트를 기반으로 다양성을 평가합니다.
 
     모든 문서 임베딩 쌍의 평균 코사인 유사도를 계산한 뒤, `1 - 평균 유사도`로 다양성 점수를 산출합니다.
     값이 1에 가까울수록 문서들이 서로 의미적으로 다르다는 것(다양성이 높음)을 의미합니다.
     """
-    def evaluate(self, doc_embeddings: List[np.ndarray]) -> Performance:
+    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
+        """
+        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
+        :type embedding_adapter: BaseEmbeddingAdapter
+        """
+        self.embedding_adapter = embedding_adapter
+
+    def evaluate(self, retrieved_documents: List[str]) -> Performance:
         """
         다양성 점수를 계산합니다.
 
-        :param doc_embeddings: 검색된 각 문서의 임베딩 벡터 리스트
-        :type doc_embeddings: List[np.ndarray]
+        :param retrieved_documents: 검색된 문서 텍스트 리스트
+        :type retrieved_documents: List[str]
         :return: 계산된 다양성 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if len(doc_embeddings) < 2:
+        if len(retrieved_documents) < 2:
+            return Performance(score=0.0, unit='0 to 1', metric='Diversity')
+
+        doc_embeddings = self.embedding_adapter.create_embeddings(retrieved_documents)
+
+        if doc_embeddings.size < 2: # np.array는 len()보다 .size로 확인하는 것이 더 명확합니다.
             return Performance(score=0.0, unit='0 to 1', metric='Diversity')
 
         similarity_matrix = cosine_similarity(doc_embeddings)
@@ -437,43 +467,69 @@ class GeneralizedEmbeddingCoverageError(BaseMetric):
     쿼리 임베딩과 검색된 문서 임베딩들 간의 평균 유클리드 거리를 계산합니다.
     값이 작을수록 검색 결과가 쿼리와 가깝다는 의미(커버리지가 좋음)입니다.
     """
-    def evaluate(self, query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
+    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
+        """
+        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
+        :type embedding_adapter: BaseEmbeddingAdapter
+        """
+        self.embedding_adapter = embedding_adapter
+
+    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
         """
         평균 유클리드 거리 (GECE 점수)를 계산합니다.
 
-        :param query_embedding: 쿼리의 임베딩 벡터
-        :type query_embedding: np.ndarray
-        :param doc_embeddings: 검색된 각 문서의 임베딩 벡터 리스트
-        :type doc_embeddings: List[np.ndarray]
+        :param query: 사용자 원본 쿼리 텍스트
+        :type query: str
+        :param retrieved_documents: 검색된 각 문서의 텍스트 리스트
+        :type retrieved_documents: List[str]
         :return: 계산된 평균 거리(coverage_error)를 담은 Performance 객체
         :rtype: Performance
         """
-        if not doc_embeddings:
-            return Performance(score=0.0, unit='distance', metric='GECE')
+        if not retrieved_documents:
+            return Performance(score=float('inf'), unit='distance', metric='GECE')
             
+        query_embedding = self.embedding_adapter.create_embeddings([query])[0]
+        doc_embeddings = self.embedding_adapter.create_embeddings(retrieved_documents)
+        
+        if query_embedding.size == 0 or doc_embeddings.size == 0:
+            return Performance(score=float('inf'), unit='distance', metric='GECE')
+
         distances = [np.linalg.norm(query_embedding - doc_emb) for doc_emb in doc_embeddings]
         coverage_error = np.mean(distances) if distances else 0.0
         return Performance(score=coverage_error, unit='distance', metric='GECE')
 
 
 class EmbeddingCosineSimilarityEvaluation(BaseMetric):
-    """쿼리와 문서 임베딩 간의 코사인 유사도를 기반으로 일관성과 커버리지를 평가합니다.
+    """쿼리와 문서 텍스트 간의 코사인 유사도를 기반으로 일관성과 커버리지를 평가합니다.
 
     가장 높은 유사도(local)와 전체 평균 유사도(global)를 구해, 두 값을 평균내어 반환합니다.
     값이 1에 가까울수록 쿼리와 검색 결과가 임베딩 공간에서 잘 맞닿아 있음을 의미합니다.
     """
-    def evaluate(self, query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
+    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
+        """
+        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
+        :type embedding_adapter: BaseEmbeddingAdapter
+        """
+        self.embedding_adapter = embedding_adapter
+        
+    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
         """
         임베딩 기반 일관성 점수를 계산합니다.
 
-        :param query_embedding: 쿼리의 임베딩 벡터
-        :type query_embedding: np.ndarray
-        :param doc_embeddings: 검색된 각 문서의 임베딩 벡터 리스트
-        :type doc_embeddings: List[np.ndarray]
+        :param query: 쿼리의 텍스트
+        :type query: str
+        :param retrieved_documents: 검색된 각 문서의 텍스트 리스트
+        :type retrieved_documents: List[str]
         :return: 계산된 일관성 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not doc_embeddings:
+        if not retrieved_documents:
+            return Performance(score=0.0, unit='-1 to 1', metric='Embedding Cosine Similarity')
+
+        query_embedding = self.embedding_adapter.create_embeddings([query])[0]
+        doc_embeddings = self.embedding_adapter.create_embeddings(retrieved_documents)
+        
+        if query_embedding.size == 0 or doc_embeddings.size == 0:
             return Performance(score=0.0, unit='-1 to 1', metric='Embedding Cosine Similarity')
 
         sims = cosine_similarity([query_embedding], doc_embeddings)[0]
