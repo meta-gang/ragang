@@ -61,15 +61,20 @@ class BaseContainer(metaclass=ABCMeta):
 
     def print_eval(self):
         for query_idx, state in self.storage.history.items():
+            tot_x_time: float = 0  # ms
             print()
-            print(ANSIStyler.style(f'Query: {state.query}', font_style='bold', fore_color='light-green'))
-            print(ANSIStyler.style(f"Answer: {state.answer}", font_style='bold', fore_color='light-green'))
-            for mid, packet_list in state.snapshots.items():
+            print(ANSIStyler.style(f'Query: {state.query}', font_style='bold', fore_color='light-green'))  # query
+            print(ANSIStyler.style(f"Answer: {state.answer}", font_style='bold', fore_color='light-green'))  # answer
+
+            for mid, packet_list in state.snapshots.items():  # print by packets
                 print(ANSIStyler.style(f"\t'{mid}' Performance:", font_style='normal', fore_color='blue'))
                 for packet in packet_list:  # TODO: update after multi metric usage available
-                    print(ANSIStyler.style(f"\t\t{packet.performance}", font_style='normal', fore_color='yellow'))
-            print(ANSIStyler.style(f"\tE2E Performance:", font_style='bold', fore_color='light-blue'))
-            print(ANSIStyler.style(f"\t\t{state.performance}", font_style='bold', fore_color='light-yellow'))
+                    x_time = packet.x_time * 1000
+                    print(ANSIStyler.style(f"\t\t{packet.performance} ({x_time:.4f}ms)", font_style='normal', fore_color='yellow'))
+                    tot_x_time += x_time
+
+            print(ANSIStyler.style(f"E2E Performance:", font_style='bold', fore_color='light-blue'))
+            print(ANSIStyler.style(f"\t{state.performance} ({tot_x_time:.4f}ms)", font_style='bold', fore_color='light-yellow'))
 
     @abstractmethod
     def show(self):
