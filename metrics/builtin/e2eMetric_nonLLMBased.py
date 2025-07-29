@@ -24,12 +24,6 @@ class AnswerQuerySimilarity(BaseMetric):
     
 
 
-"""
-Name : End to end consistency metric via mean cosine-similarity
-Target : Answer-Query Similarity
-Type: Non-LLM Metric, cosine-similarity, E2E Metric
-Explanation: 생성된 답변과 Query 간 cosine 유사도를 계산
-"""
 class e2eCosineConsistencyMetric(BaseMetric):
     """
     End to end consistency metric via mean cosine-similarity.
