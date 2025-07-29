@@ -1,4 +1,5 @@
 # from common.bases.abstracts.base_module import BaseModule
+from dataclasses import dataclass
 from typing import Any
 
 from common.bases.datas.performance_dataclass import Performance
@@ -8,25 +9,18 @@ class FlowStorage:
     def __init__(self, flow_id: str):
         self.flow_id: str = flow_id
         self.subscription: dict[str, list['BaseModule']] = dict()
-        self.state: State = None
+        self.state: State | None = None
         self.history: dict[int, State] = {}
 
     def subscribe(self, subscriber: 'BaseModule', src_mid: str):
-        if self.subscription.get(src_mid, None) is None:
-            self.subscription[src_mid] = [subscriber]
-        else:
-            self.subscription[src_mid].append(subscriber)
+        self.subscription[src_mid].append(subscriber)
 
     def unsubscribe(self, subscriber: 'BaseModule', src_mid: str):
-        if self.subscription.get(src_mid, None) is None:
-            return
         if subscriber not in self.subscription[src_mid]:
             return
         self.subscription[src_mid].remove(subscriber)
 
     def notify_all(self, packet: 'Packet'):
-        if self.subscription[packet.src] is None:
-            return
         for subscriber in self.subscription[packet.src]:
             subscriber.update(packet)
 
@@ -36,6 +30,7 @@ class FlowStorage:
     def destruct(self, performance: Performance):
         self.state.performance = performance
         self.history[self.state.x_id] = self.state
+        self.state = None
 
     def send_packet(self, packet: 'Packet'):
         # 1. add execution status == link
@@ -47,7 +42,6 @@ class FlowStorage:
         # 4. notify listeners
         self.notify_all(packet)
 
-
 class State:
     def __init__(self, x_id: int, query: str):
         self.query: str = query
@@ -55,7 +49,7 @@ class State:
         self.x_status: list[tuple[str, str]] = list()  # execution status (for dependency checking)
         self.snapshots: dict[str, list['Packet']] = dict()  # module output packet snapshots
         self.performance: Performance = Performance()
-        self.answer: str = None
+        self.answer: str | None = None
 
     def save_snapshots(self, packet: 'Packet'):
         if self.snapshots.get(packet.src, None) is None:

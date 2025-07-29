@@ -6,6 +6,7 @@ from common.bases.datas.flow_storage import FlowStorage
 from common.bases.datas.performance_dataclass import Performance
 from exceptions.frameworks.modules import DuplicateModuleIdException, FlowOutputException, \
     MultipleStarterModuleException
+from common.utils.ansi_styler import ANSIStyler
 
 
 class BaseContainer(metaclass=ABCMeta):
@@ -13,7 +14,6 @@ class BaseContainer(metaclass=ABCMeta):
         self.modules: list[BaseModule] = self.__validate_module_id(modules)
         self.starter: BaseModule | None = None
         self.__metric: BaseMetric | None = e2e_metric
-        self.performance: Performance | None = None
         self.storage: FlowStorage = FlowStorage(u_fid)
         self.__connect_dependencies()
 
@@ -27,6 +27,7 @@ class BaseContainer(metaclass=ABCMeta):
 
     def __connect_dependencies(self):
         for module in self.modules:
+            self.storage.subscription[module.module_id] = []  # init subscription
             module.storage = self.storage  # inject dependency
             self.__set_starter_module(module)  # set flow starter
             for dep_mid in module.dependency.get_dependent_mids():
@@ -59,7 +60,16 @@ class BaseContainer(metaclass=ABCMeta):
         return answer
 
     def print_eval(self):
-        pass
+        for query_idx, state in self.storage.history.items():
+            print()
+            print(ANSIStyler.style(f'Query: {state.query}', font_style='bold', fore_color='light-green'))
+            print(ANSIStyler.style(f"Answer: {state.answer}", font_style='bold', fore_color='light-green'))
+            for mid, packet_list in state.snapshots.items():
+                print(ANSIStyler.style(f"\t'{mid}' Performance:", font_style='normal', fore_color='blue'))
+                for packet in packet_list:  # TODO: update after multi metric usage available
+                    print(ANSIStyler.style(f"\t\t{packet.performance}", font_style='normal', fore_color='yellow'))
+            print(ANSIStyler.style(f"\tE2E Performance:", font_style='bold', fore_color='light-blue'))
+            print(ANSIStyler.style(f"\t\t{state.performance}", font_style='bold', fore_color='light-yellow'))
 
     @abstractmethod
     def show(self):

@@ -13,7 +13,7 @@ from exceptions.frameworks.modules import StarterModuleException
 
 
 class BaseModule(metaclass=ABCMeta):  # observer
-    def __init__(self, module_id: str, linker: Linker, metric: BaseMetric = None, is_starter: bool = False):
+    def __init__(self, module_id: str, linker: Linker = None, metric: BaseMetric = None, is_starter: bool = False):
         self.module_id: str = module_id
         self.dependency: Dependency = linker.build(module_id) if linker else Dependency([], False)
         self.__metric: BaseMetric | None = metric
@@ -67,7 +67,7 @@ class BaseModule(metaclass=ABCMeta):  # observer
         else:
             dep_mids: list[str] = self.dependency.get_dependent_mids()
             for dep_mid in dep_mids:
-                args[dep_mid] = self.storage.state.snapshots[dep_mid][-1].data
+                args[dep_mid] = self.storage.state.snapshots[dep_mid][-1].data[self.module_id]
         return args
 
     def __execute(self, args: dict[str, Any]):
@@ -91,7 +91,7 @@ class BaseModule(metaclass=ABCMeta):  # observer
 
     def __validate_output(self, output: dict[str, Any]) -> dict[str, Any]:
         if self.__metric is not None and 'metric' not in output.keys():
-            MissingMetricDataException(self.module_id, self.__metric.__class__.__name__)
+            raise MissingMetricDataException(self.module_id, self.__metric.__class__.__name__)
         if self.__metric is None and 'metric' in output.keys():
             output.pop('metric')
 
@@ -113,7 +113,7 @@ class BaseModule(metaclass=ABCMeta):  # observer
         req_params: list[str] = list(signature.keys())
 
         if any([rp not in eval_data.keys() for rp in req_params]):
-            raise MissingMetricArgumentException(self.__metric.__class__.__name__, req_params)
+            raise MissingMetricArgumentException(self.module_id, self.__metric.__class__.__name__, req_params)
 
         args = {rp: eval_data[rp] for rp in req_params}
         return self.__metric.evaluate(**args)
