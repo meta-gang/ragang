@@ -32,10 +32,12 @@ class BaseContainer(metaclass=ABCMeta):
         return modules
 
     def __connect_dependencies(self):
-        for module in self.modules:
+        for module in self.modules:  # initialization
             self.storage.subscription[module.module_id] = []  # init subscription
             module.storage = self.storage  # inject dependency
             self.__set_starter_module(module)  # set flow starter
+
+        for module in self.modules:
             for dep_mid in module.dependency.get_dependent_mids():
                 self.storage.subscribe(module, dep_mid)
 
