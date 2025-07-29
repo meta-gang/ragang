@@ -8,7 +8,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 class AnswerQuerySimilarity(BaseMetric):
     """
-    Cosine similarity between the genrated anser and user query
+    Cosine similarity between the genrated anser and user 
+    
     :param embedding_adapter: The embedding model to use
     :type: BaseEmbeddingAdapter
     :ivar embedding_adapter: Stores the embedding model
@@ -20,6 +21,7 @@ class AnswerQuerySimilarity(BaseMetric):
     def evaluate(self, query: str, gen: str) -> Performance:
         """
         Compute cosine similarity between the embedded genrated anser and user query
+        
         :param query: User query
         :type query: str
         :param gen: Genrateor's answer

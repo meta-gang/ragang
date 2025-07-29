@@ -482,6 +482,7 @@ class EmbeddingCosineSimilarityEvaluation(BaseMetric):
 class PairwiseCosineSimilarityVariance(BaseMetric):
     """
     Evaluate the semantic diversity of retrieval chunks by measuring the variance of pairwise cosine similarities
+    
     :param embedding_adapter: The embedding model to use
     :type embedding_adapter: BaseEmbeddingAdapter
     :ivar embedding_adapter: Stores the embedding model
@@ -494,6 +495,7 @@ class PairwiseCosineSimilarityVariance(BaseMetric):
     def evaluate(self, context: list) -> Performance:
         """
         Compute the semantic diversity among retrieval chunks by computing the variance of pairwise cosine similarities between their embeddings.
+        
         :param context: Retrieved chunks
         :type context: list[str]
         :returns: Variance score of pairwise cosine similarities indicating semantic spread
