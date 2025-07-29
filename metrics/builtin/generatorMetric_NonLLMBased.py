@@ -5,36 +5,65 @@ from adapters.embedding_adapter import BaseEmbeddingAdapter
 from common.utils.tools import CosineSimilarity
 
 
-"""
-Answer Context Similarity (ACS)
-답변과 Retrieval Chunk 간 평균 유사도
-"""
 class AnswerContextSimilarity(BaseMetric):
+    """
+    Average of cosine similarity between the generated answer and retrieval chunks
+    :param embedding_adapter: The embedding model to use
+    :type: BaseEmbeddingAdapter
+    :ivar embedding_adapter: Stores the embedding model
+    :vartype embedding_adapter: BaseEmbeddingAdapter
+    """
+
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, context: list, gen: str) -> Performance:
+    def evaluate(self, context: list[str], gen: str) -> Performance:
+        """
+        Compute average cosine similarity between embedded retrieval chunks and generator's answer
+        :param context: retrieval chunks
+        :type context: list[str]
+        :param gen: Genrator's answer
+        :type gen: str
+        :returns: mean of cosine similarities between gen and each retrieval chunks
+        :rtype: Performance
+        """
         ans_vec = self.embedding_adapter.create_embeddings([gen])[0]
         chunk_vecs = self.embedding_adapter.create_embeddings(context)
+
         similarity = []
         for chunk_vec in chunk_vecs:
             sim = CosineSimilarity.compute(chunk_vec, ans_vec)
             similarity.append(abs(sim))
+        
         acs_score = float(np.mean(similarity))
+
         return Performance(score=acs_score, unit="", metric="ACS")
 
 
 
 
-"""
-Answer Centric Similarity Variance (ACSV)
-답변 기준 Retrieval의 각도 분산
-"""
 class AnswerCentricSimilarityVariance(BaseMetric):
+    """
+    Veriance of angles beteween embedded generator's answer and each retrieval chunks
+    :param embedding_adapter: The embedding model to use
+    :type embedding_adapter: BaseEmbeddingAdapter
+    :ivar embedding_adapter: Stores the embedding model
+    :vartype embedding_adapter: BaseEmbeddingAdapter
+    """
+
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, context: list, gen: str):
+    def evaluate(self, context: list[str], gen: str):
+        """
+        Compute veriance of angles between generator's answer and each retrieval chunks
+        :param context: Retrieval text chunks
+        :type context: list[str]
+        :param gen: Generator's text answer
+        :type gen: str
+        :returns: Veriance of angles beteween gen_vec and each chunk_vecs
+        :rtype: Performance
+        """
         ans_vec = self.embedding_adapter.create_embeddings([gen])[0]
         chunk_vecs = self.embedding_adapter.create_embeddings(context)
         angles = []
@@ -49,17 +78,33 @@ class AnswerCentricSimilarityVariance(BaseMetric):
 
 
 
-"""
-Mutual Information
-생성된 답변과 Retrieval간 임베딩의 평균 유사도를 통해 정보량의 공유 정도를 측정
-원래의 MI값은 확률분포를 구하기 위해 추가 import가 필요하여 KSG근사 방식 사용
-"""
 class MutualInformation_KSG(BaseMetric):
+    """
+    Estimates mutual information between the generated answer and context using KSG estimator.
+    :param embedding_adapter: The embedding model to use
+    :type embedding_adapter: BaseEmbeddingAdapter
+    :param k: Number of nearest neighbors
+    :type k: int
+    :ivar embedding_adapter: Stores the embedding model
+    :vartype embedding_adapter: BaseEmbeddingAdapter
+    :ivar k: Number of nearest neighbors used in the KSG estimation
+    :vartype k: int
+    """
+
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter, k=3):
         self.embedding_adapter = embedding_adapter
         self.k = k
 
-    def evaluate(self, context: list, generation: str) -> Performance:
+    def evaluate(self, context: list[str], generation: str) -> Performance:
+        """
+        Estimate how much mutual information exists between the generated answer and the retrieval context by measuring statistical dependency using the KSG(Kraskov Stögbauer Grassberger) method, which approximates mutual information based on neighbor distances in joint and marginal embedding spaces.
+        :param context: Retrieval chunks
+        :type context: list[str]
+        :param generation: Generated answer
+        :type generation: str
+        :returns: Estimated mutual information score
+        :rtype: Performance
+        """
         context_embeddings = self.embedding_adapter.create_embeddings(context)
         gen_embedding = self.embedding_adapter.create_embeddings([generation])[0]
 
@@ -109,16 +154,29 @@ class MutualInformation_KSG(BaseMetric):
         return Performance(score=float(mi), unit="", metric="MI_GC_KSG")
 
 
-"""
-Retrieval Deviation from Answer
-생성된 답변을 기준으로 Retrieval Embedding들이 얼마나 균일하게 가까운 방향으로 응집되어 있는지를 확인
-백터 차이를 기반으로 분산 계산
-"""
+
 class RetrievalDeviationfromAnswer(BaseMetric):
+    """
+    Measure how much the generated answer deviates from the retrieved context embeddings by computing the average embedding dispersion
+    :param embedding_adapter: The embedding model to use
+    :type embedding_adapter: BaseEmbeddingAdapter
+    :ivar embedding_adapter: Stores the embedding model
+    :vartype embedding_adapter: BaseEmbeddingAdapter
+    """
+
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
     
-    def evaluate(self, context: list, gen: str) -> Performance:
+    def evaluate(self, context: list[str], gen: str) -> Performance:
+        """
+        Compute how closely the retrieved context vectors align with the generated answer by computing the average deviation and dispersion of their embeddings, then converting this deviation into a bounded score using inverse scaling.
+        :param context: Retrieval chunks
+        :type context: list[str]
+        :param gen: Generator's answer
+        :type gen: str
+        :returns: Inverse of dispersion score indicating deviation of answer from retrieval embeddings
+        :rtype: Performance
+        """
         chunk_vecs = self.embedding_adapter.create_embeddings(context)
         ans_vec = self.embedding_adapter.create_embeddings([gen])[0]
 
@@ -135,18 +193,31 @@ class RetrievalDeviationfromAnswer(BaseMetric):
         return Performance(score=acd_score, unit="", metric="RDA")
 
 
-"""
-Retrieval top-k Mean, Answer Similarity
-Retrieval들 중 Query와 유사도가 높은 top-k개를 추출한다(Noise를 최대한 배제하기 위해)
-기존의 Retrieval과 선정한 top-k개의 chunk들의 평균을 계산하고 각 평균과 LLM이 생성한 답변 간
-cos유사도를 비교하여 점수로 나타낸다. 이때, Noise chunk가 Retrieval에 안 들어가 있을 수 있기 때문에
-tok-k Retrieval과 전체 Retrieval의 Query에 대한 cos유사도 차이 합을 보정변수로 사용한다.
-"""
+
 class RetrievaltopkMeanAnswerSimilarity(BaseMetric):
+    """
+    Measure how well the generated answer aligns with the most relevant subset of retrieved chunks based on cosine similarity with the query, using dynamic top-k selection and centroid comparison
+    :param embedding_adapter: The embedding model to use
+    :type embedding_adapter: BaseEmbeddingAdapter
+    :ivar embedding_adapter: Stores the embedding model
+    :vartype embedding_adapter: BaseEmbeddingAdapter
+    """
+    
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, context: list, gen: str, query: str):
+    def evaluate(self, context: list[str], gen: str, query: str):
+        """
+        Compute the similarity score by selecting top-k retrieved chunks based on query similarity drop-off, comparing centroids of the top-k and full set against the generated answer, and applying a sigmoid-based adjustment using z-score to account for uniformly relevant or noise-free retrievals.
+        :param context: Retrieved chunks
+        :type context: list[str]
+        :param gen: Generator's answer
+        :type gen: str
+        :param query: User query
+        :type query: str
+        :returns: Adjusted similarity score emphasizing top-k retrieval relevance
+        :rtype: Performance
+        """
         chunk_vecs = self.embedding_adapter.create_embeddings(context)
         gen_vec = self.embedding_adapter.create_embeddings([gen])[0]
         query_vec = self.embedding_adapter.create_embeddings([query])[0]
@@ -176,7 +247,7 @@ class RetrievaltopkMeanAnswerSimilarity(BaseMetric):
 
         final_score = base_score * adjustment_weight
 
-        return Performance(score=final_score, unit="", metric="RMAS-Z")
+        return Performance(score=final_score, unit="", metric="RMAS")
 
 
 

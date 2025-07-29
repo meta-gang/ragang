@@ -5,17 +5,27 @@ from adapters.embedding_adapter import BaseEmbeddingAdapter
 from common.utils.tools import CosineSimilarity
 
 
-"""
-Name : Pairwise Cosine Similarity Variance
-Target : Retreival Variance
-Type: Non-LLM Metric, cosine-similarity, Variance
-Explanation: 모든 Retrieval간 각도를 cosine유사도를 통해 구하고 각도들의 분산을 통해 Retrieval의 응집도를 계산
-"""
+
 class PairwiseCosineSimilarityVariance(BaseMetric):
+    """
+    Evaluate the semantic diversity of retrieval chunks by measuring the variance of pairwise cosine similarities
+    :param embedding_adapter: The embedding model to use
+    :type embedding_adapter: BaseEmbeddingAdapter
+    :ivar embedding_adapter: Stores the embedding model
+    :vartype embedding_adapter: BaseEmbeddingAdapter
+    """
+
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
 
     def evaluate(self, context: list) -> Performance:
+        """
+        Compute the semantic diversity among retrieval chunks by computing the variance of pairwise cosine similarities between their embeddings.
+        :param context: Retrieved chunks
+        :type context: list[str]
+        :returns: Variance score of pairwise cosine similarities indicating semantic spread
+        :rtype: Performance
+        """
         embeddings = self.embedding_adapter.create_embeddings(context)
         similarity = []
         for i in range(len(embeddings)):

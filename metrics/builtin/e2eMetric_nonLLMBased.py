@@ -6,20 +6,32 @@ from common.utils.tools import CosineSimilarity
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-"""
-Name : Answer Query Similarity
-Target : Answer-Query Similarity
-Type: Non-LLM Metric, cosine-similarity, E2E Metric
-Explanation: 생성된 답변과 Query 간 cosine 유사도를 계산
-"""
 class AnswerQuerySimilarity(BaseMetric):
+    """
+    Cosine similarity between the genrated anser and user query
+    :param embedding_adapter: The embedding model to use
+    :type: BaseEmbeddingAdapter
+    :ivar embedding_adapter: Stores the embedding model
+    :vartype embedding_adapter: BaseEmbeddingAdapter
+    """
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
     
     def evaluate(self, query: str, gen: str) -> Performance:
+        """
+        Compute cosine similarity between the embedded genrated anser and user query
+        :param query: User query
+        :type query: str
+        :param gen: Genrateor's answer
+        :type gen: str
+        :returns: Cosine similarity between query_vec and ans_vec
+        :rtype: Performance
+        """
         embeddings = self.embedding_adapter.create_embeddings([query, gen])
         query_vec, ans_vec = embeddings[0], embeddings[1]
+
         aqs_score = CosineSimilarity.compute(query_vec, ans_vec)
+
         return Performance(score=aqs_score, unit="", metric="AQS")
     
 
