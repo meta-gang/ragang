@@ -23,21 +23,32 @@ class BaseEmbeddingAdapter(ABC):
         pass
 
 class LocalEmbeddingAdapter(BaseEmbeddingAdapter):
-    """Adapter for local embedding models."""
+    """Adapter for local embedding model.
+    Note that the API request format(url, payload, etc) implemented here is for ollama only.
+    You may have to check the exact requirement."""
+
+    def __init__(self, api_url, model_name):
+        url = f"http://{api_url}/api/embeddings"
+        super().__init__(url, model_name)
 
     def create_embeddings(self, texts: list[str]) -> np.ndarray:
-        payload = {
-            "model": self.model_name,
-            "input": texts
-        }
-        try:
-            response = requests.post(self.api_url, json=payload)
-            response.raise_for_status()
-            embeddings = response.json()["data"]
-            return np.array([embedding["embedding"] for embedding in embeddings])   #실제 로컬 API 포맷에 따라 변경 필요
-        except requests.exceptions.RequestException as e:
-            print(f"An error occurred while calling the local embedding API: {e}")
-            return np.array([])
+        embeddings = []
+        for text in texts:
+            payload = {
+                "model": self.model_name,
+                "prompt": text
+            }
+            try:
+                response = requests.post(self.api_url, json=payload)
+                response.raise_for_status()
+                result = response.json()
+                embeddings.append(result["embedding"])
+            except requests.exceptions.RequestException as e:
+                print(f"An error occurred while calling the local embedding API: {e}")
+                return np.array([])
+
+        return np.array([embeddings])
+
 
 class OpenAIEmbeddingAdapter(BaseEmbeddingAdapter):
     """Adapter for the OpenAI embedding API."""
@@ -70,9 +81,9 @@ class GeminiEmbeddingAdapter(BaseEmbeddingAdapter):
     def __init__(self, api_key: str, model_name: str = "embedding-001", api_version: str = "v1beta"):
         if not api_key:
             raise ValueError("API key is required for GeminiEmbeddingAdapter.")
+        api_url = f"https://generativelanguage.googleapis.com/{api_version}/models/{self.model_name}:batchEmbedContents"
+        super().__init__(api_url, model_name)
         self.api_key = api_key
-        self.model_name = model_name
-        self.api_url = f"https://generativelanguage.googleapis.com/{api_version}/models/{self.model_name}:batchEmbedContents"
         self.headers = {
             "Content-Type": "application/json"
         }

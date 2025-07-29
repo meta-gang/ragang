@@ -4,27 +4,38 @@ from abc import ABC, abstractmethod
 
 class BaseLLMAdapter(ABC):
     """Abstract base class for LLM adapters."""
-    def __init__(self, model_name: str, api_url: str):
-        self.model_name = model_name
+    def __init__(self, api_url: str, model_name: str):
         self.api_url = api_url
+        self.model_name = model_name
 
     @abstractmethod
     def request(self, prompt: str, query: str) -> dict:
         """Sends a request to the LLM API and returns the response."""
         pass
 
+
 class LocalLLMAdapter(BaseLLMAdapter):
-    """Adapter for local LLM APIs (e.g., LLaMON)."""
+    """Adapter for local LLM APIs (e.g., Ollama)."""
+
+    def __init__(self, api_url, model_name):
+        url = f"http://{api_url}/api/generate"
+        super().__init__(url, model_name)
+
     def request(self, prompt: str, query: str) -> dict:
         """Sends a request to a local LLM API."""
         payload = {
             "model": self.model_name,
-            "prompt": f"{prompt}\n\n{query}" # needs to be adopted according to the actual payload format
+            "prompt": f"{prompt}\n\n{query}",
+            "stream": False
         }
         try:
             response = requests.post(self.api_url, json=payload)
             response.raise_for_status()
-            return response.json()    # return format needs to be modified to align with other classes
+            result = response.json()
+            return {
+                "text": result.get("response", ""),
+                "raw": result                        
+            }
         except requests.exceptions.RequestException as e:
             print(f"An error occurred while calling the local LLM API: {e}")
             return {"error": str(e)}
@@ -32,7 +43,7 @@ class LocalLLMAdapter(BaseLLMAdapter):
 class OpenAIAdapter(BaseLLMAdapter):
     """Adapter for the OpenAI API."""
     def __init__(self, model_name: str, api_key: str, api_url: str = "https://api.openai.com/v1/chat/completions"):
-        super().__init__(model_name, api_url)
+        super().__init__(api_url, model_name)
         if not api_key:
             raise ValueError("API key is required for OpenAIAdapter.")
         self.headers = {
@@ -67,7 +78,7 @@ class GeminiAdapter(BaseLLMAdapter):
             raise ValueError("API key is required for GeminiAdapter.")
         # The model name is part of the URL for Gemini
         api_url = f"https://generativelanguage.googleapis.com/{api_version}/models/{model_name}:generateContent"
-        super().__init__(model_name, api_url)
+        super().__init__(api_url, model_name)
         self.api_key = api_key
         self.headers = {
             "Content-Type": "application/json"
