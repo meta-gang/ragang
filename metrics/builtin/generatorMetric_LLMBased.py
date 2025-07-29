@@ -427,6 +427,10 @@ class A2RYNFaithfulnessMetricSingleCall(BaseMetric):
     """
     (EXPERIMENTAL) Generator faithfulness metric via a single Yes/No judgement call on all claims.
 
+    This approach is faster and more cost-effective than making an API call for each claim.
+    However, for smaller models, a single large prompt might be challenging. The prompt and parsing
+    have been optimized for robustness.
+
     :param llm_adapter: The LLM model to use.
     :type llm_adapter: BaseLLMAdapter
     :ivar llm_adapter: Stores the LLM model.
@@ -435,76 +439,277 @@ class A2RYNFaithfulnessMetricSingleCall(BaseMetric):
     def __init__(self, llm_adapter: BaseLLMAdapter):
         self.llm_adapter = llm_adapter
 
-    def evaluate(self, docs: list[str], gen: str) -> Performance:
+    def evaluate(self, docs: list[str], gen: str, max_docs: int = 5, max_gen_chars: int = 2000) -> Performance:
         """
         Evaluates the faithfulness of a generated answer by extracting and verifying all claims in a single LLM call.
+
+        To manage context size, inputs are truncated:
+        - The number of documents is limited by `max_docs`.
+        - The generated answer is limited by `max_gen_chars`.
 
         :param docs: A list of retrieved documents.
         :type docs: list[str]
         :param gen: The generated answer.
         :type gen: str
+        :param max_docs: The maximum number of documents to include in the prompt.
+        :type max_docs: int
+        :param max_gen_chars: The maximum number of characters from the generated answer to evaluate.
+        :type max_gen_chars: int
         :returns: A Performance object with the faithfulness score, or np.nan on failure.
         :rtype: Performance
         """
+        if not gen or not gen.strip():
+            return Performance(score=0.0, unit="", metric="Faithfulness (Single Call)")
+
+        # Truncate inputs to manage context window size
+        truncated_gen = gen[:max_gen_chars]
+        truncated_docs = docs[:max_docs]
+
         prompt = (
             """
-            You are given a generated answer and a set of retrieved documents. Your task is to perform the following two steps:
-            1.  Break down the answer into individual, self-contained claims.
-            2.  For each claim, evaluate whether it is grounded in the provided documents.
+            You are an expert evaluator. Your task is to break down a generated answer into self-contained claims
+            and evaluate if each claim is grounded in a set of retrieved documents.
 
-            A claim is considered "Grounded" if it is explicitly stated or clearly supported by the documents. Otherwise, it is "Not Grounded".
+            A claim is "Grounded" if supported by the documents. Otherwise, it is "Not Grounded".
 
-            Provide the output as a single JSON array of objects. Each object must have two keys:
-            -   `"claim"`: The string containing the claim.
-            -   `"grounded"`: A boolean value (`true` if the claim is grounded, `false` otherwise).
+            Your final output **must be a single, valid JSON array of objects**. Each object must have two keys:
+            - "`claim`": The string containing the claim.
+            - "`grounded`": A boolean value (`true` if grounded, `false` otherwise).
 
-            Do not include any other text or explanations outside of the JSON array.
+            **Do not include any other text or explanations outside of the JSON array.**
 
             <Example>
             <Generated Answer>
-            The Eiffel Tower, located in Paris, is 330 meters tall. It was designed by Gustave Eiffel.
+            The Eiffel Tower is 330 meters tall and was designed by Gustave Eiffel.
 
             <Retrieved Documents>
             1. "The Eiffel Tower stands at a height of 330 meters (1,083 ft)."
-            2. "Paris is the capital city of France and is famous for its landmarks, including the Eiffel Tower."
+            2. "The famous tower in Paris was built for the 1889 World's Fair."
 
             <Output>
-            ```json
             [
-                {
-                    "claim": "The Eiffel Tower, located in Paris, is 330 meters tall.",
-                    "grounded": true
-                },
-                {
-                    "claim": "It was designed by Gustave Eiffel.",
-                    "grounded": false
-                }
+                {"claim": "The Eiffel Tower is 330 meters tall.", "grounded": true},
+                {"claim": "It was designed by Gustave Eiffel.", "grounded": false}
             ]
-            ```
             """
         )
 
-        # Format the documents for the prompt
-        formatted_docs = "\n".join([f"{i+1}. {doc}" for i, doc in enumerate(docs)])
-        user_query = f"<Generated Answer>\n{gen}\n\n<Retrieved Documents>\n{formatted_docs}\n\n<Output>\n"
+        formatted_docs = "\n".join([f"{i+1}. {doc}" for i, doc in enumerate(truncated_docs)])
+        user_query = f"<Generated Answer>\n{truncated_gen}\n\n<Retrieved Documents>\n{formatted_docs}\n\n<Output>\n"
 
         try:
             response = self.llm_adapter.request(prompt, user_query)
-            # Clean up the response to extract only the JSON part
             response_text = response["text"].strip()
-            json_part = response_text[response_text.find('['):response_text.rfind(']') + 1]
+
+            match = re.search(r"```json\s*(\[.*?\])\s*```|(\[.*?\])", response_text, re.DOTALL)
             
+            if not match:
+                logger.error("Failed to find a valid JSON array in the LLM response.")
+                logger.debug(f"Malformed response: {response_text}")
+                return Performance(score=np.nan, unit="", metric="Faithfulness (Single Call)")
+
+            json_part = match.group(1) or match.group(2)
             evaluations = json.loads(json_part)
 
             if not evaluations:
                 return Performance(score=0.0, unit="", metric="Faithfulness (Single Call)")
 
-            grounded_count = sum(1 for e in evaluations if e.get("grounded", False))
+            grounded_count = sum(1 for e in evaluations if e.get("grounded") is True)
             score = grounded_count / len(evaluations)
 
-        except (json.JSONDecodeError, KeyError, AttributeError, IndexError) as e:
-            logger.error(f"Failed to parse LLM response for single-call faithfulness: {e}")
-            logger.debug(f"Malformed response: {response.get('text', '')}")
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decoding failed for single-call faithfulness: {e}")
+            logger.debug(f"Invalid JSON content: {json_part}")
+            score = np.nan
+        except (KeyError, AttributeError, IndexError) as e:
+            logger.error(f"Failed to parse LLM response structure for single-call faithfulness: {e}")
+            logger.debug(f"Full response text: {response_text}")
             score = np.nan
         
         return Performance(score=score, unit="", metric="Faithfulness (Single Call)")
+
+
+class A2RHybridFaithfulnessMetric(BaseMetric):
+    """
+    A robust faithfulness metric that separates claim extraction and judgment into two steps.
+    It extracts all claims first, then evaluates them in batches to manage context size,
+    providing a balance between performance and reliability.
+
+    :param llm_adapter: The LLM model to use.
+    :type llm_adapter: BaseLLMAdapter
+    :param claims_batch_size: The number of claims to evaluate in a single LLM call.
+    :type claims_batch_size: int
+    """
+    def __init__(self, llm_adapter: BaseLLMAdapter, claims_batch_size: int = 10):
+        self.llm_adapter = llm_adapter
+        self.claims_batch_size = claims_batch_size
+
+    def _extract_claims(self, gen: str) -> list[str]:
+        """Extracts claims from the generated text using an LLM call."""
+        prompt = (
+            """
+            You are a text analysis expert. Your task is to split the following answer into self-contained, 
+            verifiable claims. Each claim should be a single, complete sentence or a meaningful unit that can be 
+            judged for accuracy on its own.
+
+            Provide the output as a single, valid JSON array of strings.
+            **Do not include any other text, markdown formatting, or explanations outside of the JSON array.**
+
+            <Example>
+            <Answer>
+            The Eiffel Tower, located in Paris, is 330 meters tall. It was designed by Gustave Eiffel.
+
+            <Output>
+            ```json
+            [
+                "The Eiffel Tower, located in Paris, is 330 meters tall.",
+                "It was designed by Gustave Eiffel."
+            ]
+            ```
+            ---
+            <Answer>
+            {gen}
+
+            <Output>
+            """
+        )
+        user_query = f"<Answer>\n{gen}\n\n<Output>\n"
+
+        try:
+            response = self.llm_adapter.request(prompt, user_query)
+            response_text = response["text"].strip()
+            match = re.search(r"```json\s*(\[.*?\])\s*```|(\[.*?\])", response_text, re.DOTALL)
+            
+            if not match:
+                logger.error("Failed to find a valid JSON array in the claim extraction response.")
+                logger.debug(f"Malformed response: {response_text}")
+                return []
+
+            json_part = match.group(1) or match.group(2)
+            claims = json.loads(json_part)
+            return [str(c) for c in claims if isinstance(c, str)]
+        except (json.JSONDecodeError, KeyError, AttributeError) as e:
+            logger.error(f"Failed to extract claims: {e}")
+            logger.debug(f"Full response text: {response.get('text', '')}")
+            return []
+
+    def _judge_claims_batch(self, claims: list[str], docs: list[str]) -> list[dict]:
+        """Judges a batch of claims for faithfulness against the provided documents."""
+        # Note the double curly braces `{{` and `}}` to escape them for the .format() method.
+        prompt = (
+            """
+            You are an expert evaluator. For each claim in the <Claims to Evaluate> list, you must determine if it is grounded in the <Retrieved Documents>.
+            A claim is "Grounded" if it is explicitly stated or clearly supported by the documents.
+
+            Your final output **must be a single, valid JSON array of objects**. Each object must have two keys:
+            - "`claim`": The exact string of the claim you evaluated.
+            - "`grounded`": A boolean value (`true` if the claim is grounded, `false` otherwise).
+
+            **Do not include any other text, markdown formatting, or explanations outside of the JSON array.**
+
+            <Example>
+            <Retrieved Documents>
+            1. The sky is blue due to Rayleigh scattering.
+            2. Water is composed of hydrogen and oxygen.
+
+            <Claims to Evaluate>
+            1. The sky's color is caused by Rayleigh scattering.
+            2. The ocean is salty.
+
+            <Output>
+            ```json
+            [
+                {{
+                    "claim": "The sky's color is caused by Rayleigh scattering.",
+                    "grounded": true
+                }},
+                {{
+                    "claim": "The ocean is salty.",
+                    "grounded": false
+                }}
+            ]
+            ```
+            ---
+            <Retrieved Documents>
+            {formatted_docs}
+
+            <Claims to Evaluate>
+            {formatted_claims}
+
+            <Output>
+            """
+        )
+        
+        formatted_docs = "\n".join([f"{i+1}. {doc}" for i, doc in enumerate(docs)])
+        formatted_claims = "\n".join([f"{i+1}. {claim}" for i, claim in enumerate(claims)])
+        
+        final_prompt = prompt.format(formatted_docs=formatted_docs, formatted_claims=formatted_claims)
+
+        try:
+            response = self.llm_adapter.request(final_prompt, "")
+            response_text = response["text"].strip()
+            match = re.search(r"```json\s*(\[.*?\])\s*```|(\[.*?\])", response_text, re.DOTALL)
+
+            if not match:
+                logger.error("Failed to find a valid JSON array in the judgment response.")
+                logger.debug(f"Malformed response: {response_text}")
+                return []
+
+            json_part = match.group(1) or match.group(2)
+            evaluations = json.loads(json_part)
+
+            if len(evaluations) != len(claims):
+                logger.warning(f"Judgment mismatch: Expected {len(claims)} evaluations, but got {len(evaluations)}.")
+                return []
+            return evaluations
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to judge claims batch: {e}")
+            logger.debug(f"Full response text for failed JSON parse: {response.get('text', '')}")
+            return []
+        except (KeyError, AttributeError) as e:
+            logger.error(f"Failed to parse judgment response structure: {e}")
+            logger.debug(f"Full response text: {response.get('text', '')}")
+            return []
+
+    def evaluate(self, docs: list[str], gen: str, max_docs: int = 5) -> Performance:
+        """
+        Evaluates faithfulness by extracting all claims and then judging them in batches.
+
+        :param docs: A list of retrieved documents.
+        :type docs: list[str]
+        :param gen: The generated answer.
+        :type gen: str
+        :param max_docs: The maximum number of documents to include for judgment.
+        :type max_docs: int
+        :returns: A Performance object with the faithfulness score, or np.nan on failure.
+        :rtype: Performance
+        """
+        if not gen or not gen.strip():
+            return Performance(score=0.0, unit="", metric="Hybrid Faithfulness")
+
+        claims = self._extract_claims(gen)
+        if not claims:
+            logger.warning("No claims were extracted from the generated answer.")
+            return Performance(score=0.0, unit="", metric="Hybrid Faithfulness")
+
+        all_evaluations = []
+        truncated_docs = docs[:max_docs]
+
+        for i in range(0, len(claims), self.claims_batch_size):
+            batch = claims[i:i + self.claims_batch_size]
+            evaluations = self._judge_claims_batch(batch, truncated_docs)
+            if evaluations:
+                all_evaluations.extend(evaluations)
+            else:
+                logger.warning(f"A batch of {len(batch)} claims failed to be judged.")
+
+        if not all_evaluations:
+            logger.error("All claim judgment batches failed.")
+            return Performance(score=np.nan, unit="", metric="Hybrid Faithfulness")
+
+        grounded_count = sum(1 for e in all_evaluations if isinstance(e, dict) and e.get("grounded") is True)
+        
+        total_claims = len(claims)
+        score = grounded_count / total_claims
+        
+        return Performance(score=score, unit="", metric="Hybrid Faithfulness")
