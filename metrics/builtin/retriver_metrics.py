@@ -49,15 +49,11 @@ from common.bases.datas.performance_dataclass import Performance
 from adapters.llm_adapter import BaseLLMAdapter, LocalLLMAdapter
 from adapters.embedding_adapter import BaseEmbeddingAdapter, LocalEmbeddingAdapter
 
-# .env 파일에서 환경 변수 불러오기
-load_dotenv()
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-
 class KeywordMatchingMetric(BaseMetric):
     """쿼리와 문서 간의 키워드 매칭 비율을 평가합니다.
 
-    단순히 띄어쓰기 기준으로 토큰화하여, 쿼리 토큰이 각 문서에 얼마나
-    포함되어 있는지를 계산하고 그 평균을 백분율로 반환합니다.
+    쿼리 토큰이 각 문서 텍스트의 토큰들과 얼마나 일치하는지 계산하고
+    그 평균을 백분율로 반환합니다.
     """
     def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
         """
@@ -91,7 +87,7 @@ class KeywordMatchingMetric(BaseMetric):
 class JaccardSimilarityMetric(BaseMetric):
     """쿼리와 문서 간의 Jaccard 유사도를 평가합니다.
 
-    두 텍스트를 토큰 집합으로 보고, (교집합 크기 / 합집합 크기)를 계산합니다.
+    쿼리와 문서 텍스트를 토큰 집합으로 보고, (쿼리와 텍스트의 교집합 토큰 수 / 쿼리와 텍스트의 합집합 토큰 수)를 계산합니다.
     검색된 모든 문서에 대한 평균 Jaccard 유사도를 백분율로 반환합니다.
     """
     def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
@@ -130,25 +126,33 @@ class CosineSimilarityMetric(BaseMetric):
     코사인 유사도는 두 벡터가 가리키는 방향의 유사성을 측정하며,
     -1에서 1 사이의 값을 가집니다. 1에 가까울수록 유사합니다.
 
-    .. note:: 입력되는 벡터들은 동일한 임베딩 모델을 통해 생성되어야 합니다.
+    .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
-    def evaluate(self, query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
+    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
+        self.embedding_adapter = embedding_adapter
+
+    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
         """
         평균 코사인 유사도 점수를 계산합니다.
 
-        :param query_embedding: 쿼리의 임베딩 벡터
-        :type query_embedding: np.ndarray
-        :param doc_embeddings: 검색된 각 문서의 임베딩 벡터 리스트
-        :type doc_embeddings: List[np.ndarray]
-        :return: 평균 코사인 유사도 점수를 담은 Performance 객체
+        :param query: 사용자 원본 쿼리 텍스트
+        :type query: str
+        :param retrieved_documents: 검색된 문서 텍스트 리스트
+        :type retrieved_documents: List[str]
+        :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not doc_embeddings:
+        if not retrieved_documents:
             return Performance(score=0.0, unit='-1 to 1', metric='Cosine Similarity Metric')
+        
+        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        doc_vecs = self.embedding_adapter.create_embeddings(retrieved_documents)
 
-        scores = cosine_similarity([query_embedding], doc_embeddings)[0]
-        avg_score = np.mean(scores) if scores.size > 0 else 0.0
-        return Performance(score=avg_score, unit='-1 to 1', metric='Cosine Similarity Metric')
+        similarity_scores = cosine_similarity([query_vec], doc_vecs)[0]
+
+        avg_score = np.mean(similarity_scores) if similarity_scores.size else 0.0
+
+        return Performance(score=avg_score, unit="-1 to 1", metric="Cosine Similarity Metric")
 
 
 class EuclideanDistanceMetric(BaseMetric):
@@ -157,23 +161,29 @@ class EuclideanDistanceMetric(BaseMetric):
     유클리드 거리는 벡터 공간에서 두 점 사이의 직선 거리를 나타냅니다.
     값이 작을수록 두 벡터가 가깝다는 것을 의미합니다.
 
-    .. note:: 입력되는 벡터들은 동일한 임베딩 모델을 통해 생성되어야 합니다.
+    .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
-    def evaluate(self, query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
+    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
+        self.embedding_adapter = embedding_adapter
+
+    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
         """
         평균 유클리드 거리를 계산합니다.
 
-        :param query_embedding: 쿼리의 임베딩 벡터
-        :type query_embedding: np.ndarray
-        :param doc_embeddings: 검색된 각 문서의 임베딩 벡터 리스트
-        :type doc_embeddings: List[np.ndarray]
-        :return: 평균 유클리드 거리를 담은 Performance 객체
+        :param query: 사용자 원본 쿼리 텍스트
+        :type query: str
+        :param retrieved_documents: 검색된 문서 텍스트 리스트
+        :type retrieved_documents: List[str]
+        :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not doc_embeddings:
+        if not retrieved_documents:
             return Performance(score=0.0, unit='distance', metric='Euclidean Distance Metric')
 
-        distances = [np.linalg.norm(query_embedding - doc_emb) for doc_emb in doc_embeddings]
+        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        doc_vecs = self.embedding_adapter.create_embeddings(retrieved_documents)
+
+        distances = [np.linalg.norm(query_vec - doc_vec) for doc_vec in doc_vecs]
         avg_distance = np.mean(distances) if distances else 0.0
         return Performance(score=avg_distance, unit='distance', metric='Euclidean Distance Metric')
 
@@ -184,23 +194,29 @@ class ManhattanDistanceMetric(BaseMetric):
     맨해튼 거리는 각 차원의 차이의 절댓값 합으로, 고차원 데이터에서 유용할 수 있습니다.
     값이 작을수록 두 벡터가 가깝다는 것을 의미합니다.
 
-    .. note:: 입력되는 벡터들은 동일한 임베딩 모델을 통해 생성되어야 합니다.
+    .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
-    def evaluate(self, query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
+    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
+        self.embedding_adapter = embedding_adapter
+
+    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
         """
         평균 맨해튼 거리를 계산합니다.
 
-        :param query_embedding: 쿼리의 임베딩 벡터
-        :type query_embedding: np.ndarray
-        :param doc_embeddings: 검색된 각 문서의 임베딩 벡터 리스트
-        :type doc_embeddings: List[np.ndarray]
-        :return: 평균 맨해튼 거리를 담은 Performance 객체
+        :param query: 사용자 원본 쿼리 텍스트
+        :type query: str
+        :param retrieved_documents: 검색된 문서 텍스트 리스트
+        :type retrieved_documents: List[str]
+        :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not doc_embeddings:
+        if not retrieved_documents:
             return Performance(score=0.0, unit='distance', metric='Manhattan Distance Metric')
         
-        distances = [np.sum(np.abs(query_embedding - doc_emb)) for doc_emb in doc_embeddings]
+        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        doc_vecs = self.embedding_adapter.create_embeddings(retrieved_documents)
+
+        distances = [np.sum(np.abs(query_vec - doc_vec)) for doc_vec in doc_vecs]
         avg_distance = np.mean(distances) if distances else 0.0
         return Performance(score=avg_distance, unit='distance', metric='Manhattan Distance Metric')
 
@@ -210,25 +226,28 @@ class NegativeRejectionRateMetric(BaseMetric):
 
     이 비율(NRR)이 낮을수록 검색 결과에 관련 없는 문서가 적게 포함되었다는 것을 의미합니다.
 
-    .. note:: 입력되는 벡터들은 동일한 임베딩 모델을 통해 생성되어야 합니다.
+    .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
-    def evaluate(self, query_embedding: np.ndarray, doc_embeddings: List[np.ndarray]) -> Performance:
+    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
         """
         NRR(Negative Rejection Rate) 점수를 백분율로 계산합니다.
 
-        :param query_embedding: 쿼리의 임베딩 벡터
-        :type query_embedding: np.ndarray
-        :param doc_embeddings: 검색된 각 문서의 임베딩 벡터 리스트
-        :type doc_embeddings: List[np.ndarray]
-        :return: NRR 점수를 담은 Performance 객체
+        :param query: 사용자 원본 쿼리 텍스트
+        :type query: str
+        :param retrieved_documents: 검색된 문서 텍스트 리스트
+        :type retrieved_documents: List[str]
+        :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not doc_embeddings:
+        if not retrieved_documents:
             return Performance(score=0.0, unit='%', metric='Negative Rejection Rate Metric')
 
-        similarities = cosine_similarity([query_embedding], doc_embeddings)[0]
+        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        doc_vecs = self.embedding_adapter.create_embeddings(retrieved_documents)
+
+        similarities = cosine_similarity([query_vec], doc_vecs)[0]
         irrelevant_count = np.sum(similarities <= 0)
-        rejection_rate = (irrelevant_count / len(doc_embeddings)) * 100
+        rejection_rate = (irrelevant_count / len(doc_vecs)) * 100
         return Performance(score=rejection_rate, unit='%', metric='Negative Rejection Rate Metric')
 
 class PrecisionMetric(BaseMetric):
