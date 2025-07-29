@@ -8,6 +8,7 @@ from common.utils.tools import CosineSimilarity
 class AnswerContextSimilarity(BaseMetric):
     """
     Average of cosine similarity between the generated answer and retrieval chunks
+    
     :param embedding_adapter: The embedding model to use
     :type: BaseEmbeddingAdapter
     :ivar embedding_adapter: Stores the embedding model
@@ -20,6 +21,7 @@ class AnswerContextSimilarity(BaseMetric):
     def evaluate(self, context: list[str], gen: str) -> Performance:
         """
         Compute average cosine similarity between embedded retrieval chunks and generator's answer
+        
         :param context: retrieval chunks
         :type context: list[str]
         :param gen: Genrator's answer
@@ -45,6 +47,7 @@ class AnswerContextSimilarity(BaseMetric):
 class AnswerCentricSimilarityVariance(BaseMetric):
     """
     Veriance of angles beteween embedded generator's answer and each retrieval chunks
+    
     :param embedding_adapter: The embedding model to use
     :type embedding_adapter: BaseEmbeddingAdapter
     :ivar embedding_adapter: Stores the embedding model
@@ -57,6 +60,7 @@ class AnswerCentricSimilarityVariance(BaseMetric):
     def evaluate(self, context: list[str], gen: str):
         """
         Compute veriance of angles between generator's answer and each retrieval chunks
+        
         :param context: Retrieval text chunks
         :type context: list[str]
         :param gen: Generator's text answer
@@ -81,6 +85,7 @@ class AnswerCentricSimilarityVariance(BaseMetric):
 class MutualInformation_KSG(BaseMetric):
     """
     Estimates mutual information between the generated answer and context using KSG estimator.
+    
     :param embedding_adapter: The embedding model to use
     :type embedding_adapter: BaseEmbeddingAdapter
     :param k: Number of nearest neighbors
@@ -98,6 +103,7 @@ class MutualInformation_KSG(BaseMetric):
     def evaluate(self, context: list[str], generation: str) -> Performance:
         """
         Estimate how much mutual information exists between the generated answer and the retrieval context by measuring statistical dependency using the KSG(Kraskov Stögbauer Grassberger) method, which approximates mutual information based on neighbor distances in joint and marginal embedding spaces.
+        
         :param context: Retrieval chunks
         :type context: list[str]
         :param generation: Generated answer
@@ -158,6 +164,7 @@ class MutualInformation_KSG(BaseMetric):
 class RetrievalDeviationfromAnswer(BaseMetric):
     """
     Measure how much the generated answer deviates from the retrieved context embeddings by computing the average embedding dispersion
+    
     :param embedding_adapter: The embedding model to use
     :type embedding_adapter: BaseEmbeddingAdapter
     :ivar embedding_adapter: Stores the embedding model
@@ -170,6 +177,7 @@ class RetrievalDeviationfromAnswer(BaseMetric):
     def evaluate(self, context: list[str], gen: str) -> Performance:
         """
         Compute how closely the retrieved context vectors align with the generated answer by computing the average deviation and dispersion of their embeddings, then converting this deviation into a bounded score using inverse scaling.
+        
         :param context: Retrieval chunks
         :type context: list[str]
         :param gen: Generator's answer
@@ -197,6 +205,7 @@ class RetrievalDeviationfromAnswer(BaseMetric):
 class RetrievaltopkMeanAnswerSimilarity(BaseMetric):
     """
     Measure how well the generated answer aligns with the most relevant subset of retrieved chunks based on cosine similarity with the query, using dynamic top-k selection and centroid comparison
+    
     :param embedding_adapter: The embedding model to use
     :type embedding_adapter: BaseEmbeddingAdapter
     :ivar embedding_adapter: Stores the embedding model
@@ -209,6 +218,7 @@ class RetrievaltopkMeanAnswerSimilarity(BaseMetric):
     def evaluate(self, context: list[str], gen: str, query: str):
         """
         Compute the similarity score by selecting top-k retrieved chunks based on query similarity drop-off, comparing centroids of the top-k and full set against the generated answer, and applying a sigmoid-based adjustment using z-score to account for uniformly relevant or noise-free retrievals.
+        
         :param context: Retrieved chunks
         :type context: list[str]
         :param gen: Generator's answer
