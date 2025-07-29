@@ -1,6 +1,11 @@
 from common.bases.datas.performance_dataclass import Performance
 from common.bases.abstracts.base_metric import BaseMetric
 from adapters.llm_adapter import BaseLLMAdapter
+import json
+import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 class A2RYNFaithfulnessMetric(BaseMetric):
     """
@@ -395,3 +400,90 @@ class A2RTruthfulFaithfulnessMetric(BaseMetric):
             except ValueError:
                 score = 0.0  # Default to 0 if the response is not a valid form
         return Performance(score=score/len(claim_list), unit="", metric="Yes/No Relevancy")
+
+
+class A2RYNFaithfulnessMetricSingleCall(BaseMetric):
+    """
+    (EXPERIMENTAL) Generator faithfulness metric via a single Yes/No judgement call on all claims.
+
+    :param llm_adapter: The LLM model to use.
+    :type llm_adapter: BaseLLMAdapter
+    :ivar llm_adapter: Stores the LLM model.
+    :vartype llm_adapter: BaseLLMAdapter
+    """
+    def __init__(self, llm_adapter: BaseLLMAdapter):
+        self.llm_adapter = llm_adapter
+
+    def evaluate(self, docs: list[str], gen: str) -> Performance:
+        """
+        Evaluates the faithfulness of a generated answer by extracting and verifying all claims in a single LLM call.
+
+        :param docs: A list of retrieved documents.
+        :type docs: list[str]
+        :param gen: The generated answer.
+        :type gen: str
+        :returns: A Performance object with the faithfulness score, or np.nan on failure.
+        :rtype: Performance
+        """
+        prompt = (
+            """
+            You are given a generated answer and a set of retrieved documents. Your task is to perform the following two steps:
+            1.  Break down the answer into individual, self-contained claims.
+            2.  For each claim, evaluate whether it is grounded in the provided documents.
+
+            A claim is considered "Grounded" if it is explicitly stated or clearly supported by the documents. Otherwise, it is "Not Grounded".
+
+            Provide the output as a single JSON array of objects. Each object must have two keys:
+            -   `"claim"`: The string containing the claim.
+            -   `"grounded"`: A boolean value (`true` if the claim is grounded, `false` otherwise).
+
+            Do not include any other text or explanations outside of the JSON array.
+
+            <Example>
+            <Generated Answer>
+            The Eiffel Tower, located in Paris, is 330 meters tall. It was designed by Gustave Eiffel.
+
+            <Retrieved Documents>
+            1. "The Eiffel Tower stands at a height of 330 meters (1,083 ft)."
+            2. "Paris is the capital city of France and is famous for its landmarks, including the Eiffel Tower."
+
+            <Output>
+            ```json
+            [
+                {
+                    "claim": "The Eiffel Tower, located in Paris, is 330 meters tall.",
+                    "grounded": true
+                },
+                {
+                    "claim": "It was designed by Gustave Eiffel.",
+                    "grounded": false
+                }
+            ]
+            ```
+            """
+        )
+
+        # Format the documents for the prompt
+        formatted_docs = "\n".join([f"{i+1}. {doc}" for i, doc in enumerate(docs)])
+        user_query = f"<Generated Answer>\n{gen}\n\n<Retrieved Documents>\n{formatted_docs}\n\n<Output>\n"
+
+        try:
+            response = self.llm_adapter.request(prompt, user_query)
+            # Clean up the response to extract only the JSON part
+            response_text = response["text"].strip()
+            json_part = response_text[response_text.find('['):response_text.rfind(']') + 1]
+            
+            evaluations = json.loads(json_part)
+
+            if not evaluations:
+                return Performance(score=0.0, unit="", metric="Faithfulness (Single Call)")
+
+            grounded_count = sum(1 for e in evaluations if e.get("grounded", False))
+            score = grounded_count / len(evaluations)
+
+        except (json.JSONDecodeError, KeyError, AttributeError, IndexError) as e:
+            logger.error(f"Failed to parse LLM response for single-call faithfulness: {e}")
+            logger.debug(f"Malformed response: {response.get('text', '')}")
+            score = np.nan
+        
+        return Performance(score=score, unit="", metric="Faithfulness (Single Call)")

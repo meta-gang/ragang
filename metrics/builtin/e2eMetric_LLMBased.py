@@ -4,6 +4,9 @@ from adapters.llm_adapter import BaseLLMAdapter
 from adapters.embedding_adapter import BaseEmbeddingAdapter
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 class E2ESYNRelevancyMetric(BaseMetric):
     """
@@ -14,7 +17,7 @@ class E2ESYNRelevancyMetric(BaseMetric):
     :ivar llm_adapter: Stores the LLM model to use
     :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, llm_adapter : BaseLLMAdapter):
+    def __init__(self, llm_adapter: BaseLLMAdapter):
         self.llm_adapter = llm_adapter
 
     def evaluate(self, query: str, gen: str) -> Performance:
@@ -25,20 +28,21 @@ class E2ESYNRelevancyMetric(BaseMetric):
         :type query: str
         :param gen: The generated answer string.
         :type gen: str
-        :returns: A Performance object with a score of 1 for "Yes" and 0 for "No".
+        :returns: A Performance object with a score of 1 for "Yes" and 0 for "No", or np.nan on failure.
         :rtype: Performance
         """
-        prompt = (   #todo : prompt needs to be refined. especially the rubric has to be specified more.
+        prompt = (
             "You are given a question and a final response.\n"
             "Your task is to judge whether the response aligns with the intention of the question.\n"
-
             "Judge the response using the following rubric:\n\n"
             "Y → The response is fully relevant and well-aligned with the input question, addressing all the information required from the question directly and appropriately.\n\n"
             "N → The response is totally irrelevant or does not address the input question.\n"
             "Note that whether the answer itself to be correct or not is not a matter here."
+
             "The only factor you consider is whether the response correctly addresses the type of required information aksed in the question."
+
             "Output only the judgement without explanation.\n\n"
-            
+
             "Example 1:\n"
             "Question:\nWhat is the capital of France?\n"
             "Response:\nIt's a man-made factor of production, meaning it's created by humans rather than being a natural resource\n"
@@ -53,18 +57,24 @@ class E2ESYNRelevancyMetric(BaseMetric):
             "Question:\nWhat is the capital of France?\n"
             "Response:\nThe capital of France is Paris.\n"
             "Judgement: Y\n\n"
+
         )
         user_query = f"Question:\n{query}\n\nResponse:\n{gen}\nJudgement: "
 
-
-        response = self.llm_adapter.request(prompt, user_query)
         try:
-            score = 1 if response["text"].strip().upper() == "Y" else 0
-        except (KeyError, AttributeError):
-            score = 0.0  # Default to 0 if the response is not in the expected format
+            response = self.llm_adapter.request(prompt, user_query)
+            response_text = response["text"].strip().upper()
+            if response_text == "Y":
+                score = 1.0
+            elif response_text == "N":
+                score = 0.0
+            else:
+                logger.warning(f"LLM returned an unexpected value: {response['text']}")
+                score = np.nan
+        except (KeyError, AttributeError) as e:
+            logger.error(f"Failed to parse LLM response: {e}")
+            score = np.nan
         return Performance(score=score, unit="", metric="Yes/No Relevancy")
-
-
 
 class E2EScoringRelevancyMetric(BaseMetric):
     """
@@ -75,7 +85,7 @@ class E2EScoringRelevancyMetric(BaseMetric):
     :ivar llm_adapter: Stores the LLM model to use
     :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, llm_adapter : BaseLLMAdapter):
+    def __init__(self, llm_adapter: BaseLLMAdapter):
         self.llm_adapter = llm_adapter
 
     def evaluate(self, query: str, gen: str) -> Performance:
@@ -86,10 +96,10 @@ class E2EScoringRelevancyMetric(BaseMetric):
         :type query: str
         :param gen: The generated answer string.
         :type gen: str
-        :returns: A Performance object with the relevancy score.
+        :returns: A Performance object with the relevancy score, or np.nan on failure.
         :rtype: Performance
         """
-        prompt = (   #todo : prompt needs to be refined. especially the rubric has to be specified more.
+        prompt = (
             "You are given a question and a final response.\n"
             "Your task is to evaluate how well the response aligns with the intention of the question.\n"
 
@@ -115,18 +125,17 @@ class E2EScoringRelevancyMetric(BaseMetric):
             "Question:\nWhat is the capital of France?\n"
             "Response:\nThe capital of France is Paris.\n"
             "Score: 2\n\n"
+
         )
         user_query = f"Question:\n{query}\n\nResponse:\n{gen}\nScore: "
 
-
-        response = self.llm_adapter.request(prompt, user_query)
         try:
-            score = float(response["text"])/2
-        except (ValueError, KeyError, TypeError):
-            score = 0.0  # Default to 0 if the response is not a valid number
+            response = self.llm_adapter.request(prompt, user_query)
+            score = float(response["text"]) / 2.0
+        except (ValueError, KeyError, TypeError) as e:
+            logger.warning(f"Failed to parse score from LLM response: {e}")
+            score = np.nan
         return Performance(score=score, unit="", metric="Simple Score Relevancy")
-
-
 
 class E2EQGenRelevancyMetric(BaseMetric):
     """
@@ -153,46 +162,39 @@ class E2EQGenRelevancyMetric(BaseMetric):
         :type query: str
         :param gen: The generated answer string.
         :type gen: str
-        :returns: A Performance object with the mean cosine similarity score.
+        :returns: A Performance object with the mean cosine similarity score, or np.nan on failure.
         :rtype: Performance
         """
-        prompt = (  # todo : prompt needs to be refined.
+        prompt = (
+            "You are given a final response generated by another LLM when a question is given.\n"
+            "Your task is to generate three expected questions that would have resulted in such a response.\n"
+            "Output only the expected questions, each on a new line, without any numbering or explanation.\n\n"
 
-            "You are given a final response generated by other LLM when a question is given.\n"
-            "Your task is to generate the expected question that would have resulted in such a response.\n"
-            "Output only the expected question without explanation.\n\n"
-            
             "Example 1:\n"
             "Response:\nThe capital of France is Paris.\n"
-            "Expected question:\nWhat is the capital of France?\n\n"
-            
+            "Expected questions:\nWhat is the capital of France?\nWhat is France's capital city?\nWhich city is the capital of France?\n\n"
+
             "Example 2:\n"
             "Response:\nPhotosynthesis is the process by which green plants convert sunlight into energy.\n"
-            "Expected question:\nWhat is photosynthesis?\n\n"
-            
-            "Example 3:\n"
-            "Response:\nYes, the Great Wall of China is visible from space under certain conditions.\n"
-            "Expected question:\nIs the Great Wall of China visible from space?\n\n"
+            "Expected questions:\nWhat is photosynthesis?\nHow do green plants get energy?\nDescribe the process of photosynthesis.\n\n"
+
         )
-        user_query = f"Response:\n{gen}\nExpected question: "
+        user_query = f"Response:\n{gen}\nExpected questions:"
 
-        responses = []
-        for _ in range(3):
+        try:
             response_data = self.llm_adapter.request(prompt, user_query)
-            if "text" in response_data and response_data["text"]:
-                responses.append(response_data["text"].strip())
-
-        if not responses:
-            # If no questions were generated, relevancy is 0
-            return Performance(score=0.0, unit="", metric="Q-Gen Relevancy")
+            responses = [line.strip() for line in response_data["text"].splitlines() if line.strip()]
+            if not responses:
+                logger.warning("LLM failed to generate any questions.")
+                return Performance(score=np.nan, unit="", metric="Q-Gen Relevancy")
+        except (KeyError, AttributeError) as e:
+            logger.error(f"Failed to parse LLM response for question generation: {e}")
+            return Performance(score=np.nan, unit="", metric="Q-Gen Relevancy")
 
         all_texts = [query] + responses
 
         try:
-            # Create embeddings using the provided adapter
             embeddings = self.embedding_adapter.create_embeddings(all_texts)
-
-            # The first vector is the original query, the rest are for the generated questions
             query_embedding = embeddings[0:1]
             generated_embeddings = embeddings[1:]
 
@@ -200,14 +202,10 @@ class E2EQGenRelevancyMetric(BaseMetric):
                 return Performance(score=0.0, unit="", metric="Q-Gen Relevancy")
 
         except Exception as e:
-            # Handle potential errors from the embedding adapter
-            print(f"An error occurred during embedding creation: {e}")
-            return Performance(score=0.0, unit="", metric="Q-Gen Relevancy")
+            logger.error(f"An error occurred during embedding creation: {e}")
+            return Performance(score=np.nan, unit="", metric="Q-Gen Relevancy")
 
-        # Calculate cosine similarity
         similarity_scores = cosine_similarity(query_embedding, generated_embeddings)
-
-        # The final score is the average of the similarity scores
         final_score = np.mean(similarity_scores) if similarity_scores.size > 0 else 0.0
 
         return Performance(score=float(final_score), unit="", metric="Q-Gen Relevancy")
