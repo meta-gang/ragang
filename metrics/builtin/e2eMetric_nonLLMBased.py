@@ -26,25 +26,40 @@ class AnswerQuerySimilarity(BaseMetric):
 
 """
 Name : End to end consistency metric via mean cosine-similarity
-Target : Answer-Query consistency
-Type : End to end, cosine-similarity
-Explanation : 생성된 답변들 간의 코사인 유사도의 평균을 측정한다. 
+Target : Answer-Query Similarity
+Type: Non-LLM Metric, cosine-similarity, E2E Metric
+Explanation: 생성된 답변과 Query 간 cosine 유사도를 계산
 """
 class e2eCosineConsistencyMetric(BaseMetric):
-    def __init__(self, embedding_adapter : BaseEmbeddingAdapter):
+    """
+    End to end consistency metric via mean cosine-similarity.
+
+    :param embedding_adapter: The embedding model to use
+    :type embedding_adapter: BaseEmbeddingAdapter
+    :ivar embedding_adapter: Stores the embedding model to use
+    :vartype embedding_adapter: BaseEmbeddingAdapter
+    """
+
+    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
 
     def evaluate(self, gens: list[str]) -> Performance:
+        """
+        Calculates the mean cosine similarity between each pair of generated answers.
+
+        :param gens: list of generated answers
+        :type gens: list[str]
+        :returns: Performance object with the mean cosine similarity score
+        :rtype: Performance
+        """
         if len(gens) < 2:
             return Performance(score=1.0, unit="", metric="E2E Consistency")
 
         try:
             gen_vectors = self.embedding_adapter.create_embeddings(gens)
-            
             similarity_matrix = cosine_similarity(gen_vectors)
-            
+
             num_gens = len(gens)
-            # Sum of the upper triangle, excluding the diagonal
             indices = np.triu_indices(num_gens, k=1)
             total_cos = np.sum(similarity_matrix[indices])
             num_pairs = len(indices[0])
@@ -60,20 +75,34 @@ class e2eCosineConsistencyMetric(BaseMetric):
         return Performance(score=float(score), unit="", metric="E2E Consistency")
 
 
-"""
-Name : End to end consistency metric via variance of cosine-similarity
-Target : Answer-Query consistency
-Type : End to end, cosine-similarity
-Explanation : 입력된 쿼리와 생성된 답변들 간의 코사인 유사도의 분산을 구한다.
-"""
+
 class e2eCovarianceConsistencyMetric(BaseMetric):
-    def __init__(self, embedding_adapter : BaseEmbeddingAdapter):
+    """
+    End to end consistency metric via variance of cosine-similarity.
+
+    :param embedding_adapter: The embedding model to use
+    :type embedding_adapter: BaseEmbeddingAdapter
+    :ivar embedding_adapter: Stores the embedding model to use
+    :vartype embedding_adapter: BaseEmbeddingAdapter
+    """
+
+    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, query : str, gens: list[str]) -> Performance:
+    def evaluate(self, query: str, gens: list[str]) -> Performance:
+        """
+        Calculates the variance of cosine similarities between the query and each generated answer.
+
+        :param query: input query string
+        :type query: str
+        :param gens: list of generated answers
+        :type gens: list[str]
+        :returns: Performance object with the variance of cosine similarities
+        :rtype: Performance
+        """
         if not gens:
             return Performance(score=0.0, unit="", metric="E2E Query-Answer Consistency Variance")
-        
+
         try:
             all_texts = [query] + gens
             embeddings = self.embedding_adapter.create_embeddings(all_texts)
@@ -85,13 +114,9 @@ class e2eCovarianceConsistencyMetric(BaseMetric):
                 return Performance(score=0.0, unit="", metric="E2E Query-Answer Consistency Variance")
 
             cos_sims = cosine_similarity(query_vector, gen_vectors)[0]
-            
             consistency_score = float(np.var(cos_sims))
         except Exception as e:
             print(f"An error occurred during consistency variance calculation: {e}")
             consistency_score = 0.0
 
         return Performance(score=consistency_score, unit="", metric="E2E Query-Answer Consistency Variance")
-
-
-
