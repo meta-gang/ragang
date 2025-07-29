@@ -51,7 +51,7 @@ class MySecondRetrievalModule(RetrievalModule):  # 'second_ret'
 
 
 class MyMergeModule(CustomModule):  # 'merge'
-    def execute(self, first_ret: dict = None, second_ret: dict = None):
+    def execute(self, first_ret: dict, second_ret: dict):
         input_data: dict = first_ret or second_ret
 
         return {

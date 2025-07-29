@@ -62,9 +62,13 @@ class BaseModule(metaclass=ABCMeta):  # observer
 
     def __retrieve_parameter(self, packet: Packet) -> dict[str, Any]:
         args: dict[str, Any] = {}
-        if self.dependency.is_or:
-            args[packet.src] = packet.data[self.module_id]  # TODO: Data 객체 만들고 수정
-        else:
+        if self.dependency.is_or:  # for cond, loop module
+            for dep_mid in self.dependency.get_dependent_mids():
+                if packet.src == dep_mid:
+                    args[dep_mid] = packet.data[self.module_id]  # TODO: Data 객체 만들고 수정
+                else:
+                    args[dep_mid] = None
+        else:  # for merge module
             dep_mids: list[str] = self.dependency.get_dependent_mids()
             for dep_mid in dep_mids:
                 args[dep_mid] = self.storage.state.snapshots[dep_mid][-1].data[self.module_id]
