@@ -422,11 +422,31 @@ class RankingConsistencyKendallTau(BaseMetric):
         :type ranking2: List[int]
         :return: 계산된 켄달 타우 점수를 담은 Performance 객체
         :rtype: Performance
+        :raises ValueError: 두 리스트의 길이가 다르거나, 계산에 필요한 최소 길이(2)보다 짧을 경우
+        :raises TypeError: 리스트가 아니거나, 리스트 내에 숫자가 아닌 값이 포함되어 있을 경우
+        :raises RuntimeError: 그 외 계산 중 예상치 못한 오류가 발생했을 경우
         """
-        if len(ranking1) < 2 or len(ranking2) < 2 or len(ranking1) != len(ranking2):
-            return Performance(score=0.0, unit='-1 to 1', metric="Kendall's Tau")
-        tau, _ = kendalltau(ranking1, ranking2)
-        return Performance(score=tau, unit='-1 to 1', metric="Kendall's Tau")
+        # 1. 입력값 타입 유효성 검사
+        if not isinstance(ranking1, list) or not isinstance(ranking2, list):
+            raise TypeError("입력값(ranking1, ranking2)은 반드시 리스트(List) 형태여야 합니다.")
+
+        # 2. 입력값 길이 유효성 검사
+        if len(ranking1) != len(ranking2):
+            raise ValueError("두 랭킹 리스트의 길이가 동일해야 합니다.")
+        
+        if len(ranking1) < 2:
+            raise ValueError("켄달 타우를 계산하려면 리스트에 최소 2개 이상의 요소가 필요합니다.")
+
+        # 3. 켄달 타우 계산 시 발생할 수 있는 연산 오류 처리
+        try:
+            tau, _ = kendalltau(ranking1, ranking2)
+            return Performance(score=tau, unit='-1 to 1', metric="Kendall's Tau")
+        except TypeError as e:
+            # 리스트 안에 숫자가 아닌 값이 포함되어 연산이 불가능한 경우 등
+            raise TypeError(f"랭킹 리스트의 값 타입을 확인해주세요. 숫자만 포함되어야 합니다. 원본 오류: {e}")
+        except Exception as e:
+            # 그 외 scipy 연산 중 발생할 수 있는 예기치 못한 오류
+            raise RuntimeError(f"켄달 타우 계산 중 예상치 못한 오류가 발생했습니다: {e}")
 
 
 class DiversityMetric(BaseMetric):
@@ -440,6 +460,8 @@ class DiversityMetric(BaseMetric):
         :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
         :type embedding_adapter: BaseEmbeddingAdapter
         """
+        if not isinstance(embedding_adapter, BaseEmbeddingAdapter):
+            raise TypeError("embedding_adapter는 BaseEmbeddingAdapter의 인스턴스여야 합니다.")
         self.embedding_adapter = embedding_adapter
 
     def evaluate(self, ret_docs: List[str]) -> Performance:
@@ -450,20 +472,39 @@ class DiversityMetric(BaseMetric):
         :type ret_docs: List[str]
         :return: 계산된 다양성 점수를 담은 Performance 객체
         :rtype: Performance
+        :raises ValueError: 문서 리스트의 길이가 2 미만일 경우
+        :raises TypeError: 입력값이 문자열 리스트가 아닐 경우
+        :raises RuntimeError: 임베딩 생성 또는 유사도 계산 중 예상치 못한 오류가 발생했을 경우
         """
+        # 1. 입력값 유효성 검사
+        if not isinstance(ret_docs, list):
+            raise TypeError("입력값(ret_docs)은 반드시 문자열 리스트(List[str]) 형태여야 합니다.")
         if len(ret_docs) < 2:
-            return Performance(score=0.0, unit='0 to 1', metric='Diversity')
+            raise ValueError("다양성을 계산하려면 최소 2개 이상의 문서가 필요합니다.")
 
-        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+        # 2. 임베딩 생성 및 유사도 계산 오류 처리
+        try:
+            # 텍스트 리스트를 임베딩 벡터(Numpy 배열) 리스트로 변환
+            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
 
-        if ret_docs_vec.size < 2: # np.array는 len()보다 .size로 확인하는 것이 더 명확합니다.
-            return Performance(score=0.0, unit='0 to 1', metric='Diversity')
+            # 임베딩 결과가 비어있거나 유효하지 않은 경우 에러 발생
+            if not isinstance(ret_docs_vec, np.ndarray) or ret_docs_vec.size == 0:
+                raise ValueError("임베딩 어댑터가 유효한 임베딩 결과를 반환하지 않았습니다.")
+            
+            # 코사인 유사도 계산
+            similarity_matrix = cosine_similarity(ret_docs_vec)
+            indices = np.triu_indices(len(ret_docs_vec), k=1)
+            
+            mean_similarity = np.mean(similarity_matrix[indices]) if indices[0].size > 0 else 0.0
+            
+            diversity_score = 1 - mean_similarity
+            return Performance(score=diversity_score, unit='0 to 1', metric='Diversity')
 
-        similarity_matrix = cosine_similarity(ret_docs_vec)
-        indices = np.triu_indices(len(ret_docs_vec), k=1)
-        mean_similarity = np.mean(similarity_matrix[indices]) if indices[0].size > 0 else 0.0
-        diversity_score = 1 - mean_similarity
-        return Performance(score=diversity_score, unit='0 to 1', metric='Diversity')
+        except Exception as e:
+            # 임베딩 어댑터 API 호출 실패, sklearn 연산 오류 등 모든 예외를 처리
+            # 원본 에러(e)를 포함하여 RuntimeError 발생
+            raise RuntimeError(f"다양성 점수 계산 중 오류가 발생했습니다: {e}")
+
 
 
 class GeneralizedEmbeddingCoverageError(BaseMetric):
@@ -477,6 +518,8 @@ class GeneralizedEmbeddingCoverageError(BaseMetric):
         :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
         :type embedding_adapter: BaseEmbeddingAdapter
         """
+        if not isinstance(embedding_adapter, BaseEmbeddingAdapter):
+            raise TypeError("embedding_adapter는 BaseEmbeddingAdapter의 인스턴스여야 합니다.")
         self.embedding_adapter = embedding_adapter
 
     def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
@@ -489,19 +532,41 @@ class GeneralizedEmbeddingCoverageError(BaseMetric):
         :type ret_docs: List[str]
         :return: 계산된 평균 거리(coverage_error)를 담은 Performance 객체
         :rtype: Performance
+        :raises ValueError: 문서 리스트가 비어있거나 임베딩 생성에 실패했을 경우
+        :raises TypeError: 입력값의 타입이 올바르지 않을 경우
+        :raises RuntimeError: 거리 계산 중 예상치 못한 오류가 발생했을 경우
         """
+        # 1. 입력값 유효성 검사
+        if not isinstance(query, str) or not isinstance(ret_docs, list):
+            raise TypeError("입력값의 타입이 올바르지 않습니다 (query: str, ret_docs: List[str]).")
         if not ret_docs:
-            return Performance(score=float('inf'), unit='distance', metric='GECE')
-            
-        query_vec = self.embedding_adapter.create_embeddings([query])[0]
-        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
-        
-        if query_vec.size == 0 or ret_docs_vec.size == 0:
-            return Performance(score=float('inf'), unit='distance', metric='GECE')
+            raise ValueError("GECE를 계산하려면 최소 1개 이상의 문서가 필요합니다.")
 
-        distances = [np.linalg.norm(query_vec - ret_doc_vec) for ret_doc_vec in ret_docs_vec]
-        coverage_error = np.mean(distances) if distances else 0.0
-        return Performance(score=coverage_error, unit='distance', metric='GECE')
+        # 2. 임베딩 생성 및 거리 계산 오류 처리
+        try:
+            # 쿼리와 문서를 임베딩 벡터로 변환
+            query_vec_list = self.embedding_adapter.create_embeddings([query])
+            if query_vec_list.size == 0:
+                raise ValueError("쿼리를 임베딩하는 데 실패했습니다.")
+            query_vec = query_vec_list[0]
+            
+            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+            if ret_docs_vec.size == 0:
+                # 문서가 있었는데 임베딩 결과가 없다면 오류로 간주
+                raise ValueError("문서들을 임베딩하는 데 실패했습니다.")
+
+            # 유클리드 거리 계산
+            distances = [np.linalg.norm(query_vec - doc_vec) for doc_vec in ret_docs_vec]
+            coverage_error = np.mean(distances)
+            
+            return Performance(score=coverage_error, unit='distance', metric='GECE')
+        
+        except ValueError as e:
+            # create_embeddings 결과가 비어있을 때 직접 발생시킨 ValueError
+            raise e
+        except Exception as e:
+            # 임베딩 어댑터 API 호출 실패, Numpy 연산 오류 등 모든 예외를 처리
+            raise RuntimeError(f"GECE 점수 계산 중 오류가 발생했습니다: {e}")
 
 
 class EmbeddingCosineSimilarityEvaluation(BaseMetric):
@@ -515,6 +580,8 @@ class EmbeddingCosineSimilarityEvaluation(BaseMetric):
         :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
         :type embedding_adapter: BaseEmbeddingAdapter
         """
+        if not isinstance(embedding_adapter, BaseEmbeddingAdapter):
+            raise TypeError("embedding_adapter는 BaseEmbeddingAdapter의 인스턴스여야 합니다.")
         self.embedding_adapter = embedding_adapter
         
     def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
@@ -527,23 +594,42 @@ class EmbeddingCosineSimilarityEvaluation(BaseMetric):
         :type ret_docs: List[str]
         :return: 계산된 일관성 점수를 담은 Performance 객체
         :rtype: Performance
+        :raises ValueError: 문서 리스트가 비어있거나 임베딩 생성에 실패했을 경우
+        :raises TypeError: 입력값의 타입이 올바르지 않거나 임베딩 벡터 형식이 잘못되었을 경우
+        :raises RuntimeError: 유사도 계산 중 예상치 못한 오류가 발생했을 경우
         """
+        # 1. 입력값 유효성 검사
+        if not isinstance(query, str) or not isinstance(ret_docs, list):
+            raise TypeError("입력값의 타입이 올바르지 않습니다 (query: str, ret_docs: List[str]).")
         if not ret_docs:
-            return Performance(score=0.0, unit='-1 to 1', metric='Embedding Cosine Similarity')
+            raise ValueError("일관성 점수를 계산하려면 최소 1개 이상의 문서가 필요합니다.")
 
-        query_vec = self.embedding_adapter.create_embeddings([query])[0]
-        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
-        
-        if query_vec.size == 0 or ret_docs_vec.size == 0:
-            return Performance(score=0.0, unit='-1 to 1', metric='Embedding Cosine Similarity')
+        # 2. 임베딩 생성 및 유사도 계산 오류 처리
+        try:
+            # 쿼리와 문서를 임베딩 벡터로 변환
+            query_vec_list = self.embedding_adapter.create_embeddings([query])
+            if query_vec_list.size == 0:
+                raise ValueError("쿼리를 임베딩하는 데 실패했습니다.")
+            query_vec = query_vec_list[0]
+            
+            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+            if ret_docs_vec.size == 0:
+                raise ValueError("문서들을 임베딩하는 데 실패했습니다.")
 
-        sims = cosine_similarity([query_vec], ret_docs_vec)[0]
-        local_score = np.max(sims)
-        global_score = np.mean(sims)
-        final_score = (local_score + global_score) / 2
-        return Performance(score=final_score, unit='-1 to 1', metric='Embedding Cosine Similarity')
+            # 코사인 유사도 계산
+            sims = cosine_similarity([query_vec], ret_docs_vec)[0]
+            local_score = np.max(sims)
+            global_score = np.mean(sims)
+            final_score = (local_score + global_score) / 2
+            
+            return Performance(score=final_score, unit='-1 to 1', metric='Embedding Cosine Similarity')
 
-
+        except (ValueError, TypeError, IndexError) as e:
+            # 임베딩 결과가 잘못된 형식일 경우(e.g., shape 불일치) 발생 가능
+            raise TypeError(f"임베딩 벡터의 형식이 올바르지 않습니다. 원본 오류: {e}")
+        except Exception as e:
+            # 임베딩 어댑터 API 호출 실패, Numpy/Sklearn 연산 오류 등 모든 예외 처리
+            raise RuntimeError(f"일관성 점수 계산 중 오류가 발생했습니다: {e}")
 
 class PairwiseCosineSimilarityVariance(BaseMetric):
     """
