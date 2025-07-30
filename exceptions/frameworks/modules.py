@@ -9,9 +9,8 @@ class DuplicateModuleIdException(ValueError):
 
 
 class InvalidModuleIdException(ValueError):
-    def __init__(self, module_id: str):
-        super().__init__(f"Invalid module id '{module_id}'.\n"
-                         f"Only combination of alphabets, numbers, and underscores are allowed.")
+    def __init__(self, module_id: str, additional_msg: str=None):
+        super().__init__(f"Invalid module id '{module_id}'.\n" + (additional_msg or ''))
 
 
 class FlowOutputException(Exception):

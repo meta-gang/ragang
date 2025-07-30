@@ -22,7 +22,11 @@ class BaseContainer(metaclass=ABCMeta):
         ids: list[str] = []
         for module in modules:  # check id format
             if re.fullmatch(r'^[A-Za-z0-9_]+$', module.module_id) is None:  # only allows alphabet, number, underscore
-                raise InvalidModuleIdException(module.module_id)
+                raise InvalidModuleIdException(module.module_id,
+                                               "Only combination of alphabets, numbers, and underscores are allowed.")
+            if module.module_id in ['gen', 'metric']:
+                raise InvalidModuleIdException(module.module_id,
+                                               "'gen', 'metric' are reserved. Use the other one instead.")
             ids.append(module.module_id)
         u_ids: set[str] = set(ids)
 
@@ -72,7 +76,8 @@ class BaseContainer(metaclass=ABCMeta):
             tot_x_time: float = 0  # ms
             print()
             print(ANSIStyler.style(f'Query: {state.query}', font_style='bold', fore_color='light-green'))  # query
-            print(ANSIStyler.style(f"Generated Answer: {state.gen}", font_style='bold', fore_color='light-green'))  # answer
+            print(ANSIStyler.style(f"Generated Answer: {state.gen}", font_style='bold',
+                                   fore_color='light-green'))  # answer
 
             for mid, packet_list in state.snapshots.items():  # print by packets
                 print(ANSIStyler.style(f"\t'{mid}' Performance:", font_style='normal', fore_color='blue'))
