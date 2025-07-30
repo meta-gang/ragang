@@ -20,12 +20,12 @@ class A2RYNFaithfulnessMetric(BaseMetric):
     def __init__(self, llm_adapter : BaseLLMAdapter):
         self.llm_adapter = llm_adapter
 
-    def evaluate(self, ret: list[str], gen: str) -> Performance:
+    def evaluate(self, ret_docs: list[str], gen: str) -> Performance:
         """
         Evaluates the faithfulness of a generated answer by breaking it into claims and verifying each against the provided documents.
 
-        :param ret: A list of retrieved documents.
-        :type ret: list[str]
+        :param ret_docs: A list of retrieved documents.
+        :type ret_docs: list[str]
         :param gen: The generated answer.
         :type gen: str
         :returns: A Performance object with the faithfulness score calculatd by # of faithful claims / # of total claims.
@@ -112,7 +112,7 @@ class A2RYNFaithfulnessMetric(BaseMetric):
         score = 0
         for claim in claim_list:
             print(f"Claim: {claim}")
-            user_query = f"Claim:\n{claim}\n\nRetrieved Documents:\n{ret}\n\nJustification:\n"
+            user_query = f"Claim:\n{claim}\n\nRetrieved Documents:\n{ret_docs}\n\nJustification:\n"
             response = self.llm_adapter.request(prompt_claim_judgement, user_query)
             try:
                 for line in reversed(response["text"].strip().splitlines()):
@@ -142,12 +142,12 @@ class A2RSimpleScoringFaithfulnessMetric(BaseMetric):
     def __init__(self, llm_adapter : BaseLLMAdapter):
         self.llm_adapter = llm_adapter
 
-    def evaluate(self, ret: list[str], gen: str) -> Performance:
+    def evaluate(self, ret_docs: list[str], gen: str) -> Performance:
         """
         Evaluates the faithfulness of a generated answer by scoring claims against the provided documents.
 
-        :param ret: A list of retrieved documents.
-        :type ret: list[str]
+        :param ret_docs: A list of retrieved documents.
+        :type ret_docs: list[str]
         :param gen: The generated answer.
         :type gen: str
         :returns: A Performance object with the faithfulness score calculated by total score / possible highest score.
@@ -232,7 +232,7 @@ class A2RSimpleScoringFaithfulnessMetric(BaseMetric):
 
         total_score = 0
         for i, claim in enumerate(claim_list):
-            user_query = f"Claim:\n{claim}\n\nRetrieved Documents:\n{ret}\n\nJustification:\n"
+            user_query = f"Claim:\n{claim}\n\nRetrieved Documents:\n{ret_docs}\n\nJustification:\n"
             response = self.llm_adapter.request(prompt_claim_scoring, user_query)
             score = 0
             try:
@@ -266,14 +266,14 @@ class A2RHallucinationFaithfulnessMetric(BaseMetric):
     def __init__(self, llm_adapter: BaseLLMAdapter):
         self.llm_adapter = llm_adapter
 
-    def evaluate(self, query: str, ret: list[str], gen: str) -> Performance:
+    def evaluate(self, query: str, ret_docs: list[str], gen: str) -> Performance:
         """
         Evaluates whether a generated answer is a hallucination based on a relevant text.
 
         :param query: The user's query.
         :type query: str
-        :param ret: A list of relevant documents.
-        :type ret: list[str]
+        :param ret_docs: A list of relevant documents.
+        :type ret_docs: list[str]
         :param gen: The generated answer.
         :type gen: str
         :returns: A Performance object with a score of 1 for "factual" and 0 for "hallucinated".
@@ -289,7 +289,7 @@ class A2RHallucinationFaithfulnessMetric(BaseMetric):
             "factual" indicates that the answer to the question is correct relative to the reference text, and does not contain made up information. 
             Please read the query and reference text carefully before determining your response.
             # Query: {query}
-            # Reference text: {ret}
+            # Reference text: {ret_docs}
             # Answer: {gen}
             Is the answer above factual or hallucinated based on the query and reference text?"""
 
@@ -314,12 +314,12 @@ class A2RTruthfulFaithfulnessMetric(BaseMetric):
     def __init__(self, llm_adapter : BaseLLMAdapter):
         self.llm_adapter = llm_adapter
 
-    def evaluate(self, ret: list[str], gen: str) -> Performance:
+    def evaluate(self, ret_docs: list[str], gen: str) -> Performance:
         """
         Evaluates the truthfulness of a generated answer by checking for contradictions with the provided documents.
 
-        :param ret: A list of retrieved documents.
-        :type ret: list[str]
+        :param ret_docs: A list of retrieved documents.
+        :type ret_docs: list[str]
         :param gen: The generated answer.
         :type gen: str
         :returns: A Performance object with the truthfulness score calculated by # of truthful claims / # of total claims.
@@ -406,7 +406,7 @@ class A2RTruthfulFaithfulnessMetric(BaseMetric):
         score = 0
         for claim in claim_list:
             print(f"Claim: {claim}")
-            user_query = f"Claim:\n{claim}\n\nRetrieved Documents:\n{ret}\n\nJustification:\n"
+            user_query = f"Claim:\n{claim}\n\nRetrieved Documents:\n{ret_docs}\n\nJustification:\n"
             response = self.llm_adapter.request(prompt_claim_judgement, user_query)
             try:
                 for line in reversed(response["text"].strip().splitlines()):
@@ -439,7 +439,7 @@ class A2RYNFaithfulnessMetricSingleCall(BaseMetric):
     def __init__(self, llm_adapter: BaseLLMAdapter):
         self.llm_adapter = llm_adapter
 
-    def evaluate(self, ret: list[str], gen: str, max_docs: int = 5, max_gen_chars: int = 2000) -> Performance:
+    def evaluate(self, ret_docs: list[str], gen: str, max_docs: int = 5, max_gen_chars: int = 2000) -> Performance:
         """
         Evaluates the faithfulness of a generated answer by extracting and verifying all claims in a single LLM call.
 
@@ -447,8 +447,8 @@ class A2RYNFaithfulnessMetricSingleCall(BaseMetric):
         - The number of documents is limited by `max_docs`.
         - The generated answer is limited by `max_gen_chars`.
 
-        :param ret: A list of retrieved documents.
-        :type ret: list[str]
+        :param ret_docs: A list of retrieved documents.
+        :type ret_docs: list[str]
         :param gen: The generated answer.
         :type gen: str
         :param max_docs: The maximum number of documents to include in the prompt.
@@ -463,7 +463,7 @@ class A2RYNFaithfulnessMetricSingleCall(BaseMetric):
 
         # Truncate inputs to manage context window size
         truncated_gen = gen[:max_gen_chars]
-        truncated_docs = ret[:max_docs]
+        truncated_docs = ret_docs[:max_docs]
 
         prompt = (
             """
@@ -590,7 +590,7 @@ class A2RHybridFaithfulnessMetric(BaseMetric):
             logger.debug(f"Full response text: {response.get('text', '')}")
             return []
 
-    def _judge_claims_batch(self, claims: list[str], ret: list[str]) -> list[dict]:
+    def _judge_claims_batch(self, claims: list[str], ret_docs: list[str]) -> list[dict]:
         """Judges a batch of claims for faithfulness against the provided documents."""
         # Note the double curly braces `{{` and `}}` to escape them for the .format() method.
         prompt = (
@@ -637,7 +637,7 @@ class A2RHybridFaithfulnessMetric(BaseMetric):
             """
         )
         
-        formatted_docs = "\n".join([f"{i+1}. {doc}" for i, doc in enumerate(ret)])
+        formatted_docs = "\n".join([f"{i+1}. {doc}" for i, doc in enumerate(ret_docs)])
         formatted_claims = "\n".join([f"{i+1}. {claim}" for i, claim in enumerate(claims)])
         
         final_prompt = prompt.format(formatted_docs=formatted_docs, formatted_claims=formatted_claims)
@@ -668,12 +668,12 @@ class A2RHybridFaithfulnessMetric(BaseMetric):
             logger.debug(f"Full response text: {response.get('text', '')}")
             return []
 
-    def evaluate(self, ret: list[str], gen: str, max_docs: int = 5) -> Performance:
+    def evaluate(self, ret_docs: list[str], gen: str, max_docs: int = 5) -> Performance:
         """
         Evaluates faithfulness by extracting all claims and then judging them in batches.
 
-        :param ret: A list of retrieved documents.
-        :type ret: list[str]
+        :param ret_docs: A list of retrieved documents.
+        :type ret_docs: list[str]
         :param gen: The generated answer.
         :type gen: str
         :param max_docs: The maximum number of documents to include for judgment.
@@ -690,7 +690,7 @@ class A2RHybridFaithfulnessMetric(BaseMetric):
             return Performance(score=0.0, unit="", metric="Hybrid Faithfulness")
 
         all_evaluations = []
-        truncated_docs = ret[:max_docs]   # 상위 [max_docs]개만 포함
+        truncated_docs = ret_docs[:max_docs]   # 상위 [max_docs]개만 포함
 
         for i in range(0, len(claims), self.claims_batch_size):
             batch = claims[i:i + self.claims_batch_size]
