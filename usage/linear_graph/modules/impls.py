@@ -49,8 +49,8 @@ class MyPostRetrievalModule(PostRetrievalModule):
 class MyGenerationModule(GenerationModule):
     def execute(self, post: dict):
         return {
-            'gen': post['data'] + ' - gen',
+            'gen': post['data'] + ' - output',
             'metric': {
-                'gen': post['data'] + ' - gen'
+                'gen': post['data'] + ' - output'
             }
         }

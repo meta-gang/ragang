@@ -64,11 +64,11 @@ class MyMergeModule(CustomModule):  # 'merge'
         }
 
 
-class MyGenerationModule(GenerationModule):  # 'gen'
+class MyGenerationModule(GenerationModule):  # 'output'
     def execute(self, merge: dict):
         return {
-            'gen': merge['data'] + ' - gen',
+            'gen': merge['data'] + ' - output',
             'metric': {
-                'gen': merge['data'] + ' - gen'
+                'gen': merge['data'] + ' - output'
             }
         }

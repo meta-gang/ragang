@@ -47,12 +47,12 @@ class MyRerankingModule(CustomModule):  # 'rerank'
         }
 
 
-class MyGenerationModule(GenerationModule):  # 'gen'
+class MyGenerationModule(GenerationModule):  # 'output'
     def execute(self, rerank: dict):
         print('generation')
         return {
-            'gen': rerank['data'] + ' - gen',
+            'gen': rerank['data'] + ' - output',
             'metric': {
-                'gen': rerank['data'] + ' - gen'
+                'gen': rerank['data'] + ' - output'
             }
         }

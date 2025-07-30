@@ -34,19 +34,7 @@ class BaseModule(metaclass=ABCMeta):  # observer
         self.__execute(args)
 
 
-    def update(self, packet: Packet) -> None:  # event handler
-        """
-        우선 지금은 모듈의 return이 아래와 같다고 가정
-        {
-            'd1': object,
-            'd2': object,
-            'metric': {
-                'param1': object,
-                'param2': object,
-            }
-        }
-        Data class로 만들어 사용할 것
-        """
+    def chain_react(self, packet: Packet) -> None:  # event handler
         if not self.__satisfy_dependency(packet):
             return
 

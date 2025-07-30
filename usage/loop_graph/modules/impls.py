@@ -49,11 +49,11 @@ class MyPostRetrievalModule(PostRetrievalModule):  # 'post'
         }
 
 
-class MyGenerationModule(GenerationModule):  # 'gen'
+class MyGenerationModule(GenerationModule):  # 'output'
     def execute(self, post: dict):
         return {
-            'gen': post['data'] + ' - gen',
+            'gen': post['data'] + ' - output',
             'metric': {
-                'gen': post['data'] + ' - gen'
+                'gen': post['data'] + ' - output'
             }
         }

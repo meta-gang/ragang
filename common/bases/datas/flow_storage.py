@@ -22,7 +22,7 @@ class FlowStorage:
 
     def notify_all(self, packet: 'Packet'):
         for subscriber in self.subscription[packet.src]:
-            subscriber.update(packet)
+            subscriber.chain_react(packet)
 
     def construct(self, x_id: int, query: str):
         self.state = State(x_id=x_id, query=query)
