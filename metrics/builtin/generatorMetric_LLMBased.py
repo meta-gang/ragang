@@ -266,7 +266,7 @@ class A2RHallucinationFaithfulnessMetric(BaseMetric):
     def __init__(self, llm_adapter: BaseLLMAdapter):
         self.llm_adapter = llm_adapter
 
-    def evaluate(self, query: str, reference: list[str], gen: str) -> Performance:
+    def evaluate(self, query: str, docs: list[str], gen: str) -> Performance:
         """
         Evaluates whether a generated answer is a hallucination based on a reference text.
 
@@ -289,7 +289,7 @@ class A2RHallucinationFaithfulnessMetric(BaseMetric):
             "factual" indicates that the answer to the question is correct relative to the reference text, and does not contain made up information. 
             Please read the query and reference text carefully before determining your response.
             # Query: {query}
-            # Reference text: {reference}
+            # Reference text: {docs}
             # Answer: {gen}
             Is the answer above factual or hallucinated based on the query and reference text?"""
 
