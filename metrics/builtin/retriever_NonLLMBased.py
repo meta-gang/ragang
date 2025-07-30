@@ -67,22 +67,33 @@ class KeywordMatchingMetric(BaseMetric):
         :return: Keyword Matching 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not ret_docs:
-            return Performance(score=0.0, unit='%', metric='Keyword Matching Metric')
+        if not isinstance(query, str):
+            raise TypeError("query는 str 타입이어야 합니다.")
+        if not isinstance(ret_docs, list):
+            raise TypeError("ret_docs는 List[str] 타입이어야 합니다")
+        if not all(isinstance(doc, str) for doc in ret_docs):
+            raise TypeError("ret_docs 리스트에는 str 타입만 포함되어야 합니다")
         
-        tokenized_query = set(query.split())
-        scores = []
-        for doc in ret_docs:
-            tokenized_doc = doc.split()
-            if not tokenized_doc:
-                continue
+        try:
+            if not ret_docs:
+                return Performance(score=0.0, unit='%', metric='Keyword Matching Metric')
             
-            matched_tokens = sum(1 for token in tokenized_doc if token in tokenized_query)
-            score_per_doc = matched_tokens / len(tokenized_doc)
-            scores.append(score_per_doc)
-            
-        avg_score = np.mean(scores) * 100 if scores else 0.0
-        return Performance(score=avg_score, unit='%', metric='Keyword Matching Metric')
+            tokenized_query = set(query.split())
+            scores = []
+            for doc in ret_docs:
+                tokenized_doc = doc.split()
+                if not tokenized_doc:
+                    continue
+                
+                matched_tokens = sum(1 for token in tokenized_doc if token in tokenized_query)
+                score_per_doc = matched_tokens / len(tokenized_doc)
+                scores.append(score_per_doc)
+                
+            avg_score = np.mean(scores) * 100 if scores else 0.0
+            return Performance(score=avg_score, unit='%', metric='Keyword Matching Metric')
+        except Exception as e:
+            raise RuntimeError(f"Keyword Matching 점수 계산 중 오류가 발생했습니다: {e}")
+        
 
 
 class JaccardSimilarityMetric(BaseMetric):
@@ -102,23 +113,34 @@ class JaccardSimilarityMetric(BaseMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not ret_docs:
-            return Performance(score=0.0, unit='%', metric='Jaccard Similarity Metric')
+        if not isinstance(query, str):
+            raise TypeError("query는 str 타입이어야 합니다.")
+        if not isinstance(ret_docs, list):
+            raise TypeError("ret_docs는 List[str] 타입이어야 합니다")
+        if not all(isinstance(doc, str) for doc in ret_docs):
+            raise TypeError("ret_docs 리스트에는 str 타입만 포함되어야 합니다")
+        
+        try:
+            if not ret_docs:
+                return Performance(score=0.0, unit='%', metric='Jaccard Similarity Metric')
 
-        tokenized_query = set(query.split())
-        scores = []
-        for doc in ret_docs:
-            tokenized_doc = set(doc.split())
-            if not tokenized_doc:
-                continue
+            tokenized_query = set(query.split())
+            scores = []
+            for doc in ret_docs:
+                tokenized_doc = set(doc.split())
+                if not tokenized_doc:
+                    continue
 
-            intersection = tokenized_query.intersection(tokenized_doc)
-            union = tokenized_query.union(tokenized_doc)
-            score_per_doc = len(intersection) / len(union) if union else 0.0
-            scores.append(score_per_doc)
+                intersection = tokenized_query.intersection(tokenized_doc)
+                union = tokenized_query.union(tokenized_doc)
+                score_per_doc = len(intersection) / len(union) if union else 0.0
+                scores.append(score_per_doc)
 
-        avg_score = np.mean(scores) * 100 if scores else 0.0
-        return Performance(score=avg_score, unit='%', metric='Jaccard Similarity Metric')
+            avg_score = np.mean(scores) * 100 if scores else 0.0
+            return Performance(score=avg_score, unit='%', metric='Jaccard Similarity Metric')
+        except Exception as e:
+            raise RuntimeError(f"Jaccard 유사도 점수 계산 중 오류가 발생했습니다: {e}")
+
 
 
 class CosineSimilarityMetric(BaseMetric):
@@ -147,17 +169,27 @@ class CosineSimilarityMetric(BaseMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not ret_docs:
-            return Performance(score=0.0, unit='-1 to 1', metric='Cosine Similarity Metric')
+        if not isinstance(query, str):
+            raise TypeError("query는 str 타입이어야 합니다.")
+        if not isinstance(ret_docs, list):
+            raise TypeError("ret_docs는 List[str] 타입이어야 합니다")
+        if not all(isinstance(doc, str) for doc in ret_docs):
+            raise TypeError("ret_docs 리스트에는 str 타입만 포함되어야 합니다")
         
-        query_vec = self.embedding_adapter.create_embeddings([query])[0]
-        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+        try:
+            if not ret_docs:
+                return Performance(score=0.0, unit='-1 to 1', metric='Cosine Similarity Metric')
+            
+            query_vec = self.embedding_adapter.create_embeddings([query])[0]
+            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
 
-        similarity_scores = cosine_similarity([query_vec], ret_docs_vec)[0]
+            similarity_scores = cosine_similarity([query_vec], ret_docs_vec)[0]
 
-        avg_score = np.mean(similarity_scores) if similarity_scores.size else 0.0
+            avg_score = np.mean(similarity_scores) if similarity_scores.size else 0.0
 
-        return Performance(score=avg_score, unit="-1 to 1", metric="Cosine Similarity Metric")
+            return Performance(score=avg_score, unit="-1 to 1", metric="Cosine Similarity Metric")
+        except Exception as e:
+            raise RuntimeError(f"코사인 유사도 점수 계산 중 오류가 발생했습니다: {e}")
 
 
 class EuclideanDistanceMetric(BaseMetric):
@@ -186,15 +218,26 @@ class EuclideanDistanceMetric(BaseMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not ret_docs:
-            return Performance(score=0.0, unit='distance', metric='Euclidean Distance Metric')
+        if not isinstance(query, str):
+            raise TypeError("query는 str 타입이어야 합니다.")
+        if not isinstance(ret_docs, list):
+            raise TypeError("ret_docs는 List[str] 타입이어야 합니다")
+        if not all(isinstance(doc, str) for doc in ret_docs):
+            raise TypeError("ret_docs 리스트에는 str 타입만 포함되어야 합니다")
+        
+        try:
+            if not ret_docs:
+                return Performance(score=0.0, unit='distance', metric='Euclidean Distance Metric')
 
-        query_vec = self.embedding_adapter.create_embeddings([query])[0]
-        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+            query_vec = self.embedding_adapter.create_embeddings([query])[0]
+            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
 
-        distances = [np.linalg.norm(query_vec - doc_vec) for doc_vec in ret_docs_vec]
-        avg_distance = np.mean(distances) if distances else 0.0
-        return Performance(score=avg_distance, unit='distance', metric='Euclidean Distance Metric')
+            distances = [np.linalg.norm(query_vec - doc_vec) for doc_vec in ret_docs_vec]
+            avg_distance = np.mean(distances) if distances else 0.0
+            return Performance(score=avg_distance, unit='distance', metric='Euclidean Distance Metric')
+        except Exception as e:
+            raise RuntimeError(f"유클리드 거리 계산 중 오류가 발생했습니다: {e}")
+
 
 
 class ManhattanDistanceMetric(BaseMetric):
@@ -223,15 +266,26 @@ class ManhattanDistanceMetric(BaseMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not ret_docs:
-            return Performance(score=0.0, unit='distance', metric='Manhattan Distance Metric')
+        if not isinstance(query, str):
+            raise TypeError("query는 str 타입이어야 합니다.")
+        if not isinstance(ret_docs, list):
+            raise TypeError("ret_docs는 List[str] 타입이어야 합니다")
+        if not all(isinstance(doc, str) for doc in ret_docs):
+            raise TypeError("ret_docs 리스트에는 str 타입만 포함되어야 합니다")
         
-        query_vec = self.embedding_adapter.create_embeddings([query])[0]
-        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+        try:
+            if not ret_docs:
+                return Performance(score=0.0, unit='distance', metric='Manhattan Distance Metric')
+            
+            query_vec = self.embedding_adapter.create_embeddings([query])[0]
+            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
 
-        distances = [np.sum(np.abs(query_vec - doc_vec)) for doc_vec in ret_docs_vec]
-        avg_distance = np.mean(distances) if distances else 0.0
-        return Performance(score=avg_distance, unit='distance', metric='Manhattan Distance Metric')
+            distances = [np.sum(np.abs(query_vec - doc_vec)) for doc_vec in ret_docs_vec]
+            avg_distance = np.mean(distances) if distances else 0.0
+            return Performance(score=avg_distance, unit='distance', metric='Manhattan Distance Metric')
+        except Exception as e:
+            raise RuntimeError(f"맨해튼 거리 계산 중 오류가 발생했습니다: {e}")
+        
 
 
 class NegativeRejectionRateMetric(BaseMetric):
@@ -252,16 +306,28 @@ class NegativeRejectionRateMetric(BaseMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not ret_docs:
-            return Performance(score=0.0, unit='%', metric='Negative Rejection Rate Metric')
+        if not isinstance(query, str):
+            raise TypeError("query는 str 타입이어야 합니다.")
+        if not isinstance(ret_docs, list):
+            raise TypeError("ret_docs는 List[str] 타입이어야 합니다")
+        if not all(isinstance(doc, str) for doc in ret_docs):
+            raise TypeError("ret_docs 리스트에는 str 타입만 포함되어야 합니다")
+        
+        try:
+            if not ret_docs:
+                return Performance(score=0.0, unit='%', metric='Negative Rejection Rate Metric')
 
-        query_vec = self.embedding_adapter.create_embeddings([query])[0]
-        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+            query_vec = self.embedding_adapter.create_embeddings([query])[0]
+            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
 
-        similarities = cosine_similarity([query_vec], ret_docs_vec)[0]
-        irrelevant_count = np.sum(similarities <= 0)
-        rejection_rate = (irrelevant_count / len(ret_docs_vec)) * 100
-        return Performance(score=rejection_rate, unit='%', metric='Negative Rejection Rate Metric')
+            similarities = cosine_similarity([query_vec], ret_docs_vec)[0]
+            irrelevant_count = np.sum(similarities <= 0)
+            rejection_rate = (irrelevant_count / len(ret_docs_vec)) * 100
+            return Performance(score=rejection_rate, unit='%', metric='Negative Rejection Rate Metric')
+        except Exception as e:
+            raise RuntimeError(f"NRR 점수 계산 중 오류가 발생했습니다: {e}")
+
+
 
 class PrecisionMetric(BaseMetric):
     """정밀도(Precision)를 평가합니다.
