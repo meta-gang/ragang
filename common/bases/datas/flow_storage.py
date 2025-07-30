@@ -34,9 +34,9 @@ class FlowStorage:
 
     def send_packet(self, packet: 'Packet'):
         # 1. add execution status == link
-        self.state.add_x_status(packet.src, packet.destinations)
+        status_cnt: int = self.state.add_x_status(packet.src, packet.destinations)
         # 2. refresh execution status
-        self.state.refresh_x_status(packet.src)
+        self.state.refresh_x_status(packet.src, status_cnt)  # TODO: status_cnt로 추가된 status 관리하는 로직 수정
         # 3. store packet into snapshots
         self.state.save_snapshots(packet)
         # 4. notify listeners
@@ -61,16 +61,20 @@ class State:
         if packet.is_answer:
             self.answer = packet.data.get('answer', None)
 
-    def add_x_status(self, src_mid: str, dest_mids: list[str]):
+    def add_x_status(self, src_mid: str, dest_mids: list[str]) -> int:
+        status_cnt: int = 0
         if len(dest_mids) == 0:
             self.x_status.append((src_mid, None))
+            status_cnt += 1
         for dest in dest_mids:
             self.x_status.append((src_mid, dest))
+            status_cnt += 1
+        return status_cnt
 
-    def refresh_x_status(self, src_mid: str):
-        current_x: tuple[str, str] = self.x_status[-1]
+    def refresh_x_status(self, src_mid: str, status_cnt: int):
+        current_x: list[tuple[str, str]] = self.x_status[-status_cnt:]
         self.__refresh_x_status(src_mid, 0)
-        self.x_status.append(current_x)
+        self.x_status.extend(current_x)
 
     def __refresh_x_status(self, src_mid: str, idx: int):
         if idx >= len(self.x_status):
