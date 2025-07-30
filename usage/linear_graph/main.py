@@ -23,6 +23,7 @@ rag = RAGContainer(
 
 rag.invoke_batch([
     'Hello, Ragang',
+    'Hello, Starbucks',
     'Hello, SKKU',
     'Hello, Metabuild'
 ])

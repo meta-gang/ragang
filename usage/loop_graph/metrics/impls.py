@@ -7,7 +7,7 @@ class MyRetrievalMetric(BaseMetric):
         return Performance(score=0.6, unit='', metric='f1')
 
 
-class MyMergeModuleMetric(BaseMetric):
+class MyPostRetrievalMetric(BaseMetric):
     def evaluate(self, retrieved: list[str]) -> Performance:
         return Performance(score=0.8, unit='', metric='Cosine Similarity')
 

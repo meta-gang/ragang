@@ -44,7 +44,7 @@ class MyPostRetrievalModule(PostRetrievalModule):  # 'post'
                 'data': data
             },
             'metric': {
-                'context': data
+                'retrieved': data
             }
         }
 

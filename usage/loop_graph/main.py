@@ -1,6 +1,5 @@
 from common.bases.datas.linker import Linker
 from container import RAGContainer
-from usage.linear_graph.metrics.impls import MyPostRetrievalMetric
 from usage.loop_graph.modules.impls import *
 from usage.loop_graph.metrics.impls import *
 
