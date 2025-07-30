@@ -1,7 +1,7 @@
 [project]
-name = "framework-demo"
-version = "0.1.0"
-description = "Add your description here"
+name = "rag-testing-framework"
+version = "0.0.2"
+description = "RAG flow modular testing framework"
 requires-python = ">=3.13"
 dependencies = [
     "numpy>=2.3.1",

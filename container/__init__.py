@@ -1,1 +1,1 @@
-from .rag_container import LinearRagContainer
+from .rag_container import RAGContainer

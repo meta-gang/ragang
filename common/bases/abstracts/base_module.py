@@ -1,52 +1,137 @@
+import time
+import inspect
 from abc import ABCMeta, abstractmethod
+from typing import Any
 
-from .base_metric import BaseMetric
-from exceptions.frameworks.types import ModuleConnectionException
-from ..datas.performance_dataclass import Performance
+from common.bases.abstracts.base_metric import BaseMetric
+from common.bases.datas.flow_storage import Packet, FlowStorage
+from common.bases.datas.linker import Dependency, Linker
+from common.bases.datas.performance_dataclass import Performance
+from exceptions.frameworks.datas import MissingMetricDataException, MissingMetricArgumentException, \
+    ModuleOutputException
+from exceptions.frameworks.modules import StarterModuleException
 
 
-class BaseModule(metaclass=ABCMeta):
-    def __init__(self, metric: BaseMetric = None):
-        self.__next_module: BaseModule | None = None
-        self.__metric: BaseMetric | None = metric  # 여러 metric을 모두 적용한 결과를 볼 수 있게 하고 싶다면 얘랑 아래 performance를 리스트로 만들기
-        self.performance: Performance | None = None
+class BaseModule(metaclass=ABCMeta):  # observer
+    def __init__(self, module_id: str, linker: Linker = None, metric: BaseMetric = None, is_starter: bool = False):
+        self.module_id: str = module_id
+        self.dependency: Dependency = linker.build(module_id) if linker else Dependency([], False)
+        self.__metric: BaseMetric | None = metric
+        self.storage: FlowStorage | None = None
+        self.is_starter: bool = is_starter
 
-    def __execute(self, *args, **kwargs):
-        result = self.execute(*args, **kwargs)
-        if self.__metric is None:
-            self.performance = Performance(_eval=False)
-        else:
-            self.performance = self.__metric.evaluate(result, *args, **kwargs)
-        return self.__chain_call(result) or result
-        # 최종 결과가 빈 문자열 등 0을 의미하는 값이라면 그 중간 결과가 결과로 return 될 수 있으니 윗 라인이 타당한 코드인지 더 생각해보기
-        # 지금은 우리가 각 metric을 구현할 때 여러 형태로 들어올 in/out data에서 적절한 것들을 뽑아서 평가하도록 만들어야 하니 이걸 사용자가 좀 우리가 정한 interface에 맞게 변형해 metric에 반영할 수 있도록 할 수 없을까?
-        # 지금은 metric의 입력이 각 모듈이 실행 되는 과정에서의 그 데이터 흐름에 너무 의존해있는 느낌임 이걸 좀 개선하자
+    def trigger_chain_execution(self, query: str):
+        if not self.is_starter:
+            raise  StarterModuleException(f"Trying to call trigger method at '{self.module_id}'.\n"
+                                          f"Only starter modules can use trigger method.")
 
-    def __rshift__(self, _next: 'BaseModule'):
-        # connect modules by using '>>' operator
-        # TODO: type checking
-        # TODO: connect to the next module
-        if not isinstance(_next, BaseModule):
-            raise ModuleConnectionException(str(type(_next)))
+        signature: list[str] = list(inspect.signature(self.execute).parameters.keys())
+        if signature != ['query']:
+            raise StarterModuleException(f"Method execute() of starter module '{self.module_id}' can only accept 'query' parameter.\n"
+                                         f"But received {signature}.")
 
-        if self.__next_module:
-            # if this module is already connected with some module, insert new module
-            _next.__next_module = self.__next_module
-        self.__next_module = _next
+        args: dict[str, Any] = {'query': query}
+        self.__execute(args)
 
-        # piv: BaseModule = self
-        # while piv.__next_module:
-        #     piv = piv.__next_module
-        # or head에 >> 로 여러개 연결지을 수 있도록 여기서 next_module을 쭉 들어가서 마지막 뒤에 새로운 모듈 연결되게 만들까? 그러면 컨테이너에서 모듈 연결할 때 reduce도 사용 가능해보임
-        # 근데 이렇게 하면 이미 구축해둔 sequence의 중간에 모듈을 끼워 넣는게 불가
-        return self
 
-    def __chain_call(self, *args, **kwargs):
-        if not self.__next_module is None:
-            return self.__next_module.__execute(*args, **kwargs)
-        return None
+    def update(self, packet: Packet) -> None:  # event handler
+        """
+        우선 지금은 모듈의 return이 아래와 같다고 가정
+        {
+            'd1': object,
+            'd2': object,
+            'metric': {
+                'param1': object,
+                'param2': object,
+            }
+        }
+        Data class로 만들어 사용할 것
+        """
+        if not self.__satisfy_dependency(packet):
+            return
+
+        # parse module input
+        args: dict[str, Any] = self.__retrieve_parameter(packet)
+
+        self.__execute(args)
+
+    def __satisfy_dependency(self, packet: Packet) -> bool:
+        if self.module_id not in packet.destinations:
+            return False
+        return self.dependency.check_dependencies(self.storage.state.x_status)
+
+    def __retrieve_parameter(self, packet: Packet) -> dict[str, Any]:
+        args: dict[str, Any] = {}
+        if self.dependency.is_or:  # for cond, loop module
+            for dep_mid in self.dependency.get_dependent_mids():
+                if packet.src == dep_mid:
+                    args[dep_mid] = packet.data[self.module_id]  # TODO: Data 객체 만들고 수정
+                else:
+                    args[dep_mid] = None
+        else:  # for merge module
+            dep_mids: list[str] = self.dependency.get_dependent_mids()
+            for dep_mid in dep_mids:
+                args[dep_mid] = self.storage.state.snapshots[dep_mid][-1].data[self.module_id]
+        return args
+
+    def __execute(self, args: dict[str, Any]):
+        # call self.execute()
+        x_start: float = time.time()
+        new_result: dict[str, Any] = self.execute(**args)
+        x_time: float = time.time() - x_start
+
+        # validate output data
+        self.__validate_output(new_result)
+
+        # evaluation
+        eval_data: dict[str, Any] | None = new_result.pop('metric', None)
+        performance: Performance = self.__evaluate_performance(eval_data)
+
+        # build packet
+        new_packet = Packet(self, new_result, performance, x_time)
+
+        # send packet
+        self.storage.send_packet(new_packet)
+
+    def __validate_output(self, output: dict[str, Any]) -> dict[str, Any]:
+        if self.__metric is not None and 'metric' not in output.keys():
+            raise MissingMetricDataException(self.module_id, self.__metric.__class__.__name__)
+        if self.__metric is None and 'metric' in output.keys():
+            output.pop('metric')
+
+        subscribers: list[str] = [module.module_id for module in self.storage.subscription[self.module_id]]
+        dest_mids: list[str] = [dest_mid for dest_mid in output.keys() if dest_mid not in ['metric', 'answer']]
+        for mid in dest_mids:
+            if mid not in subscribers:
+                raise ModuleOutputException(f"Destination module '{mid}' is not depends on module '{self.module_id}'.\n"
+                                            f"But '{self.module_id}' is trying to send packet to '{mid}'.")
+
+        return output
+
+    def __evaluate_performance(self, eval_data: dict[str, Any]) -> Performance:
+        if eval_data is None:
+            return Performance(_eval=False)
+
+        # parse arg names via signature of metric.evaluate()
+        signature: dict[str, inspect.Parameter] = dict(inspect.signature(self.__metric.evaluate).parameters)
+        req_params: list[str] = list(signature.keys())
+
+        if any([rp not in eval_data.keys() for rp in req_params]):
+            raise MissingMetricArgumentException(self.module_id, self.__metric.__class__.__name__, req_params)
+
+        args = {rp: eval_data[rp] for rp in req_params}
+        return self.__metric.evaluate(**args)
 
     @abstractmethod
     def execute(self, *args, **kwargs):
         """ TODO: Define this module's responsibility """
         raise NotImplementedError(f"Please implement '{self.__class__.__name__}.execute()'")
+
+# if __name__ == '__main__':
+#     class M(BaseModule):
+#         def execute(self, query: str, he):
+#             pass
+#
+#     m = M('hello', None, None, True)
+#     m.trigger_chain_execution('dd')
+
