@@ -49,7 +49,7 @@ class State:
         self.x_status: list[tuple[str, str]] = list()  # execution status (for dependency checking)
         self.snapshots: dict[str, list['Packet']] = dict()  # module output packet snapshots
         self.performance: Performance = Performance()
-        self.answer: str | None = None
+        self.gen: str | None = None
 
     def save_snapshots(self, packet: 'Packet'):
         if self.snapshots.get(packet.src, None) is None:
@@ -57,9 +57,9 @@ class State:
         else:
             self.snapshots[packet.src].append(packet)
 
-        # save answer (for output module)
+        # save gen (for output module)
         if packet.is_answer:
-            self.answer = packet.data.get('answer', None)
+            self.gen = packet.data.get('gen', None)
 
     def add_x_status(self, src_mid: str, dest_mids: list[str]) -> int:
         status_cnt: int = 0
@@ -96,8 +96,8 @@ class Packet:
         self.data: dict[str, Any] = data  # {dest_mid: data} TODO: Data 객체 만들고 수정
         self.performance: Performance = performance
         self.x_time: float = x_time  # sec
-        self.destinations: list[str] = list(key for key in data.keys() if key not in ['metric', 'answer'])
-        self.is_answer: bool = 'answer' in data.keys()
+        self.destinations: list[str] = list(key for key in data.keys() if key not in ['metric', 'gen'])
+        self.is_answer: bool = 'gen' in data.keys()
 
 # if __name__ == '__main__':
 #     state: State = State(0, 'hello')

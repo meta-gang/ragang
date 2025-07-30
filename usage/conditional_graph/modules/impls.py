@@ -55,7 +55,7 @@ class MyMergeModule(CustomModule):  # 'merge'
         input_data: dict = first_ret or second_ret
 
         return {
-            'gen': {
+            'output': {
                 'data': input_data['data'] + ' - merge',
             },
             'metric': {
@@ -67,8 +67,8 @@ class MyMergeModule(CustomModule):  # 'merge'
 class MyGenerationModule(GenerationModule):  # 'gen'
     def execute(self, merge: dict):
         return {
-            'answer': merge['data'] + ' - gen',
+            'gen': merge['data'] + ' - gen',
             'metric': {
-                'answer': merge['data'] + ' - gen'
+                'gen': merge['data'] + ' - gen'
             }
         }

@@ -12,7 +12,7 @@ rag = RAGContainer(
         MyPreRetrievalModule('pre', linker=Linker('starter'), metric=MyPreRetrievalMetric()),
         MyRetrievalModule('ret', linker=Linker('pre'), metric=MyRetrievalMetric()),
         MyPostRetrievalModule('post', linker=Linker('ret'), metric=MyPostRetrievalMetric()),
-        MyGenerationModule('gen', linker=Linker('post'), metric=MyGenerationMetric(None)),
+        MyGenerationModule('output', linker=Linker('post'), metric=MyGenerationMetric(None)),
     ],
     e2e_metric=MyE2EMetric()
 )

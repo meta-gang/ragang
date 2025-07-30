@@ -11,7 +11,7 @@ rag = RAGContainer(
         MyRetrievalModule('first_ret', linker=Linker('branch'), metric=MyRetrievalMetric()),
         MyRetrievalModule('second_ret', linker=Linker('branch'), metric=MyRetrievalMetric()),
         MyRerankingModule('rerank', linker=Linker('first_ret') & Linker('second_ret'), metric=MyRerankingMetric()),
-        MyGenerationModule('gen', linker=Linker('rerank'), metric=MyGenerationMetric(None)),
+        MyGenerationModule('output', linker=Linker('rerank'), metric=MyGenerationMetric(None)),
     ],
     e2e_metric=MyE2EMetric()
 )

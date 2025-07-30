@@ -100,7 +100,7 @@ class BaseModule(metaclass=ABCMeta):  # observer
             output.pop('metric')
 
         subscribers: list[str] = [module.module_id for module in self.storage.subscription[self.module_id]]
-        dest_mids: list[str] = [dest_mid for dest_mid in output.keys() if dest_mid not in ['metric', 'answer']]
+        dest_mids: list[str] = [dest_mid for dest_mid in output.keys() if dest_mid not in ['metric', 'gen']]
         for mid in dest_mids:
             if mid not in subscribers:
                 raise ModuleOutputException(f"Destination module '{mid}' is not depends on module '{self.module_id}'.\n"

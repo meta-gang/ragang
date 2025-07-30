@@ -17,7 +17,7 @@ class InvalidModuleIdException(ValueError):
 class FlowOutputException(Exception):
     def __init__(self, msg: str = None):
         super().__init__(msg or
-                         f"The output module must return an answer string with the key 'answer', but none was given")
+                         f"The output module must return an generated string with the key 'gen', but none was given")
 
 
 class MultipleStarterModuleException(Exception):

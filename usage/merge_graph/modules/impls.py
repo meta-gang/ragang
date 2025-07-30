@@ -38,7 +38,7 @@ class MyRerankingModule(CustomModule):  # 'rerank'
     def execute(self, first_ret: dict, second_ret: dict):
         data: str = f"[{first_ret['data']} & {second_ret['data']}]"
         return {
-            'gen': {
+            'output': {
                 'data': f'{data} - rerank',
             },
             'metric': {
@@ -49,9 +49,10 @@ class MyRerankingModule(CustomModule):  # 'rerank'
 
 class MyGenerationModule(GenerationModule):  # 'gen'
     def execute(self, rerank: dict):
+        print('generation')
         return {
-            'answer': rerank['data'] + ' - gen',
+            'gen': rerank['data'] + ' - gen',
             'metric': {
-                'answer': rerank['data'] + ' - gen'
+                'gen': rerank['data'] + ' - gen'
             }
         }

@@ -56,23 +56,23 @@ class BaseContainer(metaclass=ABCMeta):
     def invoke(self, query: str, query_id: int = 0) -> str:
         self.storage.construct(query_id, query)
         self.starter.trigger_chain_execution(query)
-        answer: str = self.storage.state.answer
-        if answer is None:
+        gen: str = self.storage.state.gen
+        if gen is None:
             raise FlowOutputException()
 
         if self.__metric is None:
             performance: Performance = Performance(_eval=False)
         else:
-            performance: Performance = self.__metric.evaluate(query=query, gen=answer)
+            performance: Performance = self.__metric.evaluate(query=query, gen=gen)
         self.storage.destruct(performance)
-        return answer
+        return gen
 
     def print_eval(self):
         for query_idx, state in self.storage.history.items():
             tot_x_time: float = 0  # ms
             print()
             print(ANSIStyler.style(f'Query: {state.query}', font_style='bold', fore_color='light-green'))  # query
-            print(ANSIStyler.style(f"Answer: {state.answer}", font_style='bold', fore_color='light-green'))  # answer
+            print(ANSIStyler.style(f"Generated Answer: {state.gen}", font_style='bold', fore_color='light-green'))  # answer
 
             for mid, packet_list in state.snapshots.items():  # print by packets
                 print(ANSIStyler.style(f"\t'{mid}' Performance:", font_style='normal', fore_color='blue'))

@@ -16,7 +16,7 @@ class MyGenerationMetric(BaseMetric):
     def __init__(self, llm_adaptor: object):
         self.llm_adaptor = llm_adaptor
 
-    def evaluate(self, answer: str) -> Performance:
+    def evaluate(self, gen: str) -> Performance:
         return Performance(score=100, unit='', metric='LLMBased')
 
 

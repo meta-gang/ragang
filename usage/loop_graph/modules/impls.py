@@ -34,7 +34,7 @@ class MyRetrievalModule(RetrievalModule):  # 'ret'
 class MyPostRetrievalModule(PostRetrievalModule):  # 'post'
     def execute(self, ret: dict):
         if int(ret['data'][-1]) >= 5:
-            target: str = 'gen'
+            target: str = 'output'
             data = ret['data'] + ' - post'
         else:
             target: str = 'ret'
@@ -52,8 +52,8 @@ class MyPostRetrievalModule(PostRetrievalModule):  # 'post'
 class MyGenerationModule(GenerationModule):  # 'gen'
     def execute(self, post: dict):
         return {
-            'answer': post['data'] + ' - gen',
+            'gen': post['data'] + ' - gen',
             'metric': {
-                'answer': post['data'] + ' - gen'
+                'gen': post['data'] + ' - gen'
             }
         }
