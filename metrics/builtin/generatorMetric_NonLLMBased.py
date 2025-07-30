@@ -18,7 +18,7 @@ class AnswerContextSimilarity(BaseMetric):
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, context: list[str], gen: str) -> Performance:
+    def evaluate(self, ret_docs: list[str], gen: str) -> Performance:
         """
         Compute average cosine similarity between embedded retrieval chunks and generator's answer
         
@@ -29,12 +29,12 @@ class AnswerContextSimilarity(BaseMetric):
         :returns: mean of cosine similarities between gen and each retrieval chunks
         :rtype: Performance
         """
-        ans_vec = self.embedding_adapter.create_embeddings([gen])[0]
-        chunk_vecs = self.embedding_adapter.create_embeddings(context)
+        gen_vec = self.embedding_adapter.create_embeddings([gen])[0]
+        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
 
         similarity = []
-        for chunk_vec in chunk_vecs:
-            sim = CosineSimilarity.compute(chunk_vec, ans_vec)
+        for chunk_vec in ret_docs_vec:
+            sim = CosineSimilarity.compute(chunk_vec, gen_vec)
             similarity.append(abs(sim))
         
         acs_score = float(np.mean(similarity))
@@ -57,7 +57,7 @@ class AnswerCentricSimilarityVariance(BaseMetric):
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, context: list[str], gen: str):
+    def evaluate(self, ret_docs: list[str], gen: str):
         """
         Compute veriance of angles between generator's answer and each retrieval chunks
         
@@ -68,11 +68,11 @@ class AnswerCentricSimilarityVariance(BaseMetric):
         :returns: Veriance of angles beteween gen_vec and each chunk_vecs
         :rtype: Performance
         """
-        ans_vec = self.embedding_adapter.create_embeddings([gen])[0]
-        chunk_vecs = self.embedding_adapter.create_embeddings(context)
+        gen_vec = self.embedding_adapter.create_embeddings([gen])[0]
+        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
         angles = []
-        for chunk_vec in chunk_vecs:
-            cos_sim = CosineSimilarity.compute(chunk_vec, ans_vec)
+        for chunk_vec in ret_docs_vec:
+            cos_sim = CosineSimilarity.compute(chunk_vec, gen_vec)
             angle = np.arccos(np.clip(cos_sim, -1.0, 1.0))
             angles.append(angle)
         mean_angle = np.mean(angles)
@@ -100,7 +100,7 @@ class MutualInformation_KSG(BaseMetric):
         self.embedding_adapter = embedding_adapter
         self.k = k
 
-    def evaluate(self, context: list[str], generation: str) -> Performance:
+    def evaluate(self, ret_docs: list[str], gen: str) -> Performance:
         """
         Estimate how much mutual information exists between the generated answer and the retrieval context by measuring statistical dependency using the KSG(Kraskov Stögbauer Grassberger) method, which approximates mutual information based on neighbor distances in joint and marginal embedding spaces.
         
@@ -111,16 +111,16 @@ class MutualInformation_KSG(BaseMetric):
         :returns: Estimated mutual information score
         :rtype: Performance
         """
-        context_embeddings = self.embedding_adapter.create_embeddings(context)
-        gen_embedding = self.embedding_adapter.create_embeddings([generation])[0]
+        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+        gen_vec = self.embedding_adapter.create_embeddings([gen])[0]
 
-        N = len(context_embeddings)
+        N = len(ret_docs_vec)
         if N == 0:
             return Performance(score=0.0, unit="", metric="MI_GC_KSG")
 
         joint_vectors = []
-        for ctx_vec in context_embeddings:
-            joint = np.concatenate([gen_embedding, ctx_vec])
+        for ctx_vec in ret_docs_vec:
+            joint = np.concatenate([gen_vec, ctx_vec])
             joint_vectors.append(joint)
 
         epsilons = []
@@ -143,8 +143,8 @@ class MutualInformation_KSG(BaseMetric):
             for j in range(N):
                 if i == j:
                     continue
-                dist_x = np.max(np.abs(gen_embedding - gen_embedding))
-                dist_y = np.max(np.abs(context_embeddings[i] - context_embeddings[j]))
+                dist_x = np.max(np.abs(gen_vec - gen_vec))
+                dist_y = np.max(np.abs(ret_docs_vec[i] - ret_docs_vec[j]))
                 if dist_x < eps:
                     count_x += 1
                 if dist_y < eps:
@@ -174,7 +174,7 @@ class RetrievalDeviationfromAnswer(BaseMetric):
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
     
-    def evaluate(self, context: list[str], gen: str) -> Performance:
+    def evaluate(self, ret_docs: list[str], gen: str) -> Performance:
         """
         Compute how closely the retrieved context vectors align with the generated answer by computing the average deviation and dispersion of their embeddings, then converting this deviation into a bounded score using inverse scaling.
         
@@ -185,11 +185,11 @@ class RetrievalDeviationfromAnswer(BaseMetric):
         :returns: Inverse of dispersion score indicating deviation of answer from retrieval embeddings
         :rtype: Performance
         """
-        chunk_vecs = self.embedding_adapter.create_embeddings(context)
-        ans_vec = self.embedding_adapter.create_embeddings([gen])[0]
+        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+        gen_vec = self.embedding_adapter.create_embeddings([gen])[0]
 
-        chunk_vecs = chunk_vecs / np.linalg.norm(chunk_vecs, axis=1, keepdims=True)
-        ans_vec = ans_vec / np.linalg.norm(ans_vec)
+        chunk_vecs = ret_docs_vec / np.linalg.norm(ret_docs_vec, axis=1, keepdims=True)
+        ans_vec = gen_vec / np.linalg.norm(gen_vec)
 
         diff_vecs = chunk_vecs - ans_vec
 
@@ -215,7 +215,7 @@ class RetrievaltopkMeanAnswerSimilarity(BaseMetric):
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, context: list[str], gen: str, query: str):
+    def evaluate(self, ret_docs: list[str], gen: str, query: str):
         """
         Compute the similarity score by selecting top-k retrieved chunks based on query similarity drop-off, comparing centroids of the top-k and full set against the generated answer, and applying a sigmoid-based adjustment using z-score to account for uniformly relevant or noise-free retrievals.
         
@@ -228,22 +228,22 @@ class RetrievaltopkMeanAnswerSimilarity(BaseMetric):
         :returns: Adjusted similarity score emphasizing top-k retrieval relevance
         :rtype: Performance
         """
-        chunk_vecs = self.embedding_adapter.create_embeddings(context)
+        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
         gen_vec = self.embedding_adapter.create_embeddings([gen])[0]
         query_vec = self.embedding_adapter.create_embeddings([query])[0]
 
-        similarities = [CosineSimilarity.compute(query_vec, vec) for vec in chunk_vecs]
+        similarities = [CosineSimilarity.compute(query_vec, vec) for vec in ret_docs_vec]
 
         sorted_indices = sorted(range(len(similarities)), key=lambda i: similarities[i], reverse=True)
         sorted_similarities = [similarities[i] for i in sorted_indices]
 
         drops = [sorted_similarities[i] - sorted_similarities[i + 1] for i in range(len(sorted_similarities) - 1)]
         drop_index = drops.index(max(drops)) + 1
-        k = min(max(1, drop_index), len(chunk_vecs) - 1)
+        k = min(max(1, drop_index), len(ret_docs_vec) - 1)
 
-        topk_vecs = [chunk_vecs[sorted_indices[i]] for i in range(k)]
+        topk_vecs = [ret_docs_vec[sorted_indices[i]] for i in range(k)]
         topk_centroid = np.mean(topk_vecs, axis=0)
-        r_centroid = np.mean(chunk_vecs, axis=0)
+        r_centroid = np.mean(ret_docs_vec, axis=0)
 
         cos_topk = max(CosineSimilarity.compute(gen_vec, topk_centroid), 0)
         cos_all = max(CosineSimilarity.compute(gen_vec, r_centroid), 0)

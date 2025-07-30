@@ -12,7 +12,7 @@
     (특수문자 제거, 불용어 제거, 토큰화 등)
 
     - **query**: 단일 텍스트 문자열
-    - **retrieved_documents**: 문서 텍스트들의 리스트
+    - **ret_docs**: 문서 텍스트들의 리스트
       (예: ``["문서1 텍스트", "문서2 텍스트", ...]``)
 
 .. note:: **Output 데이터 형식**
@@ -82,20 +82,20 @@ class RandomDocumentInjectionEffect(BaseMetric):
         if self.precision_calculator.mode == 'embedding' and not self.embedding_adapter:
             raise ValueError("'embedding' 모드에서는 embedding_adapter가 반드시 필요합니다.")
 
-    def evaluate(self, query: str, retrieved_documents: List[str], ground_truth: List[str]) -> Performance:
+    def evaluate(self, query: str, ret_docs: List[str], ground_truth: List[str]) -> Performance:
         """
         노이즈 문서 주입 후 정밀도 하락폭을 계산합니다.
 
         :param query: 노이즈 문서 생성을 위한 사용자 원본 쿼리
         :type query: str
-        :param retrieved_documents: 원본 검색 결과 텍스트 리스트
-        :type retrieved_documents: List[str]
+        :param ret_docs: 원본 검색 결과 텍스트 리스트
+        :type ret_docs: List[str]
         :param ground_truth: 정답 텍스트 리스트
         :type ground_truth: List[str]
         :return: 정밀도 하락폭(effect) 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        original_precision = self.precision_calculator.evaluate(retrieved_documents, ground_truth)
+        original_precision = self.precision_calculator.evaluate(ret_docs, ground_truth)
         
         prompt = "Based on the user's query below, write a short, plausible-looking document that uses similar keywords but does NOT contain the real answer. Respond only with the document text."
         response_data = self.llm_adapter.request(prompt=prompt, query=query)
@@ -107,7 +107,7 @@ class RandomDocumentInjectionEffect(BaseMetric):
             print("Warning: Failed to generate adversarial document. Using a generic random document instead.")
             adversarial_doc_text = "This is a generic irrelevant document for system testing."
 
-        injected_docs = retrieved_documents + [adversarial_doc_text]
+        injected_docs = ret_docs + [adversarial_doc_text]
         injected_precision = self.precision_calculator.evaluate(injected_docs, ground_truth)
         
         effect = original_precision.score - injected_precision.score

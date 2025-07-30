@@ -492,7 +492,7 @@ class PairwiseCosineSimilarityVariance(BaseMetric):
     def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
         self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, context: list) -> Performance:
+    def evaluate(self, ret_docs: list[str]) -> Performance:
         """
         Compute the semantic diversity among retrieval chunks by computing the variance of pairwise cosine similarities between their embeddings.
         
@@ -501,11 +501,11 @@ class PairwiseCosineSimilarityVariance(BaseMetric):
         :returns: Variance score of pairwise cosine similarities indicating semantic spread
         :rtype: Performance
         """
-        embeddings = self.embedding_adapter.create_embeddings(context)
+        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
         similarity = []
-        for i in range(len(embeddings)):
-            for j in range(i+1, len(embeddings)):
-                sim = CosineSimilarity.compute(embeddings[i], embeddings[j])
+        for i in range(len(ret_docs_vec)):
+            for j in range(i+1, len(ret_docs_vec)):
+                sim = CosineSimilarity.compute(ret_docs_vec[i], ret_docs_vec[j])
                 similarity.append(sim)
         mean = np.mean(similarity)
         variance = np.mean((np.array(similarity) - mean) ** 2)
