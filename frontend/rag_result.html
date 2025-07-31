@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>RAG Metric Summary</title>
+  <style>
+    table, th, td {  margin-left: auto; margin-right: auto; }
+    table { border-collapse: collapse; width: 80%; margin-top: 30px; }
+    th, td { border: 1px solid gray; padding: 10px 10px; }
+    th { background-color: #eee; }
+    .clickable { cursor: pointer; color: black; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>RAG Result</h1>
+  <div id="container">RAG 분석 중...</div>
+
+  <script>
+    fetch("metric_summary.json")
+      .then(function(response) {
+        return response.json();
+      })
+      .then(function(data) {
+        var state = "<table>";
+        state += "<tr> <th>Query ID</th> <th>Query</th> <th>Answer</th> <th>E2E Score</th> <th>Total Time (ms)</th> </tr>";
+
+        for (var i = 0; i < data.length; i++) {
+          state += "<tr class='clickable' onclick='toggleDetail(" + i + ")'>";
+            state += "<td>" + data[i].qid + "</td>";
+            state += "<td>" + data[i].query + "</td>";
+            state += "<td>" + data[i].answer + "</td>";
+            state += "<td>" + data[i].e2e_score + "</td>";
+            state += "<td>" + data[i].total_time_ms + "</td>";
+          state += "</tr>";
+
+
+          var moduleMetric = "<table> <tr> <th>Module</th> <th>Metric</th> <th>Score</th> <th>Time (ms)</th> </tr>";
+          for (var mod in data[i].modulers) {
+            var metrics = data[i].modulers[mod];
+            for (var j = 0; j < metrics.length; j++) {
+              var score = metrics[j].score;
+              if (metrics[j].unit) {
+                score += " " + metrics[j].unit;
+              }
+              moduleMetric += "<tr>";
+                moduleMetric += "<td>" + mod + "</td>";
+                moduleMetric += "<td>" + metrics[j].metric + "</td>";
+                moduleMetric += "<td>" + score + "</td>";
+                moduleMetric += "<td>" + metrics[j].time_ms + "</td>";
+              moduleMetric += "</tr>";
+            }
+          }
+          moduleMetric += "</table>";
+
+          state += "<tr id='detail_metrics" + i + "' class='hidden'><td colspan='5'>";
+          state += "<b>Metric for each Module [Query " + data[i].qid + "]</b>";
+          state += moduleMetric;
+          state += "</td></tr>";
+        }
+
+        state += "</table>";
+        document.getElementById("container").innerHTML = state;
+      })
+      .catch(function(error) {
+        document.getElementById("container").innerHTML = "metric_summary.json 파일을 불러오는데 실패했습니다.";
+      });
+
+    function toggleDetail(index) {
+      var detailRow = document.getElementById("detail_metrics" + index);
+      if (detailRow.classList.contains("hidden")) {
+        detailRow.classList.remove("hidden");
+      } else {
+        detailRow.classList.add("hidden");
+      }
+    }
+  </script>
+</body>
+</html>

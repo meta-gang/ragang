@@ -1,0 +1,218 @@
+[
+  {
+    "qid": 0,
+    "query": "Hello, Ragang",
+    "answer": "Hello, Ragang - starter - pre - ret - post - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0069,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0012
+        }
+      ],
+      "pre": [
+        {
+          "performance": "Accuracy: 100.00%",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 100,
+          "time_ms": 0.0019
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0014
+        }
+      ],
+      "post": [
+        {
+          "performance": "Cosine Similarity: 0.80",
+          "metric": "Cosine Similarity",
+          "unit": "",
+          "score": 0.8,
+          "time_ms": 0.001
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0014
+        }
+      ]
+    }
+  },
+  {
+    "qid": 1,
+    "query": "Hello, Starbucks",
+    "answer": "Hello, Starbucks - starter - pre - ret - post - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0041,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0007
+        }
+      ],
+      "pre": [
+        {
+          "performance": "Accuracy: 100.00%",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 100,
+          "time_ms": 0.001
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0007
+        }
+      ],
+      "post": [
+        {
+          "performance": "Cosine Similarity: 0.80",
+          "metric": "Cosine Similarity",
+          "unit": "",
+          "score": 0.8,
+          "time_ms": 0.001
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0007
+        }
+      ]
+    }
+  },
+  {
+    "qid": 2,
+    "query": "Hello, SKKU",
+    "answer": "Hello, SKKU - starter - pre - ret - post - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0038,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0005
+        }
+      ],
+      "pre": [
+        {
+          "performance": "Accuracy: 100.00%",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 100,
+          "time_ms": 0.001
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0007
+        }
+      ],
+      "post": [
+        {
+          "performance": "Cosine Similarity: 0.80",
+          "metric": "Cosine Similarity",
+          "unit": "",
+          "score": 0.8,
+          "time_ms": 0.0007
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.001
+        }
+      ]
+    }
+  },
+  {
+    "qid": 3,
+    "query": "Hello, Metabuild",
+    "answer": "Hello, Metabuild - starter - pre - ret - post - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0041,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0007
+        }
+      ],
+      "pre": [
+        {
+          "performance": "Accuracy: 100.00%",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 100,
+          "time_ms": 0.0012
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0005
+        }
+      ],
+      "post": [
+        {
+          "performance": "Cosine Similarity: 0.80",
+          "metric": "Cosine Similarity",
+          "unit": "",
+          "score": 0.8,
+          "time_ms": 0.0007
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.001
+        }
+      ]
+    }
+  }
+]
