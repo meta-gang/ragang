@@ -12,6 +12,10 @@ class Performance:
     @property
     def unit(self) -> str:
         return self.__unit
+    
+    @property
+    def metric(self) -> str:
+        return self.__metric
 
     def __str__(self):
         # light blue colored score text

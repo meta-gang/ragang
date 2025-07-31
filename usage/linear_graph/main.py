@@ -4,6 +4,7 @@ from usage.linear_graph.metrics.impls import MyPreRetrievalMetric, MyRetrievalMe
     MyGenerationMetric, MyE2EMetric
 from usage.linear_graph.modules.impls import AcceptorModule, MyPreRetrievalModule, MyRetrievalModule, \
     MyPostRetrievalModule, MyGenerationModule
+from usage.linear_graph.result_save import MetricVisualizer
 
 rag = RAGContainer(
     u_fid='unique_flow_id',
@@ -28,3 +29,7 @@ rag.invoke_batch([
     'Hello, Metabuild'
 ])
 rag.print_eval()
+
+
+vis = MetricVisualizer(rag)
+vis.save_to_json()
