@@ -21,19 +21,32 @@ if not os.path.exists(json_path):
 with open(json_path, "r", encoding="utf-8") as rag_result:
     data = json.load(rag_result)
 
-st.subheader("Query Summary")
-summary_rows = [{
-    "Query ID": entry["qid"],
-    "Query": entry["query"],
-    "E2E Score": entry["e2e_score"],
-    "Total Time (ms)": entry["total_time_ms"]
-} for entry in data]
 
-st.dataframe(summary_rows, use_container_width=True)
+st.subheader("단일 Query 입력 및 실행")
+st.markdown("\n")
+
+col1, col2, col3, col4 = st.columns([2, 6, 2, 1])
+with col2:
+    user_query = st.text_input("Query를 입력하세요", key="single_query_input")
+
+with col3:
+    st.markdown("<br>", unsafe_allow_html=True)
+    query_button = st.button("Run RAG with Query")
+
+if query_button:
+    if user_query.strip() == "":
+        st.warning("Query를 입력해주세요.")
+    else:
+        save_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "public", "test_query.json"))
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump({"query": user_query.strip()}, f, ensure_ascii=False, indent=2)
+        st.success(f"입력받은 Query로 RAG 진행 중...")
+
 
 st.markdown("\n")
 st.markdown("<hr>", unsafe_allow_html=True)
-st.markdown("\n")
+
+
 st.subheader("Query 상세 보기")
 query_options = [f"[Query{entry['qid']}] {entry['query']}" for entry in data]
 selected = st.selectbox("상세 내용을 보고 싶은 Query를 선택하세요:", ["선택 안함"] + query_options)
@@ -64,3 +77,18 @@ if st.session_state.selected_qid is not None:
             })
 
     st.table(module_items)
+
+
+st.markdown("\n")
+st.markdown("<hr>", unsafe_allow_html=True)
+
+
+st.subheader("Query Summary")
+summary_rows = [{
+    "Query ID": entry["qid"],
+    "Query": entry["query"],
+    "E2E Score": entry["e2e_score"],
+    "Total Time (ms)": entry["total_time_ms"]
+} for entry in data]
+
+st.dataframe(summary_rows, use_container_width=True)

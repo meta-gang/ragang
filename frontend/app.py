@@ -5,7 +5,7 @@ import os
 st.set_page_config(page_title="RAG 실행", layout="centered")
 st.title("RAG 설정 및 실행")
 
-st.header("RAG 입력 파일 업로드")
+st.subheader("RAG 입력 파일 업로드")
 doc_file = st.file_uploader("문서 텍스트 파일 (.txt)", type="txt", key="doc")
 api_file = st.file_uploader("API 설정 파일 (.json)", type="json", key="api")
 query_file = st.file_uploader("Query 목록 파일 (.txt)", type="txt", key="query")
@@ -28,7 +28,10 @@ if doc_file and api_file and query_file:
 
     uploaded = True
 
-run_rag = st.button("Run RAG")
+st.markdown("<hr>", unsafe_allow_html=True)
+cold1, col2, col3 = st.columns([3, 1, 3])
+with col2:
+    run_rag = st.button("Run RAG")
 
 if run_rag:
     if uploaded:
