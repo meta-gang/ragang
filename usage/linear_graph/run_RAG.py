@@ -1,3 +1,9 @@
 from build_RAG import buildRag
+from container import RAGContainer
 
-rag = buildRag()
+class RunRag:
+    def __init__(self, rag: RAGContainer):
+        self.rag = rag
+    
+    def run(self):
+        return 0
