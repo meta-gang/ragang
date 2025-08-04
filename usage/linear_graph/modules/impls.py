@@ -8,7 +8,7 @@ from modules.retrieval_module import RetrievalModule
 class AcceptorModule(CustomModule):
     def execute(self, query: str):
         return {
-            'pre': {
+            'ret': {
                 'data': f"{query} - starter"
             }
         }
@@ -27,10 +27,10 @@ class MyPreRetrievalModule(PreRetrievalModule):
 
 
 class MyRetrievalModule(RetrievalModule):
-    def execute(self, pre: dict):
+    def execute(self, starter: dict):
         return {
-            'post': {
-                'data': pre['data'] + ' - ret'
+            'gen': {
+                'data': starter['data'] + ' - ret'
             },
             'metric': {
                 'context': 'dldldl'
@@ -51,10 +51,10 @@ class MyPostRetrievalModule(PostRetrievalModule):
 
 
 class MyGenerationModule(GenerationModule):
-    def execute(self, post: dict):
+    def execute(self, ret: dict):
         return {
-            'answer': post['data'] + ' - gen',
+            'answer': ret['data'] + ' - gen',
             'metric': {
-                'answer': post['data'] + ' - gen'
+                'answer': ret['data'] + ' - gen'
             }
         }

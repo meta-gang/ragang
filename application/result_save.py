@@ -41,7 +41,7 @@ class MetricVisualizer:
     def save_to_json(self, filename=None):
         if filename is None:
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            filename = os.path.join(base_dir, "..", "frontend", "public", "metric_summary.json")
+            filename = os.path.join(base_dir, "..", "public", "metric_summary.json")
             filename = os.path.normpath(filename)
         
         os.makedirs(os.path.dirname(filename), exist_ok=True)

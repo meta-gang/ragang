@@ -6,7 +6,7 @@ from metrics.builtin.generatorMetric_LLMBased import A2RYNFaithfulnessMetric, A2
 from metrics.builtin.generatorMetric_NonLLMBased import AnswerContextSimilarity, AnswerCentricSimilarityVariance, MutualInformation_KSG, RetrievalDeviationfromAnswer, RetrievaltopkMeanAnswerSimilarity
 from metrics.builtin.retriever_LLMBased import RandomDocumentInjectionEffect
 from metrics.builtin.retriever_NonLLMBased import KeywordMatchingMetric, JaccardSimilarityMetric, CosineSimilarityMetric, EuclideanDistanceMetric, ManhattanDistanceMetric, NegativeRejectionRateMetric, PrecisionMetric, RankingConsistencyKendallTau, DiversityMetric, GeneralizedEmbeddingCoverageError, EmbeddingCosineSimilarityEvaluation, PairwiseCosineSimilarityVariance
-from usage.linear_graph.metrics.impls import MyGenerationMetric, MyRetrievalMetric, MyE2EMetric
+from usage.linear_graph.metrics.impls import MyGenerationMetric, MyRetrievalMetric, MyE2EMetric, MyPostRetrievalMetric
 from metrics.builtin.getMetrics import metric_class
 from usage.linear_graph.modules.impls import AcceptorModule, MyRetrievalModule, MyGenerationModule
 import streamlit as st

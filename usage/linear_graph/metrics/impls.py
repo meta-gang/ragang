@@ -18,7 +18,7 @@ class MyPostRetrievalMetric(BaseMetric):
 
 
 class MyGenerationMetric(BaseMetric):
-    def __init__(self, llm_adaptor: object):
+    def __init__(self, llm_adaptor: object = None):
         self.llm_adaptor = llm_adaptor
 
     def evaluate(self, answer: str) -> Performance:

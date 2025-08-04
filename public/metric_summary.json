@@ -1,0 +1,722 @@
+[
+  {
+    "qid": 0,
+    "query": "국방부가 RAG 시스템을 적용하기 위해 수행한 시범사업의 내용은 무엇인가요?",
+    "answer": "국방부가 RAG 시스템을 적용하기 위해 수행한 시범사업의 내용은 무엇인가요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0088,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0033
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0033
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0021
+        }
+      ]
+    }
+  },
+  {
+    "qid": 1,
+    "query": "RAG 시스템을 군 작전계획 문서에 어떻게 적용하고 있나요?",
+    "answer": "RAG 시스템을 군 작전계획 문서에 어떻게 적용하고 있나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.005,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0014
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0019
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0017
+        }
+      ]
+    }
+  },
+  {
+    "qid": 2,
+    "query": "국방 AI 생태계를 조성하기 위한 민군 협력 방안에는 어떤 것들이 있나요?",
+    "answer": "국방 AI 생태계를 조성하기 위한 민군 협력 방안에는 어떤 것들이 있나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0041,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0012
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0014
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0014
+        }
+      ]
+    }
+  },
+  {
+    "qid": 3,
+    "query": "데이터 거버넌스 체계는 구체적으로 어떤 절차를 포함하나요?",
+    "answer": "데이터 거버넌스 체계는 구체적으로 어떤 절차를 포함하나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0045,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0014
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0014
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0017
+        }
+      ]
+    }
+  },
+  {
+    "qid": 4,
+    "query": "AI 시스템의 오판 가능성을 방지하기 위한 윤리적 기준은 어떻게 마련되고 있나요?",
+    "answer": "AI 시스템의 오판 가능성을 방지하기 위한 윤리적 기준은 어떻게 마련되고 있나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0038,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0012
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0012
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0014
+        }
+      ]
+    }
+  },
+  {
+    "qid": 5,
+    "query": "군 특화 RAG 모델은 일반 도메인 모델과 어떤 차이점이 있나요?",
+    "answer": "군 특화 RAG 모델은 일반 도메인 모델과 어떤 차이점이 있나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0045,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0012
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0017
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0017
+        }
+      ]
+    }
+  },
+  {
+    "qid": 6,
+    "query": "전군 확대 적용 이전에 RAG 시스템을 실증한 부대 또는 분야는 어디인가요?",
+    "answer": "전군 확대 적용 이전에 RAG 시스템을 실증한 부대 또는 분야는 어디인가요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.016,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.001
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0012
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0138
+        }
+      ]
+    }
+  },
+  {
+    "qid": 7,
+    "query": "국방부가 AI 기술에 대해 예산을 확보하는 방식은 어떻게 설명되었나요?",
+    "answer": "국방부가 AI 기술에 대해 예산을 확보하는 방식은 어떻게 설명되었나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0038,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0014
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0012
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0012
+        }
+      ]
+    }
+  },
+  {
+    "qid": 8,
+    "query": "군 내부에서 RAG 성능을 평가할 때 사용하는 정량적 지표에는 어떤 것이 있나요?",
+    "answer": "군 내부에서 RAG 성능을 평가할 때 사용하는 정량적 지표에는 어떤 것이 있나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0041,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0017
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0012
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0012
+        }
+      ]
+    }
+  },
+  {
+    "qid": 9,
+    "query": "국방 데이터 보안성을 확보하기 위한 기술적 조치에는 어떤 것들이 있나요?",
+    "answer": "국방 데이터 보안성을 확보하기 위한 기술적 조치에는 어떤 것들이 있나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0033,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.001
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0012
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0012
+        }
+      ]
+    }
+  },
+  {
+    "qid": 10,
+    "query": "Class III에 해당하는 보급품은 어떤 물자를 의미하나요?",
+    "answer": "Class III에 해당하는 보급품은 어떤 물자를 의미하나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0031,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.001
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.001
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0012
+        }
+      ]
+    }
+  },
+  {
+    "qid": 11,
+    "query": "전투식량(MRE)은 어떤 상황에서 주로 사용되며 특징은 무엇인가요?",
+    "answer": "전투식량(MRE)은 어떤 상황에서 주로 사용되며 특징은 무엇인가요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0048,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0012
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0017
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0019
+        }
+      ]
+    }
+  },
+  {
+    "qid": 12,
+    "query": "기습공격 전술을 성공시키기 위한 핵심 요소는 무엇인가요?",
+    "answer": "기습공격 전술을 성공시키기 위한 핵심 요소는 무엇인가요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0043,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0012
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0014
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0017
+        }
+      ]
+    }
+  },
+  {
+    "qid": 13,
+    "query": "도시지역 전투에서 병사 간 협동이 중요한 이유는 무엇인가요?",
+    "answer": "도시지역 전투에서 병사 간 협동이 중요한 이유는 무엇인가요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0038,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0014
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.001
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0014
+        }
+      ]
+    }
+  },
+  {
+    "qid": 14,
+    "query": "기갑보병합동전투(MBT-INF Combined Operation)에서 각 병과의 역할은 어떻게 되나요?",
+    "answer": "기갑보병합동전투(MBT-INF Combined Operation)에서 각 병과의 역할은 어떻게 되나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0076,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0031
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0021
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0024
+        }
+      ]
+    }
+  },
+  {
+    "qid": 15,
+    "query": "기만전술에 사용되는 주요 수단은 어떤 것들이 있나요?",
+    "answer": "기만전술에 사용되는 주요 수단은 어떤 것들이 있나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.005,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0019
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0017
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0014
+        }
+      ]
+    }
+  },
+  {
+    "qid": 16,
+    "query": "사이버전과 전자전은 전술적으로 어떤 차이점을 가지나요?",
+    "answer": "사이버전과 전자전은 전술적으로 어떤 차이점을 가지나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0043,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0017
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.001
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0017
+        }
+      ]
+    }
+  },
+  {
+    "qid": 17,
+    "query": "방공전술 수행 시 사용되는 무기와 탐지 수단에는 어떤 것이 있나요?",
+    "answer": "방공전술 수행 시 사용되는 무기와 탐지 수단에는 어떤 것이 있나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0029,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.0012
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.0007
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.001
+        }
+      ]
+    }
+  },
+  {
+    "qid": 18,
+    "query": "유도무기를 활용한 타격 전술은 어떤 표적을 대상으로 하나요?",
+    "answer": "유도무기를 활용한 타격 전술은 어떤 표적을 대상으로 하나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0033,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.001
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.001
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0014
+        }
+      ]
+    }
+  },
+  {
+    "qid": 19,
+    "query": "야전 지휘통제에서 실시간 정보 공유는 어떤 장비나 체계를 통해 이루어지나요?",
+    "answer": "야전 지휘통제에서 실시간 정보 공유는 어떤 장비나 체계를 통해 이루어지나요? - starter - ret - gen",
+    "e2e_score": "Accuracy: 85.00%",
+    "total_time_ms": 0.0031,
+    "modulers": {
+      "starter": [
+        {
+          "performance": "Not evaluated!",
+          "metric": "Accuracy",
+          "unit": "%",
+          "score": 0,
+          "time_ms": 0.001
+        }
+      ],
+      "ret": [
+        {
+          "performance": "f1: 0.60",
+          "metric": "f1",
+          "unit": "",
+          "score": 0.6,
+          "time_ms": 0.001
+        }
+      ],
+      "gen": [
+        {
+          "performance": "LLMBased: 100.00",
+          "metric": "LLMBased",
+          "unit": "",
+          "score": 100,
+          "time_ms": 0.0012
+        }
+      ]
+    }
+  }
+]

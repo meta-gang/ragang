@@ -10,7 +10,7 @@ class RunRag:
         self.query = []
 
     def get_query(self):
-        query_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "uploaded", "queries.txt"))
+        query_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploaded", "queries.txt"))
         if not os.path.exists(query_path):
             raise FileNotFoundError(f"Query 파일을 찾을 수 없습니다: {query_path}")
 
@@ -20,9 +20,6 @@ class RunRag:
         return self.query
 
     def run(self):
-        if not self.query:
-            raise ValueError("Query가 비어 있습니다. get_query()를 먼저 호출하세요.")
-
         self.rag.invoke_batch(self.get_query())
 
         self.rag.print_eval()

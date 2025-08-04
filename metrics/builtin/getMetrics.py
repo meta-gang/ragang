@@ -1,10 +1,10 @@
-from e2eMetric_LLMBased import E2ESYNRelevancyMetric, E2EScoringRelevancyMetric, E2EQGenRelevancyMetric
-from e2eMetric_nonLLMBased import AnswerQuerySimilarity, e2eCosineConsistencyMetric, e2eCovarianceConsistencyMetric
-from generatorMetric_LLMBased import A2RYNFaithfulnessMetric, A2RSimpleScoringFaithfulnessMetric, A2RHallucinationFaithfulnessMetric, A2RTruthfulFaithfulnessMetric, A2RYNFaithfulnessMetricSingleCall, A2RHybridFaithfulnessMetric
-from generatorMetric_NonLLMBased import AnswerContextSimilarity, AnswerCentricSimilarityVariance, MutualInformation_KSG, RetrievalDeviationfromAnswer, RetrievaltopkMeanAnswerSimilarity
-from retriever_LLMBased import RandomDocumentInjectionEffect
-from retriever_NonLLMBased import KeywordMatchingMetric, JaccardSimilarityMetric, CosineSimilarityMetric, EuclideanDistanceMetric, ManhattanDistanceMetric, NegativeRejectionRateMetric, PrecisionMetric, RankingConsistencyKendallTau, DiversityMetric, GeneralizedEmbeddingCoverageError, EmbeddingCosineSimilarityEvaluation, PairwiseCosineSimilarityVariance
-from usage.linear_graph.metrics.impls import MyGenerationMetric, MyRetrievalMetric, MyE2EMetric
+from metrics.builtin.e2eMetric_LLMBased import E2ESYNRelevancyMetric, E2EScoringRelevancyMetric, E2EQGenRelevancyMetric
+from metrics.builtin.e2eMetric_nonLLMBased import AnswerQuerySimilarity, e2eCosineConsistencyMetric, e2eCovarianceConsistencyMetric
+from metrics.builtin.generatorMetric_LLMBased import A2RYNFaithfulnessMetric, A2RSimpleScoringFaithfulnessMetric, A2RHallucinationFaithfulnessMetric, A2RTruthfulFaithfulnessMetric, A2RYNFaithfulnessMetricSingleCall, A2RHybridFaithfulnessMetric
+from metrics.builtin.generatorMetric_NonLLMBased import AnswerContextSimilarity, AnswerCentricSimilarityVariance, MutualInformation_KSG, RetrievalDeviationfromAnswer, RetrievaltopkMeanAnswerSimilarity
+from metrics.builtin.retriever_LLMBased import RandomDocumentInjectionEffect
+from metrics.builtin.retriever_NonLLMBased import KeywordMatchingMetric, JaccardSimilarityMetric, CosineSimilarityMetric, EuclideanDistanceMetric, ManhattanDistanceMetric, NegativeRejectionRateMetric, PrecisionMetric, RankingConsistencyKendallTau, DiversityMetric, GeneralizedEmbeddingCoverageError, EmbeddingCosineSimilarityEvaluation, PairwiseCosineSimilarityVariance
+from usage.linear_graph.metrics.impls import MyGenerationMetric, MyRetrievalMetric, MyE2EMetric, MyPostRetrievalMetric
 
 metric_class = {
     "E2ESYNRelevancyMetric": E2ESYNRelevancyMetric,
@@ -39,5 +39,5 @@ metric_class = {
     "PairwiseCosineSimilarityVariance": PairwiseCosineSimilarityVariance, 
     "GenerationTestMetric": MyGenerationMetric,
     "RetrievalTestMetric": MyRetrievalMetric,
-    "E2ETestMetric": MyE2EMetric
+    "e2eTestMetric": MyE2EMetric
 }

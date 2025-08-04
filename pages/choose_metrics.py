@@ -9,7 +9,7 @@ from application.run_rag import RunRag
 st.set_page_config(page_title="Metric 선택", layout="wide")
 st.title("Metric 선택")
 
-if "file_upload" not in st.session_state or not st.session_state["run_rag"]:
+if "file_upload" not in st.session_state or not st.session_state["file_upload"]:
     st.warning("먼저 파일 업로드 후, RAG 실행 버튼을 눌러주세요.")
     st.stop()
 
@@ -19,7 +19,7 @@ available_metrics = {
     "Generator LLM Based Metric": ["A2RYNFaithfulnessMetric", "A2RSimpleScoringFaithfulnessMetric", "A2RHallucinationFaithfulnessMetric", "A2RTruthfulFaithfulnessMetric", "A2RYNFaithfulnessMetricSingleCall", "A2RHybridFaithfulnessMetric"],
     "Generator Non-LLM Based Metric": ["AnswerContextSimilarity", "AnswerCentricSimilarityVariance", "MutualInformation_KSG", "RetrievalDeviationfromAnswer", "RetrievaltopkMeanAnswerSimilarity", "GenerationTestMetric"],
     "Retriever LLM Based Metric": ["RandomDocumentInjectionEffect"],
-    "Retriever Non-LLM Based Metric": ["KeywordMatchingMetric", "JaccardSimilarityMetric", "CosineSimilarityMetric", "EuclideanDistanceMetric", "ManhattanDistanceMetric", "NegativeRejectionRateMetric", "PrecisionMetric", "RankingConsistencyKendallTau", "DiversityMetric", "GeneralizedEmbeddingCoverageError", "EmbeddingCosineSimilarityEvaluation", "PairwiseCosineSimilarityVariance", "RetrieverTestMetric"]
+    "Retriever Non-LLM Based Metric": ["KeywordMatchingMetric", "JaccardSimilarityMetric", "CosineSimilarityMetric", "EuclideanDistanceMetric", "ManhattanDistanceMetric", "NegativeRejectionRateMetric", "PrecisionMetric", "RankingConsistencyKendallTau", "DiversityMetric", "GeneralizedEmbeddingCoverageError", "EmbeddingCosineSimilarityEvaluation", "PairwiseCosineSimilarityVariance", "RetrievalTestMetric"]
 }
 
 selected_metrics = {}
