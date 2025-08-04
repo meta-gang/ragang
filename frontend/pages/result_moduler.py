@@ -5,11 +5,14 @@ import json
 st.set_page_config(page_title="Moduler 분석", layout="wide")
 st.title("Moduler 분석")
 
-if "run_rag" not in st.session_state or not st.session_state["run_rag"]:
+if "file_upload" not in st.session_state or not st.session_state["file_upload"]:
     st.warning("먼저 파일 업로드 후, RAG 실행 버튼을 눌러주세요.")
     st.stop()
 if "metric_config_saved" not in st.session_state or not st.session_state["metric_config_saved"]:
     st.warning("먼저 Metric 설정을 저장해주세요.")
+    st.stop()
+if "run_rag" not in st.session_state or not st.session_state["run_rag"]:
+    st.warning("아직 RAG가 실행 중 입니다.")
     st.stop()
 
 json_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "public", "metric_summary.json"))

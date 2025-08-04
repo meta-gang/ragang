@@ -4,7 +4,7 @@ from usage.linear_graph.metrics.impls import MyPreRetrievalMetric, MyRetrievalMe
     MyGenerationMetric, MyE2EMetric
 from usage.linear_graph.modules.impls import AcceptorModule, MyPreRetrievalModule, MyRetrievalModule, \
     MyPostRetrievalModule, MyGenerationModule
-from usage.linear_graph.result_save import MetricVisualizer
+from application.result_save import MetricVisualizer
 import subprocess
 
 

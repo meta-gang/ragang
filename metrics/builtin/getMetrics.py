@@ -4,6 +4,7 @@ from generatorMetric_LLMBased import A2RYNFaithfulnessMetric, A2RSimpleScoringFa
 from generatorMetric_NonLLMBased import AnswerContextSimilarity, AnswerCentricSimilarityVariance, MutualInformation_KSG, RetrievalDeviationfromAnswer, RetrievaltopkMeanAnswerSimilarity
 from retriever_LLMBased import RandomDocumentInjectionEffect
 from retriever_NonLLMBased import KeywordMatchingMetric, JaccardSimilarityMetric, CosineSimilarityMetric, EuclideanDistanceMetric, ManhattanDistanceMetric, NegativeRejectionRateMetric, PrecisionMetric, RankingConsistencyKendallTau, DiversityMetric, GeneralizedEmbeddingCoverageError, EmbeddingCosineSimilarityEvaluation, PairwiseCosineSimilarityVariance
+from usage.linear_graph.metrics.impls import MyGenerationMetric, MyRetrievalMetric, MyE2EMetric
 
 metric_class = {
     "E2ESYNRelevancyMetric": E2ESYNRelevancyMetric,
@@ -35,5 +36,8 @@ metric_class = {
     "DiversityMetric": DiversityMetric,
     "GeneralizedEmbeddingCoverageError": GeneralizedEmbeddingCoverageError,
     "EmbeddingCosineSimilarityEvaluation": EmbeddingCosineSimilarityEvaluation,
-    "PairwiseCosineSimilarityVariance": PairwiseCosineSimilarityVariance
+    "PairwiseCosineSimilarityVariance": PairwiseCosineSimilarityVariance, 
+    "GenerationTestMetric": MyGenerationMetric,
+    "RetrievalTestMetric": MyRetrievalMetric,
+    "E2ETestMetric": MyE2EMetric
 }

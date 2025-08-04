@@ -1,21 +1,25 @@
 import streamlit as st
 import json
 import os
+from application.build_rag import buildRag
+from application.run_rag import RunRag
+
+
 
 st.set_page_config(page_title="Metric 선택", layout="wide")
 st.title("Metric 선택")
 
-if "run_rag" not in st.session_state or not st.session_state["run_rag"]:
+if "file_upload" not in st.session_state or not st.session_state["run_rag"]:
     st.warning("먼저 파일 업로드 후, RAG 실행 버튼을 눌러주세요.")
     st.stop()
 
 available_metrics = {
     "E2E LLM Based Metic" : ["E2ESYNRelevancyMetric", "E2EScoringRelevancyMetric", "E2EQGenRelevancyMetric"],
-    "E2E Non-LLM Based Metric": ["AnswerQuerySimilarity", "e2eCosineConsistencyMetric", "e2eCovarianceConsistencyMetric"],
+    "E2E Non-LLM Based Metric": ["AnswerQuerySimilarity", "e2eCosineConsistencyMetric", "e2eCovarianceConsistencyMetric", "e2eTestMetric"],
     "Generator LLM Based Metric": ["A2RYNFaithfulnessMetric", "A2RSimpleScoringFaithfulnessMetric", "A2RHallucinationFaithfulnessMetric", "A2RTruthfulFaithfulnessMetric", "A2RYNFaithfulnessMetricSingleCall", "A2RHybridFaithfulnessMetric"],
-    "Generator Non-LLM Based Metric": ["AnswerContextSimilarity", "AnswerCentricSimilarityVariance", "MutualInformation_KSG", "RetrievalDeviationfromAnswer", "RetrievaltopkMeanAnswerSimilarity"],
+    "Generator Non-LLM Based Metric": ["AnswerContextSimilarity", "AnswerCentricSimilarityVariance", "MutualInformation_KSG", "RetrievalDeviationfromAnswer", "RetrievaltopkMeanAnswerSimilarity", "GenerationTestMetric"],
     "Retriever LLM Based Metric": ["RandomDocumentInjectionEffect"],
-    "Retriever Non-LLM Based Metric": ["KeywordMatchingMetric", "JaccardSimilarityMetric", "CosineSimilarityMetric", "EuclideanDistanceMetric", "ManhattanDistanceMetric", "NegativeRejectionRateMetric", "PrecisionMetric", "RankingConsistencyKendallTau", "DiversityMetric", "GeneralizedEmbeddingCoverageError", "EmbeddingCosineSimilarityEvaluation", "PairwiseCosineSimilarityVariance"]
+    "Retriever Non-LLM Based Metric": ["KeywordMatchingMetric", "JaccardSimilarityMetric", "CosineSimilarityMetric", "EuclideanDistanceMetric", "ManhattanDistanceMetric", "NegativeRejectionRateMetric", "PrecisionMetric", "RankingConsistencyKendallTau", "DiversityMetric", "GeneralizedEmbeddingCoverageError", "EmbeddingCosineSimilarityEvaluation", "PairwiseCosineSimilarityVariance", "RetrieverTestMetric"]
 }
 
 selected_metrics = {}
@@ -35,7 +39,17 @@ if st.button("Metric 설정 저장"):
     st.session_state["selected_metrics"] = selected_metrics
     st.success("Metric 설정이 저장되었습니다. 이제 RAG 실행에서 이 Metric으로 평가됩니다.")
     st.session_state["metric_config_saved"] = True
-    st.switch_page("pages/rag_result.py")
+
+    with st.spinner("RAG 실행 중입니다. 잠시만 기다려주세요..."):
+        my_rag = buildRag()
+        my_rag.buildRag()
+        rag_runner = RunRag(my_rag.rag)
+        rag_history = rag_runner.run()
+
+    if st.session_state.get("run_rag"):
+        st.success("RAG 실행이 완료되었습니다.")
+        st.switch_page("pages/rag_result.py")
+
 
 if "selected_metrics" in st.session_state:
     st.markdown("### 현재 설정된 Metric 목록")

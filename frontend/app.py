@@ -5,6 +5,9 @@ import os
 st.set_page_config(page_title="RAG 실행", layout="centered")
 st.title("RAG 설정 및 실행")
 
+if "run_rag" not in st.session_state:
+    st.session_state["run_rag"] = False
+
 st.subheader("RAG 입력 파일 업로드")
 doc_file = st.file_uploader("문서 텍스트 파일 (.txt)", type="txt", key="doc")
 api_file = st.file_uploader("API 설정 파일 (.json)", type="json", key="api")
@@ -18,9 +21,9 @@ uploaded = False
 st.markdown("<hr>", unsafe_allow_html=True)
 cold1, col2, col3 = st.columns([3, 1, 3])
 with col2:
-    run_rag = st.button("Run RAG")
+    file_upload = st.button("Upload Files")
 
-if run_rag:
+if file_upload:
     if doc_file and api_file and query_file:
         with open(os.path.join(save_dir, "document.txt"), "w", encoding="utf-8") as f:
             f.write(doc_file.read().decode("utf-8"))
@@ -33,7 +36,7 @@ if run_rag:
 
     if uploaded:
         st.success("모든 파일이 업로드되었습니다.")
-        st.session_state["run_rag"] = True
+        st.session_state["file_upload"] = True
         st.switch_page("pages/choose_metrics.py")
     else:
         st.warning("모든 파일을 업로드해주세요.")

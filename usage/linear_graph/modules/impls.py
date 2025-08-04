@@ -1,4 +1,8 @@
-from modules import *
+from modules.custom import CustomModule
+from modules.pre_retrieval_module import PreRetrievalModule
+from modules.post_retrieval_module import PostRetrievalModule
+from modules.generation_module import GenerationModule
+from modules.retrieval_module import RetrievalModule
 
 
 class AcceptorModule(CustomModule):
