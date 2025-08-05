@@ -15,7 +15,7 @@ if "run_rag" not in st.session_state or not st.session_state["run_rag"]:
     st.warning("아직 RAG가 실행 중 입니다.")
     st.stop()
 
-json_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "public", "metric_summary.json"))
+json_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "public", "Rag_summary.json"))
 
 if not os.path.exists(json_path):
     st.error("metric_summary.json 파일을 찾을 수 없습니다. 먼저 RAG 실행을 완료해주세요.")

@@ -42,7 +42,11 @@ if st.button("Metric 설정 저장"):
 
     with st.spinner("RAG 실행 중입니다. 잠시만 기다려주세요..."):
         my_rag = buildRag()
-        my_rag.buildRag()
+        st.session_state["my_rag"] = my_rag.buildRag()
+        test_rag = buildRag()
+        st.session_state["test_rag"] = test_rag.buildRag()
+        st.session_state["test_num"] = 0
+        st.session_state["run_rag"] = False
         rag_runner = RunRag(my_rag.rag)
         rag_history = rag_runner.run()
 

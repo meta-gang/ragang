@@ -1,8 +1,9 @@
 import json
 import os
+from container import RAGContainer
 
 class MetricVisualizer:
-    def __init__(self, rag_container):
+    def __init__(self, rag_container: RAGContainer):
         self.storage = rag_container.storage
         self.records = self._extract_metrics_records()
 
@@ -38,15 +39,15 @@ class MetricVisualizer:
             records.append(row)
         return records
 
-    def save_to_json(self, filename=None):
-        if filename is None:
+    def save_to_json(self, file_path=None):
+        if file_path is None:
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            filename = os.path.join(base_dir, "..", "public", "metric_summary.json")
-            filename = os.path.normpath(filename)
-        
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        
-        with open(filename, "w", encoding="utf-8") as f:
+            file_path = os.path.join(base_dir, "..", "public", "Rag_summary.json")
+            file_path = os.path.normpath(file_path)
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        with open(file_path, "w", encoding="utf-8") as f:
             json.dump(self.records, f, indent=2, ensure_ascii=False)
-        
-        print(f"Metric summary saved to '{filename}'.")
+
+        print(f"Metric summary saved to '{file_path}'.")
