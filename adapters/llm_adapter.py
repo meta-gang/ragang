@@ -1,12 +1,21 @@
 import requests
 from abc import ABC, abstractmethod
 
+import json
 
 class BaseLLMAdapter(ABC):
     """Abstract base class for LLM adapters."""
-    def __init__(self, api_url: str, model_name: str):
-        self.api_url = api_url
-        self.model_name = model_name
+    def __init__(self):
+        with open('adapters/API.json') as f:
+            data = json.load(f)
+            self.api_url = data["API_URL"]
+            
+            if data["API_KEY"] == None:
+                pass
+            else:
+                self.api_key = data["API_KEY"]
+            
+            self.model_name = data["MODEL_NAME"]
 
     @abstractmethod
     def request(self, prompt: str, query: str) -> dict:
@@ -17,9 +26,8 @@ class BaseLLMAdapter(ABC):
 class LocalLLMAdapter(BaseLLMAdapter):
     """Adapter for local LLM APIs (e.g., Ollama)."""
 
-    def __init__(self, api_url, model_name):
-        url = f"http://{api_url}/api/generate"
-        super().__init__(url, model_name)
+    def __init__(self):
+        super().__init__()
 
     def request(self, prompt: str, query: str) -> dict:
         """Sends a request to a local LLM API."""
@@ -42,12 +50,10 @@ class LocalLLMAdapter(BaseLLMAdapter):
 
 class OpenAIAdapter(BaseLLMAdapter):
     """Adapter for the OpenAI API."""
-    def __init__(self, model_name: str, api_key: str, api_url: str = "https://api.openai.com/v1/chat/completions"):
-        super().__init__(api_url, model_name)
-        if not api_key:
-            raise ValueError("API key is required for OpenAIAdapter.")
+    def __init__(self):
+        super().__init__()
         self.headers = {
-            "Authorization": f"Bearer {api_key}",
+            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
 
@@ -73,13 +79,8 @@ class OpenAIAdapter(BaseLLMAdapter):
 
 class GeminiAdapter(BaseLLMAdapter):
     """Adapter for the Google Gemini API."""
-    def __init__(self, model_name: str, api_key: str, api_version: str = "v1beta"):
-        if not api_key:
-            raise ValueError("API key is required for GeminiAdapter.")
-        # The model name is part of the URL for Gemini
-        api_url = f"https://generativelanguage.googleapis.com/{api_version}/models/{model_name}:generateContent"
-        super().__init__(api_url, model_name)
-        self.api_key = api_key
+    def __init__(self):
+        super().__init__()
         self.headers = {
             "Content-Type": "application/json"
         }

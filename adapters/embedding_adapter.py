@@ -2,12 +2,21 @@ from abc import ABC, abstractmethod
 import numpy as np
 import requests
 
+import json
+
 class BaseEmbeddingAdapter(ABC):
     """Abstract base class for text embedding model adapters."""
-    def __init__(self, api_url: str, model_name: str):
-        self.api_url = api_url
-        self.model_name = model_name
-
+    def __init__(self):
+        with open('adapters/API.json') as f:
+            data = json.load(f)
+            self.api_url = data["API_URL"]
+            
+            if data["API_KEY"] == None:
+                pass
+            else:
+                self.api_key = data["API_KEY"]
+            
+            self.model_name = data["MODEL_NAME"]
 
     @abstractmethod
     def create_embeddings(self, texts: list[str]) -> np.ndarray:
@@ -27,9 +36,8 @@ class LocalEmbeddingAdapter(BaseEmbeddingAdapter):
     Note that the API request format(url, payload, etc) implemented here is for ollama only.
     You may have to check the exact requirement."""
 
-    def __init__(self, api_url, model_name):
-        url = f"http://{api_url}/api/embeddings"
-        super().__init__(url, model_name)
+    def __init__(self):
+        super().__init__()
 
     def create_embeddings(self, texts: list[str]) -> np.ndarray:
         embeddings = []
@@ -52,11 +60,8 @@ class LocalEmbeddingAdapter(BaseEmbeddingAdapter):
 
 class OpenAIEmbeddingAdapter(BaseEmbeddingAdapter):
     """Adapter for the OpenAI embedding API."""
-    def __init__(self, api_key: str, model_name: str = "text-embedding-ada-002", api_url: str = "https://api.openai.com/v1/embeddings"):
-        super().__init__(api_url, model_name)
-        if not api_key:
-            raise ValueError("API key is required for OpenAIEmbeddingAdapter.")
-        self.api_key = api_key
+    def __init__(self):
+        super().__init__()
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -78,12 +83,8 @@ class OpenAIEmbeddingAdapter(BaseEmbeddingAdapter):
 
 class GeminiEmbeddingAdapter(BaseEmbeddingAdapter):
     """Adapter for the Google Gemini embedding API."""
-    def __init__(self, api_key: str, model_name: str = "embedding-001", api_version: str = "v1beta"):
-        if not api_key:
-            raise ValueError("API key is required for GeminiEmbeddingAdapter.")
-        api_url = f"https://generativelanguage.googleapis.com/{api_version}/models/{self.model_name}:batchEmbedContents"
-        super().__init__(api_url, model_name)
-        self.api_key = api_key
+    def __init__(self):
+        super().__init__()
         self.headers = {
             "Content-Type": "application/json"
         }
@@ -106,3 +107,7 @@ class GeminiEmbeddingAdapter(BaseEmbeddingAdapter):
         except requests.exceptions.RequestException as e:
             print(f"An error occurred while calling the Gemini embedding API: {e}")
             return np.array([])
+
+
+if __name__ == '__main__':
+    LocalEmbeddingAdapter()
