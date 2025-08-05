@@ -70,7 +70,7 @@ if st.session_state.selected_module is not None:
             if module == st.session_state.selected_module:
                 for m in metrics:
                     detailed_rows.append({
-                        "Query ID": qid,
+                        "Query": qid,
                         "Metric": m["metric"],
                         "Score": f"{m['score']} {m.get('unit', '')}",
                         "Time (ms)": m["time_ms"]

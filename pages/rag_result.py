@@ -51,7 +51,7 @@ if query_button:
             file_path = os.path.normpath(os.path.join(base_dir, "..", "public", "Test_Rag_summary.json"))
 
             test_rag = RunRag(st.session_state["test_rag"])
-            test_query_result = test_rag.run_test(save_path=file_path, query=[user_query.strip()])
+            test_query_result = test_rag.run(save_path=file_path, query=[user_query.strip()], check_test=True)
             st.session_state["test_query_result"] = test_query_result
 
             cold1, col2, col3 = st.columns([1, 1, 1])
@@ -59,8 +59,10 @@ if query_button:
             test_query_result = open(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "public", "Test_Rag_summary.json")), "r", encoding="utf-8")
             test_query_result = json.load(test_query_result)
             entry_test = next(e for e in test_query_result if e["qid"] == st.session_state["test_num"] - 1)
+
             with col2:
-                st.markdown(f"Answer: {entry_test['answer']}")
+                st.text_area("Answer", value=entry_test['answer'], height=30, max_chars=2000)
+
             module_items = []
             for module, item in entry_test["modulers"].items():
                 for m in item:
@@ -130,6 +132,9 @@ st.markdown("<hr>", unsafe_allow_html=True)
 
 
 st.subheader("Test Query Summary")
+if "test_query_result" not in st.session_state or not st.session_state["test_query_result"]:
+    st.error("Test Query 결과가 없습니다. 먼저 단일 Query를 실행해주세요.")
+    st.stop()
 test_summary_rows = [{
     "Query ID": entry["qid"],
     "Query": entry["query"],

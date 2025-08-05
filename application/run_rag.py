@@ -20,38 +20,28 @@ class RunRag:
 
         return self.query
 
-    def run(self, save_path=None, query: list[str] = None):
+    def run(self, save_path=None, query: list[str] = None, check_test = False):
         if query:
             self.query = query
         else:
             self.query = self.get_query()
-        self.rag.invoke_batch(self.query)
+
+        if check_test:
+            if "test_num" not in st.session_state:
+                st.session_state["test_num"] = 0
+            self.rag.invoke(self.query[0], st.session_state["test_num"])
+            st.session_state["test_num"] += 1
+        else:
+            self.rag.invoke_batch(self.query)
 
         self.rag.print_eval()
 
         vis = MetricVisualizer(self.rag)
         vis.save_to_json(save_path)
 
-        st.session_state["run_rag"] = True
-
-        return self.rag.storage.history
-    
-    def run_test(self, save_path=None, query: list[str] = None):
-        if query:
-            self.query = query
+        if check_test:
+            st.session_state["run_test_rag"] = True
         else:
-            self.query = self.get_query()
-        
-        if "test_num" not in st.session_state:
-            st.session_state["test_num"] = 0
-        self.rag.invoke(self.query[0], st.session_state["test_num"])
-        st.session_state["test_num"] += 1
-
-        self.rag.print_eval()
-
-        vis = MetricVisualizer(self.rag)
-        vis.save_to_json(save_path)
-
-        st.session_state["run_test_rag"] = True
+            st.session_state["run_rag"] = True
 
         return self.rag.storage.history
