@@ -56,21 +56,20 @@ if query_button:
 
             cold1, col2, col3 = st.columns([1, 1, 1])
 
-            test_query_result = open(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "public", "Test_Rag_summary.json")), "r", encoding="utf-8")
-            test_query_result = json.load(test_query_result)
-            entry_test = next(e for e in test_query_result if e["qid"] == st.session_state["test_num"] - 1)
+            state_tast = next(state for q_id, state in test_query_result.items() if q_id == st.session_state["test_num"] - 1)
 
             with col2:
-                st.text_area("Answer", value=entry_test['answer'], height=30, max_chars=2000)
+                st.text_area("Answer", value=state_tast.answer, height=30, max_chars=2000)
 
             module_items = []
-            for module, item in entry_test["modulers"].items():
-                for m in item:
+            for mid, packets in state_tast.snapshots.items():
+                for packet in packets:
+                    perf_obj = packet.performance
                     module_items.append({
-                        "Module": module,
-                        "Metric": m["metric"],
-                        "Score": f"{m['score']} {m.get('unit', '')}",
-                        "Time (ms)": m["time_ms"]
+                        "Module": mid,
+                        "Metric": perf_obj.metric,
+                        "Score": f"{perf_obj.score} {perf_obj.unit}",
+                        "Time (ms)": round(packet.x_time, 4)
                     })
 
             st.table(module_items)
@@ -133,13 +132,21 @@ st.markdown("<hr>", unsafe_allow_html=True)
 
 st.subheader("Test Query Summary")
 if "test_query_result" not in st.session_state or not st.session_state["test_query_result"]:
-    st.error("Test Query 결과가 없습니다. 먼저 단일 Query를 실행해주세요.")
-    st.stop()
-test_summary_rows = [{
-    "Query ID": entry["qid"],
-    "Query": entry["query"],
-    "E2E Score": entry["e2e_score"],
-    "Total Time (ms)": entry["total_time_ms"]
-} for entry in test_query_result]
+    st.warning("Test Query 결과가 없습니다. 먼저 단일 Query를 실행해주세요.")
+else:
+    test_summary_rows = []
+    for q_id, state in st.session_state["test_query_result"].items():
+        tot_x_time: float = 0
+        for mid, packets in state.snapshots.items():
+            for packet in packets:
+                perf_obj = packet.performance
+                tot_x_time += packet.x_time * 1000
 
-st.dataframe(test_summary_rows, use_container_width=True)
+        test_summary_rows.append({
+            "Query ID": q_id,
+            "Query": state.query,
+            "E2E Score": str(state.performance),
+            "Total Time (ms)": tot_x_time
+        })
+
+    st.dataframe(test_summary_rows, use_container_width=True)

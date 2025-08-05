@@ -65,12 +65,12 @@ if selected_module == "선택 안함":
 if st.session_state.selected_module is not None:
     detailed_rows = []
     for entry in data:
-        qid = entry["qid"]
+        query = entry["query"]
         for module, metrics in entry["modulers"].items():
             if module == st.session_state.selected_module:
                 for m in metrics:
                     detailed_rows.append({
-                        "Query": qid,
+                        "Query": query,
                         "Metric": m["metric"],
                         "Score": f"{m['score']} {m.get('unit', '')}",
                         "Time (ms)": m["time_ms"]
