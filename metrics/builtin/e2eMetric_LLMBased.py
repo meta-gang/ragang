@@ -8,7 +8,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class E2ESYNRelevancyMetric(BaseMetric):
+
+class BaseBuiltinMetric(BaseMetric):
+    def __init__(self, llm_adapter : BaseLLMAdapter = None, embedding_adapter : BaseEmbeddingAdapter = None):
+        self.llm_adapter = llm_adapter
+        self.embedding_adapter = embedding_adapter
+
+
+class E2ESYNRelevancyMetric(BaseBuiltinMetric):
     """
     End to end relevancy metric via Yes/No judgement.
 
@@ -17,8 +24,6 @@ class E2ESYNRelevancyMetric(BaseMetric):
     :ivar llm_adapter: Stores the LLM model to use
     :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, llm_adapter: BaseLLMAdapter):
-        self.llm_adapter = llm_adapter
 
     def evaluate(self, query: str, gen: str) -> Performance:
         """
@@ -76,7 +81,7 @@ class E2ESYNRelevancyMetric(BaseMetric):
             score = np.nan
         return Performance(score=score, unit="", metric="Yes/No Relevancy")
 
-class E2EScoringRelevancyMetric(BaseMetric):
+class E2EScoringRelevancyMetric(BaseBuiltinMetric):
     """
     End to end relevancy metric via simple scoring.
 
@@ -85,8 +90,6 @@ class E2EScoringRelevancyMetric(BaseMetric):
     :ivar llm_adapter: Stores the LLM model to use
     :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, llm_adapter: BaseLLMAdapter):
-        self.llm_adapter = llm_adapter
 
     def evaluate(self, query: str, gen: str) -> Performance:
         """
@@ -137,7 +140,7 @@ class E2EScoringRelevancyMetric(BaseMetric):
             score = np.nan
         return Performance(score=score, unit="", metric="Simple Score Relevancy")
 
-class E2EQGenRelevancyMetric(BaseMetric):
+class E2EQGenRelevancyMetric(BaseBuiltinMetric):
     """
     End to end relevancy metric via question generation.
 
@@ -150,9 +153,6 @@ class E2EQGenRelevancyMetric(BaseMetric):
     :ivar embedding_adapter: Stores the embedding model.
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
-    def __init__(self, llm_adapter: BaseLLMAdapter, embedding_adapter: BaseEmbeddingAdapter):
-        self.llm_adapter = llm_adapter
-        self.embedding_adapter = embedding_adapter
 
     def evaluate(self, query: str, gen: str) -> Performance:
         """

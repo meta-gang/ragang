@@ -12,7 +12,7 @@
     (특수문자 제거, 불용어 제거, 토큰화 등)
 
     - **query**: 단일 텍스트 문자열
-    - **retrieved_documents**: 문서 텍스트들의 리스트
+    - **ret_docs**: 문서 텍스트들의 리스트
       (예: ``["문서1 텍스트", "문서2 텍스트", ...]``)
 
 .. note:: **Output 데이터 형식**
@@ -49,30 +49,38 @@ from dotenv import load_dotenv
 
 # --- 공통 기반 클래스 및 어댑터 import ---
 from adapters.embedding_adapter import BaseEmbeddingAdapter
+from adapters.llm_adapter import BaseLLMAdapter
 
-class KeywordMatchingMetric(BaseMetric):
+
+class BaseBuiltinMetric(BaseMetric):
+    def __init__(self, llm_adapter : BaseLLMAdapter = None, embedding_adapter : BaseEmbeddingAdapter = None):
+        self.llm_adapter = llm_adapter
+        self.embedding_adapter = embedding_adapter
+
+
+class KeywordMatchingMetric(BaseBuiltinMetric):
     """쿼리와 문서 간의 키워드 매칭 비율을 평가합니다.
 
     쿼리 토큰이 각 문서 텍스트의 토큰들과 얼마나 일치하는지 계산하고
     그 평균을 백분율로 반환합니다.
     """
-    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
+    def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
         Keyword Matching 점수를 계산합니다.
 
         :param query: 사용자 원본 쿼리 텍스트
         :type query: str
-        :param retrieved_documents: 검색된 문서 텍스트 리스트
-        :type retrieved_documents: List[str]
+        :param ret_docs: 검색된 문서 텍스트 리스트
+        :type ret_docs: List[str]
         :return: Keyword Matching 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not retrieved_documents:
+        if not ret_docs:
             return Performance(score=0.0, unit='%', metric='Keyword Matching Metric')
         
         tokenized_query = set(query.split())
         scores = []
-        for doc in retrieved_documents:
+        for doc in ret_docs:
             tokenized_doc = doc.split()
             if not tokenized_doc:
                 continue
@@ -85,29 +93,29 @@ class KeywordMatchingMetric(BaseMetric):
         return Performance(score=avg_score, unit='%', metric='Keyword Matching Metric')
 
 
-class JaccardSimilarityMetric(BaseMetric):
+class JaccardSimilarityMetric(BaseBuiltinMetric):
     """쿼리와 문서 간의 Jaccard 유사도를 평가합니다.
 
     쿼리와 문서 텍스트를 토큰 집합으로 보고, (쿼리와 텍스트의 교집합 토큰 수 / 쿼리와 텍스트의 합집합 토큰 수)를 계산합니다.
     검색된 모든 문서에 대한 평균 Jaccard 유사도를 백분율로 반환합니다.
     """
-    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
+    def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
         Jaccard 유사도 점수를 계산합니다.
 
         :param query: 사용자 원본 쿼리 텍스트
         :type query: str
-        :param retrieved_documents: 검색된 문서 텍스트 리스트
-        :type retrieved_documents: List[str]
+        :param ret_docs: 검색된 문서 텍스트 리스트
+        :type ret_docs: List[str]
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not retrieved_documents:
+        if not ret_docs:
             return Performance(score=0.0, unit='%', metric='Jaccard Similarity Metric')
 
         tokenized_query = set(query.split())
         scores = []
-        for doc in retrieved_documents:
+        for doc in ret_docs:
             tokenized_doc = set(doc.split())
             if not tokenized_doc:
                 continue
@@ -121,7 +129,7 @@ class JaccardSimilarityMetric(BaseMetric):
         return Performance(score=avg_score, unit='%', metric='Jaccard Similarity Metric')
 
 
-class CosineSimilarityMetric(BaseMetric):
+class CosineSimilarityMetric(BaseBuiltinMetric):
     """쿼리와 문서 임베딩 간의 평균 코사인 유사도를 평가합니다.
 
     코사인 유사도는 두 벡터가 가리키는 방향의 유사성을 측정하며,
@@ -129,29 +137,23 @@ class CosineSimilarityMetric(BaseMetric):
 
     .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        """
-        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
-        :type embedding_adapter: BaseEmbeddingAdapter
-        """
-        self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
+    def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
         평균 코사인 유사도 점수를 계산합니다.
 
         :param query: 사용자 원본 쿼리 텍스트
         :type query: str
-        :param retrieved_documents: 검색된 문서 텍스트 리스트
-        :type retrieved_documents: List[str]
+        :param ret_docs: 검색된 문서 텍스트 리스트
+        :type ret_docs: List[str]
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not retrieved_documents:
+        if not ret_docs:
             return Performance(score=0.0, unit='-1 to 1', metric='Cosine Similarity Metric')
         
         query_vec = self.embedding_adapter.create_embeddings([query])[0]
-        doc_vecs = self.embedding_adapter.create_embeddings(retrieved_documents)
+        doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
 
         similarity_scores = cosine_similarity([query_vec], doc_vecs)[0]
 
@@ -160,7 +162,7 @@ class CosineSimilarityMetric(BaseMetric):
         return Performance(score=avg_score, unit="-1 to 1", metric="Cosine Similarity Metric")
 
 
-class EuclideanDistanceMetric(BaseMetric):
+class EuclideanDistanceMetric(BaseBuiltinMetric):
     """쿼리와 문서 임베딩 간의 평균 유클리드 거리를 평가합니다.
 
     유클리드 거리는 벡터 공간에서 두 점 사이의 직선 거리를 나타냅니다.
@@ -168,36 +170,30 @@ class EuclideanDistanceMetric(BaseMetric):
 
     .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        """
-        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
-        :type embedding_adapter: BaseEmbeddingAdapter
-        """
-        self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
+    def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
         평균 유클리드 거리를 계산합니다.
 
         :param query: 사용자 원본 쿼리 텍스트
         :type query: str
-        :param retrieved_documents: 검색된 문서 텍스트 리스트
-        :type retrieved_documents: List[str]
+        :param ret_docs: 검색된 문서 텍스트 리스트
+        :type ret_docs: List[str]
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not retrieved_documents:
+        if not ret_docs:
             return Performance(score=0.0, unit='distance', metric='Euclidean Distance Metric')
 
         query_vec = self.embedding_adapter.create_embeddings([query])[0]
-        doc_vecs = self.embedding_adapter.create_embeddings(retrieved_documents)
+        doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
 
         distances = [np.linalg.norm(query_vec - doc_vec) for doc_vec in doc_vecs]
         avg_distance = np.mean(distances) if distances else 0.0
         return Performance(score=avg_distance, unit='distance', metric='Euclidean Distance Metric')
 
 
-class ManhattanDistanceMetric(BaseMetric):
+class ManhattanDistanceMetric(BaseBuiltinMetric):
     """쿼리와 문서 임베딩 간의 평균 맨해튼 거리를 평가합니다.
 
     맨해튼 거리는 각 차원의 차이의 절댓값 합으로, 고차원 데이터에서 유용할 수 있습니다.
@@ -205,65 +201,59 @@ class ManhattanDistanceMetric(BaseMetric):
 
     .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        """
-        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
-        :type embedding_adapter: BaseEmbeddingAdapter
-        """
-        self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
+    def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
         평균 맨해튼 거리를 계산합니다.
 
         :param query: 사용자 원본 쿼리 텍스트
         :type query: str
-        :param retrieved_documents: 검색된 문서 텍스트 리스트
-        :type retrieved_documents: List[str]
+        :param ret_docs: 검색된 문서 텍스트 리스트
+        :type ret_docs: List[str]
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not retrieved_documents:
+        if not ret_docs:
             return Performance(score=0.0, unit='distance', metric='Manhattan Distance Metric')
         
         query_vec = self.embedding_adapter.create_embeddings([query])[0]
-        doc_vecs = self.embedding_adapter.create_embeddings(retrieved_documents)
+        doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
 
         distances = [np.sum(np.abs(query_vec - doc_vec)) for doc_vec in doc_vecs]
         avg_distance = np.mean(distances) if distances else 0.0
         return Performance(score=avg_distance, unit='distance', metric='Manhattan Distance Metric')
 
 
-class NegativeRejectionRateMetric(BaseMetric):
+class NegativeRejectionRateMetric(BaseBuiltinMetric):
     """쿼리와 관련 없는(코사인 유사도 <= 0) 문서의 비율을 평가합니다.
 
     이 비율(NRR)이 낮을수록 검색 결과에 관련 없는 문서가 적게 포함되었다는 것을 의미합니다.
 
     .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
-    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
+    def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
         NRR(Negative Rejection Rate) 점수를 백분율로 계산합니다.
 
         :param query: 사용자 원본 쿼리 텍스트
         :type query: str
-        :param retrieved_documents: 검색된 문서 텍스트 리스트
-        :type retrieved_documents: List[str]
+        :param ret_docs: 검색된 문서 텍스트 리스트
+        :type ret_docs: List[str]
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not retrieved_documents:
+        if not ret_docs:
             return Performance(score=0.0, unit='%', metric='Negative Rejection Rate Metric')
 
         query_vec = self.embedding_adapter.create_embeddings([query])[0]
-        doc_vecs = self.embedding_adapter.create_embeddings(retrieved_documents)
+        doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
 
         similarities = cosine_similarity([query_vec], doc_vecs)[0]
         irrelevant_count = np.sum(similarities <= 0)
         rejection_rate = (irrelevant_count / len(doc_vecs)) * 100
         return Performance(score=rejection_rate, unit='%', metric='Negative Rejection Rate Metric')
 
-class PrecisionMetric(BaseMetric):
+class PrecisionMetric(BaseBuiltinMetric):
     """정밀도(Precision)를 평가합니다.
 
     검색된 문서 중 실제 정답 문서의 비율을 측정합니다.
@@ -277,7 +267,7 @@ class PrecisionMetric(BaseMetric):
     :ivar embedding_adapter: 'embedding' 모드에서 사용될 임베딩 어댑터
     :vartype embedding_adapter: BaseEmbeddingAdapter, optional
     """
-    def __init__(self, mode: str = 'token', threshold: float = 0.5, embedding_adapter: BaseEmbeddingAdapter = None):
+    def __init__(self, mode: str = 'token', threshold: float = 0.5, llm_adapter: BaseLLMAdapter = None, embedding_adapter: BaseEmbeddingAdapter = None):
         """
         :param mode: 'token' 또는 'embedding' 중 평가 모드를 선택합니다. 기본값은 'token'입니다.
         :type mode: str
@@ -287,6 +277,7 @@ class PrecisionMetric(BaseMetric):
         :type embedding_adapter: BaseEmbeddingAdapter, optional
         :raises ValueError: 'embedding' 모드인데 embedding_adapter가 제공되지 않은 경우
         """
+        super().__init__(llm_adapter, embedding_adapter)
         if mode not in ['token', 'embedding']:
             raise ValueError("mode는 'token' 또는 'embedding'만 지원합니다.")
         if mode == 'embedding' and not embedding_adapter:
@@ -294,7 +285,6 @@ class PrecisionMetric(BaseMetric):
         
         self.mode = mode
         self.threshold = threshold
-        self.embedding_adapter = embedding_adapter
 
     def _jaccard_similarity(self, a: str, b: str) -> float:
         """두 텍스트 간의 Jaccard 유사도를 계산하는 헬퍼 함수입니다."""
@@ -340,7 +330,7 @@ class PrecisionMetric(BaseMetric):
         return Performance(score=precision, unit='0 to 1', metric='Precision')
 
 
-class RankingConsistencyKendallTau(BaseMetric):
+class RankingConsistencyKendallTau(BaseBuiltinMetric):
     """두 랭킹 리스트 간의 순위 일관성을 켄달 타우(Kendall's Tau) 계수로 계산합니다.
     
     두 리스트의 모든 순서쌍을 비교하여 순서가 일치하는 쌍과 불일치하는 쌍의 비율을 계산합니다.
@@ -363,32 +353,26 @@ class RankingConsistencyKendallTau(BaseMetric):
         return Performance(score=tau, unit='-1 to 1', metric="Kendall's Tau")
 
 
-class DiversityMetric(BaseMetric):
+class DiversityMetric(BaseBuiltinMetric):
     """검색된 문서들의 텍스트를 기반으로 다양성을 평가합니다.
 
     모든 문서 임베딩 쌍의 평균 코사인 유사도를 계산한 뒤, `1 - 평균 유사도`로 다양성 점수를 산출합니다.
     값이 1에 가까울수록 문서들이 서로 의미적으로 다르다는 것(다양성이 높음)을 의미합니다.
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        """
-        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
-        :type embedding_adapter: BaseEmbeddingAdapter
-        """
-        self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, retrieved_documents: List[str]) -> Performance:
+    def evaluate(self, ret_docs: List[str]) -> Performance:
         """
         다양성 점수를 계산합니다.
 
-        :param retrieved_documents: 검색된 문서 텍스트 리스트
-        :type retrieved_documents: List[str]
+        :param ret_docs: 검색된 문서 텍스트 리스트
+        :type ret_docs: List[str]
         :return: 계산된 다양성 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if len(retrieved_documents) < 2:
+        if len(ret_docs) < 2:
             return Performance(score=0.0, unit='0 to 1', metric='Diversity')
 
-        doc_embeddings = self.embedding_adapter.create_embeddings(retrieved_documents)
+        doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
 
         if doc_embeddings.size < 2: # np.array는 len()보다 .size로 확인하는 것이 더 명확합니다.
             return Performance(score=0.0, unit='0 to 1', metric='Diversity')
@@ -400,35 +384,29 @@ class DiversityMetric(BaseMetric):
         return Performance(score=diversity_score, unit='0 to 1', metric='Diversity')
 
 
-class GeneralizedEmbeddingCoverageError(BaseMetric):
+class GeneralizedEmbeddingCoverageError(BaseBuiltinMetric):
     """GECE: 쿼리와 검색 결과의 임베딩 공간상 근접성을 평가합니다.
 
     쿼리 임베딩과 검색된 문서 임베딩들 간의 평균 유클리드 거리를 계산합니다.
     값이 작을수록 검색 결과가 쿼리와 가깝다는 의미(커버리지가 좋음)입니다.
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        """
-        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
-        :type embedding_adapter: BaseEmbeddingAdapter
-        """
-        self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
+    def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
         평균 유클리드 거리 (GECE 점수)를 계산합니다.
 
         :param query: 사용자 원본 쿼리 텍스트
         :type query: str
-        :param retrieved_documents: 검색된 각 문서의 텍스트 리스트
-        :type retrieved_documents: List[str]
+        :param ret_docs: 검색된 각 문서의 텍스트 리스트
+        :type ret_docs: List[str]
         :return: 계산된 평균 거리(coverage_error)를 담은 Performance 객체
         :rtype: Performance
         """
-        if not retrieved_documents:
+        if not ret_docs:
             return Performance(score=float('inf'), unit='distance', metric='GECE')
             
         query_embedding = self.embedding_adapter.create_embeddings([query])[0]
-        doc_embeddings = self.embedding_adapter.create_embeddings(retrieved_documents)
+        doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
         
         if query_embedding.size == 0 or doc_embeddings.size == 0:
             return Performance(score=float('inf'), unit='distance', metric='GECE')
@@ -438,35 +416,29 @@ class GeneralizedEmbeddingCoverageError(BaseMetric):
         return Performance(score=coverage_error, unit='distance', metric='GECE')
 
 
-class EmbeddingCosineSimilarityEvaluation(BaseMetric):
+class EmbeddingCosineSimilarityEvaluation(BaseBuiltinMetric):
     """쿼리와 문서 텍스트 간의 코사인 유사도를 기반으로 일관성과 커버리지를 평가합니다.
 
     가장 높은 유사도(local)와 전체 평균 유사도(global)를 구해, 두 값을 평균내어 반환합니다.
     값이 1에 가까울수록 쿼리와 검색 결과가 임베딩 공간에서 잘 맞닿아 있음을 의미합니다.
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        """
-        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
-        :type embedding_adapter: BaseEmbeddingAdapter
-        """
-        self.embedding_adapter = embedding_adapter
         
-    def evaluate(self, query: str, retrieved_documents: List[str]) -> Performance:
+    def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
         임베딩 기반 일관성 점수를 계산합니다.
 
         :param query: 쿼리의 텍스트
         :type query: str
-        :param retrieved_documents: 검색된 각 문서의 텍스트 리스트
-        :type retrieved_documents: List[str]
+        :param ret_docs: 검색된 각 문서의 텍스트 리스트
+        :type ret_docs: List[str]
         :return: 계산된 일관성 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not retrieved_documents:
+        if not ret_docs:
             return Performance(score=0.0, unit='-1 to 1', metric='Embedding Cosine Similarity')
 
         query_embedding = self.embedding_adapter.create_embeddings([query])[0]
-        doc_embeddings = self.embedding_adapter.create_embeddings(retrieved_documents)
+        doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
         
         if query_embedding.size == 0 or doc_embeddings.size == 0:
             return Performance(score=0.0, unit='-1 to 1', metric='Embedding Cosine Similarity')
@@ -479,7 +451,7 @@ class EmbeddingCosineSimilarityEvaluation(BaseMetric):
 
 
 
-class PairwiseCosineSimilarityVariance(BaseMetric):
+class PairwiseCosineSimilarityVariance(BaseBuiltinMetric):
     """
     Evaluate the semantic diversity of retrieval chunks by measuring the variance of pairwise cosine similarities
     
@@ -488,9 +460,6 @@ class PairwiseCosineSimilarityVariance(BaseMetric):
     :ivar embedding_adapter: Stores the embedding model
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
-
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        self.embedding_adapter = embedding_adapter
 
     def evaluate(self, context: list) -> Performance:
         """

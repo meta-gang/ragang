@@ -1,12 +1,18 @@
 import numpy as np
 from common.bases.datas.performance_dataclass import Performance
 from common.bases.abstracts.base_metric import BaseMetric
+from adapters.llm_adapter import BaseLLMAdapter
 from adapters.embedding_adapter import BaseEmbeddingAdapter
 from common.utils.tools import CosineSimilarity
 from sklearn.metrics.pairwise import cosine_similarity
 
+class BaseBuiltinMetric(BaseMetric):
+    def __init__(self, llm_adapter : BaseLLMAdapter = None, embedding_adapter : BaseEmbeddingAdapter = None):
+        self.llm_adapter = llm_adapter
+        self.embedding_adapter = embedding_adapter
 
-class AnswerQuerySimilarity(BaseMetric):
+        
+class AnswerQuerySimilarity(BaseBuiltinMetric):
     """
     Cosine similarity between the genrated anser and user 
     
@@ -15,8 +21,6 @@ class AnswerQuerySimilarity(BaseMetric):
     :ivar embedding_adapter: Stores the embedding model
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        self.embedding_adapter = embedding_adapter
     
     def evaluate(self, query: str, gen: str) -> Performance:
         """
@@ -38,7 +42,7 @@ class AnswerQuerySimilarity(BaseMetric):
     
 
 
-class e2eCosineConsistencyMetric(BaseMetric):
+class e2eCosineConsistencyMetric(BaseBuiltinMetric):
     """
     End to end consistency metric via mean cosine-similarity.
 
@@ -47,9 +51,6 @@ class e2eCosineConsistencyMetric(BaseMetric):
     :ivar embedding_adapter: Stores the embedding model to use
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
-
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        self.embedding_adapter = embedding_adapter
 
     def evaluate(self, gens: list[str]) -> Performance:
         """
@@ -84,7 +85,7 @@ class e2eCosineConsistencyMetric(BaseMetric):
 
 
 
-class e2eCovarianceConsistencyMetric(BaseMetric):
+class e2eCovarianceConsistencyMetric(BaseBuiltinMetric):
     """
     End to end consistency metric via variance of cosine-similarity.
 
@@ -93,9 +94,6 @@ class e2eCovarianceConsistencyMetric(BaseMetric):
     :ivar embedding_adapter: Stores the embedding model to use
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
-
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        self.embedding_adapter = embedding_adapter
 
     def evaluate(self, query: str, gens: list[str]) -> Performance:
         """

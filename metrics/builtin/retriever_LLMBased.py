@@ -47,12 +47,16 @@ from dotenv import load_dotenv
 from common.bases.abstracts.base_module import BaseMetric
 from common.bases.datas.performance_dataclass import Performance
 from metrics.builtin.retriever_NonLLMBased import PrecisionMetric
-from adapters.llm_adapter import BaseLLMAdapter, LocalLLMAdapter
-from adapters.embedding_adapter import BaseEmbeddingAdapter, LocalEmbeddingAdapter
+from adapters.llm_adapter import BaseLLMAdapter
+from adapters.embedding_adapter import BaseEmbeddingAdapter
 
 
+class BaseBuiltinMetric(BaseMetric):
+    def __init__(self, llm_adapter : BaseLLMAdapter = None, embedding_adapter : BaseEmbeddingAdapter = None):
+        self.llm_adapter = llm_adapter
+        self.embedding_adapter = embedding_adapter
 
-class RandomDocumentInjectionEffect(BaseMetric):
+class RandomDocumentInjectionEffect(BaseBuiltinMetric):
     """LLM이 생성한 노이즈 문서를 주입했을 때 정밀도 하락을 측정합니다.
 
     쿼리와 유사해 보이지만 관련 없는 '적대적 문서'를 LLM으로 생성하고,
@@ -66,7 +70,7 @@ class RandomDocumentInjectionEffect(BaseMetric):
     :ivar llm_adapter: 노이즈 문서 생성에 사용될 LLM 어댑터
     :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, precision_metric: PrecisionMetric, llm_adapter: BaseLLMAdapter, embedding_adapter: BaseEmbeddingAdapter = None):
+    def __init__(self, precision_metric: PrecisionMetric, llm_adapter: BaseLLMAdapter = None, embedding_adapter: BaseEmbeddingAdapter = None):
         """
         :param precision_metric: 정밀도 계산에 사용할 PrecisionMetric 객체 (mode, threshold가 설정된 상태)
         :type precision_metric: PrecisionMetric
@@ -77,8 +81,7 @@ class RandomDocumentInjectionEffect(BaseMetric):
         :raises ValueError: 'embedding' 모드인데 embedding_adapter가 제공되지 않은 경우
         """
         self.precision_calculator = precision_metric
-        self.llm_adapter = llm_adapter
-        self.embedding_adapter = embedding_adapter
+        super().__init__(llm_adapter, embedding_adapter)
         if self.precision_calculator.mode == 'embedding' and not self.embedding_adapter:
             raise ValueError("'embedding' 모드에서는 embedding_adapter가 반드시 필요합니다.")
 
