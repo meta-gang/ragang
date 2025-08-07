@@ -21,14 +21,14 @@ class buildRag:
     def load_metrics(self) -> dict:
         selected_metrics = st.session_state.get("selected_metrics", {})
         api_adapter_instance = api_adapter()
-        llm_adapter, embedding_adapter = api_adapter_instance.create_adapters()
+        #llm_adapter, embedding_adapter = api_adapter_instance.create_adapters()
         metric_instances = {}
         for module_name, metric_names in selected_metrics.items():
             metric_instances[module_name] = []
             for name in metric_names:
                 cls = metric_class.get(name)
                 if cls is not None:
-                    metric_instances[module_name].append(cls(llm_adapter=llm_adapter, embedding_adapter=embedding_adapter))
+                    metric_instances[module_name].append(cls())
                 else:
                     raise ValueError(f"Metric '{name}' not found in registry")
         
@@ -42,20 +42,21 @@ class buildRag:
         RetrievalMetrics = metric_instances.get("Retriever Non-LLM Based Metric", [None]) + metric_instances.get("Retriever LLM Based Metric", [None])
         GenerationMetrics = metric_instances.get("Generator Non-LLM Based Metric", [None]) + metric_instances.get("Generator LLM Based Metric", [None])
         E2EMetrics = metric_instances.get("E2E Non-LLM Based Metric", [None]) + metric_instances.get("E2E LLM Based Metric", [None])
-        
+
         rag = RAGContainer(
             u_fid='unique_flow_id',
             modules=[
-                AcceptorModule('starter', metric=None, is_starter=True),
+                AcceptorModule('starter', metrics=None, is_starter=True),
                 MyRetrievalModule(
                     'ret',
                     linker=Linker('starter'),
-                    metric=RetrievalMetrics[0]
+                    #metric=RetrievalMetrics[0]
+                    metrics=RetrievalMetrics
                 ),
                 MyGenerationModule(
                     'gen',
                     linker=Linker('ret'),
-                    metric=GenerationMetrics[0]
+                    metrics=GenerationMetrics
                 ),
             ],
             e2e_metric=E2EMetrics[0]
@@ -63,3 +64,34 @@ class buildRag:
         
         self.rag = rag
         return rag
+
+"""
+# 테스트용 임시 main
+if __name__=="__main__":
+    st.session_state["selected_metrics"] = {
+        "Retriever Non-LLM Based Metric": ["KeywordMatchingMetric", "JaccardSimilarityMetric"],
+        #"Retriever LLM Based Metric": ["RandomDocumentInjectionEffect"],
+        "Generator Non-LLM Based Metric": ["AnswerContextSimilarity"],
+        #"Generator LLM Based Metric": ["A2RYNFaithfulnessMetric"],
+        "E2E Non-LLM Based Metric": ["AnswerQuerySimilarity"],
+        #"E2E LLM Based Metric": ["E2EQGenRelevancyMetric"]
+    }
+    
+    build=buildRag()
+    test_rag=build.buildRag()
+
+    # 테스트 쿼리 실행
+    test_query = "What is machine learning?"
+    
+    # 결과 확인
+    for module in test_rag:
+        if hasattr(module, '_BaseModule__metrics') and module.storage and module.storage.state.snapshots.get(module.module_id):
+            latest_snapshot = module.storage.state.snapshots[module.module_id][-1]
+            if latest_snapshot.performance._Performance__did_eval:
+                print(f"\nModule {module.module_id} metrics results:")
+                print(f"Individual score: {latest_snapshot.performance.score}")  # 기존 단일 score 출력
+                print("All metrics results:")
+                # property 사용
+                for metric_name, result in latest_snapshot.performance.all_results.items():
+                    print(f"{metric_name}: {result}")
+"""

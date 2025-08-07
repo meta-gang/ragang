@@ -1,0 +1,16 @@
+{
+  "llm": {
+    "provider": "openai",
+    "config": {
+      "model_name": "gpt-4",
+      "api_key": "baadfastewq2341"
+    }
+  },
+  "embedding": {
+    "provider": "openai",
+    "config": {
+      "model_name": "text-embedding-ada-002",
+      "api_key": "adsfasf2341235"
+    }
+  }
+}

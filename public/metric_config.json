@@ -1,0 +1,35 @@
+{
+  "E2E LLM Based Metic": [
+    "E2ESYNRelevancyMetric",
+    "E2EScoringRelevancyMetric",
+    "E2EQGenRelevancyMetric"
+  ],
+  "E2E Non-LLM Based Metric": [
+    "AnswerQuerySimilarity"
+  ],
+  "Generator LLM Based Metric": [
+    "A2RYNFaithfulnessMetric",
+    "A2RSimpleScoringFaithfulnessMetric",
+    "A2RTruthfulFaithfulnessMetric",
+    "A2RHybridFaithfulnessMetric"
+  ],
+  "Generator Non-LLM Based Metric": [
+    "AnswerContextSimilarity",
+    "AnswerCentricSimilarityVariance",
+    "MutualInformation_KSG",
+    "RetrievalDeviationfromAnswer"
+  ],
+  "Retriever LLM Based Metric": [],
+  "Retriever Non-LLM Based Metric": [
+    "KeywordMatchingMetric",
+    "JaccardSimilarityMetric",
+    "CosineSimilarityMetric",
+    "EuclideanDistanceMetric",
+    "PairwiseCosineSimilarityVariance",
+    "EmbeddingCosineSimilarityEvaluation",
+    "GeneralizedEmbeddingCoverageError",
+    "DiversityMetric",
+    "NegativeRejectionRateMetric",
+    "ManhattanDistanceMetric"
+  ]
+}

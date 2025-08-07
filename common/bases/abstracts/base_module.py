@@ -11,12 +11,18 @@ from exceptions.frameworks.datas import MissingMetricDataException, MissingMetri
     ModuleOutputException
 from exceptions.frameworks.modules import StarterModuleException
 
-
+# metric: BaseMetric = None -> metrics: list[BaseMetric] | BaseMetric | None = None
 class BaseModule(metaclass=ABCMeta):  # observer
-    def __init__(self, module_id: str, linker: Linker = None, metric: BaseMetric = None, is_starter: bool = False):
+    def __init__(self, module_id: str, linker: Linker = None, metrics: list[BaseMetric] | BaseMetric | None = None, is_starter: bool = False):
         self.module_id: str = module_id
         self.dependency: Dependency = linker.build(module_id) if linker else Dependency([], False)
-        self.__metric: BaseMetric | None = metric
+        #self.__metric: BaseMetric | None = metric
+        # metrics를 항상 리스트로 관리
+        self.__metrics: list[BaseMetric] = []
+        if isinstance(metrics, list):
+            self.__metrics.extend(metrics)
+        elif metrics is not None:
+            self.__metrics.append(metrics)
         self.storage: FlowStorage | None = None
         self.is_starter: bool = is_starter
 
@@ -94,10 +100,19 @@ class BaseModule(metaclass=ABCMeta):  # observer
         self.storage.send_packet(new_packet)
 
     def __validate_output(self, output: dict[str, Any]) -> dict[str, Any]:
-        if self.__metric is not None and 'metric' not in output.keys():
+        # metrics가 있는데 metric 데이터가 없으면 예외 발생
+        if self.__metrics is not None and 'metric' not in output.keys():
+            raise MissingMetricDataException(self.module_id, [metric.__class__.__name__ for metric in self.__metrics])
+        # metrics가 없는데 metric 데이터가 있는 경우 metric 데이터 제거
+        if self.__metrics is None and 'metric' in output.keys():
+            output.pop('metric')
+        """
+        # 기존 코드
+        if self.__metrics is not None and 'metric' not in output.keys():
             raise MissingMetricDataException(self.module_id, self.__metric.__class__.__name__)
         if self.__metric is None and 'metric' in output.keys():
             output.pop('metric')
+        """
 
         subscribers: list[str] = [module.module_id for module in self.storage.subscription[self.module_id]]
         dest_mids: list[str] = [dest_mid for dest_mid in output.keys() if dest_mid not in ['metric', 'answer']]
@@ -109,9 +124,26 @@ class BaseModule(metaclass=ABCMeta):  # observer
         return output
 
     def __evaluate_performance(self, eval_data: dict[str, Any]) -> Performance:
-        if eval_data is None:
+        # or not self.__metrics 추가
+        if eval_data is None or not self.__metrics:
             return Performance(_eval=False)
 
+        # 8/7 수정 부분
+        metric_results = {}
+        for metric in self.__metrics:
+            signature: dict[str, inspect.Parameter] = dict(inspect.signature(metric.evaluate).parameters)
+            req_params: list[str] = list(signature.keys())
+
+            if any([rp not in eval_data.keys() for rp in req_params]):
+                raise MissingMetricArgumentException(self.module_id, metric.__class__.__name__, req_params)
+
+            args = {rp: eval_data[rp] for rp in req_params}
+            # 각 metric의 결과를 metric 클래스 이름을 키로 하여 저장
+            metric_results[metric.__class__.__name__] = metric.evaluate(**args)
+
+        # Performance 클래스도 여러 metric 결과를 처리할 수 있도록 수정 필요
+        return Performance(_eval=True, metric_results=metric_results)
+        """
         # parse arg names via signature of metric.evaluate()
         signature: dict[str, inspect.Parameter] = dict(inspect.signature(self.__metric.evaluate).parameters)
         req_params: list[str] = list(signature.keys())
@@ -121,6 +153,7 @@ class BaseModule(metaclass=ABCMeta):  # observer
 
         args = {rp: eval_data[rp] for rp in req_params}
         return self.__metric.evaluate(**args)
+        """
 
     @abstractmethod
     def execute(self, *args, **kwargs):
