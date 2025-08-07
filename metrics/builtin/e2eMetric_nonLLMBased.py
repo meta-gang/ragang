@@ -22,7 +22,7 @@ class AnswerQuerySimilarity(BaseBuiltinMetric):
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
     
-    def evaluate(self, query: str, gen: str) -> Performance:
+    def evaluate(self, query: str = None, gen: str = None) -> Performance:
         """
         Compute cosine similarity between the embedded genrated anser and user query
         
@@ -52,7 +52,7 @@ class e2eCosineConsistencyMetric(BaseBuiltinMetric):
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
 
-    def evaluate(self, gens: list[str]) -> Performance:
+    def evaluate(self, query: str = None, gens: list[str] = None) -> Performance:
         """
         Calculates the mean cosine similarity between each pair of generated answers.
 
@@ -95,7 +95,7 @@ class e2eCovarianceConsistencyMetric(BaseBuiltinMetric):
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
 
-    def evaluate(self, query: str, gens: list[str]) -> Performance:
+    def evaluate(self, query: str = None, gens: list[str] = None) -> Performance:
         """
         Calculates the variance of cosine similarities between the query and each generated answer.
 

@@ -25,7 +25,7 @@ class E2ESYNRelevancyMetric(BaseBuiltinMetric):
     :vartype llm_adapter: BaseLLMAdapter
     """
 
-    def evaluate(self, query: str, gen: str) -> Performance:
+    def evaluate(self, query: str = None, gen: str = None) -> Performance:
         """
         Judges the relevancy of the generated answer to the query using a Yes/No response from an LLM.
 
@@ -91,7 +91,7 @@ class E2EScoringRelevancyMetric(BaseBuiltinMetric):
     :vartype llm_adapter: BaseLLMAdapter
     """
 
-    def evaluate(self, query: str, gen: str) -> Performance:
+    def evaluate(self, query: str = None, gen: str = None) -> Performance:
         """
         Scores the relevancy of the generated answer to the query on a scale of 0, 1, or 2.
 
@@ -154,7 +154,7 @@ class E2EQGenRelevancyMetric(BaseBuiltinMetric):
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
 
-    def evaluate(self, query: str, gen: str) -> Performance:
+    def evaluate(self, query: str = None, gen: str = None) -> Performance:
         """
         Calculates relevancy by generating questions from the answer and measuring their similarity to the original query.
 

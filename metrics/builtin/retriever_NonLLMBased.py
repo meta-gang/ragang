@@ -360,7 +360,7 @@ class DiversityMetric(BaseBuiltinMetric):
     값이 1에 가까울수록 문서들이 서로 의미적으로 다르다는 것(다양성이 높음)을 의미합니다.
     """
 
-    def evaluate(self, ret_docs: List[str]) -> Performance:
+    def evaluate(self, query: str = None, ret_docs: List[str] = None) -> Performance:
         """
         다양성 점수를 계산합니다.
 

@@ -537,11 +537,11 @@ class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
     :param claims_batch_size: The number of claims to evaluate in a single LLM call.
     :type claims_batch_size: int
     """
-    def __init__(self, llm_adapter: BaseLLMAdapter, embedding_adapter : BaseEmbeddingAdapter = None, claims_batch_size: int = 10):
+    def __init__(self, llm_adapter: BaseLLMAdapter = None, embedding_adapter : BaseEmbeddingAdapter = None, claims_batch_size: int = 10):
         super().__init__(llm_adapter, embedding_adapter)
         self.claims_batch_size = claims_batch_size
 
-    def _extract_claims(self, gen: str) -> list[str]:
+    def _extract_claims(self, ret_docs: list[str] = None, gen: str = None) -> list[str]:
         """Extracts claims from the generated text using an LLM call."""
         prompt = (
             """
@@ -665,7 +665,7 @@ class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
             logger.debug(f"Full response text: {response.get('text', '')}")
             return []
 
-    def evaluate(self, ret_docs: list[str], gen: str, max_docs: int = 5) -> Performance:
+    def evaluate(self, ret_docs: list[str] = None, gen: str = None, max_docs: int = 5) -> Performance:
         """
         Evaluates faithfulness by extracting all claims and then judging them in batches.
 

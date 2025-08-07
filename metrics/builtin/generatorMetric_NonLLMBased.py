@@ -96,7 +96,7 @@ class MutualInformation_KSG(BaseBuiltinMetric):
     :vartype k: int
     """
 
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter, llm_adapter: BaseLLMAdapter = None, k=3):
+    def __init__(self, embedding_adapter: BaseEmbeddingAdapter = None, llm_adapter: BaseLLMAdapter = None, k=3):
         super().__init__(llm_adapter, embedding_adapter)
         self.k = k
 

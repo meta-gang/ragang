@@ -9,6 +9,7 @@ from metrics.builtin.retriever_NonLLMBased import KeywordMatchingMetric, Jaccard
 from usage.linear_graph.metrics.impls import MyGenerationMetric, MyRetrievalMetric, MyE2EMetric, MyPostRetrievalMetric
 from metrics.builtin.getMetrics import metric_class
 from usage.linear_graph.modules.impls import AcceptorModule, MyRetrievalModule, MyGenerationModule
+from adapters.api_adapter import api_adapter
 import streamlit as st
 
 
@@ -19,14 +20,15 @@ class buildRag:
 
     def load_metrics(self) -> dict:
         selected_metrics = st.session_state.get("selected_metrics", {})
-        
+        api_adapter_instance = api_adapter()
+        llm_adapter, embedding_adapter = api_adapter_instance.create_adapters()
         metric_instances = {}
         for module_name, metric_names in selected_metrics.items():
             metric_instances[module_name] = []
             for name in metric_names:
                 cls = metric_class.get(name)
                 if cls is not None:
-                    metric_instances[module_name].append(cls())
+                    metric_instances[module_name].append(cls(llm_adapter=llm_adapter, embedding_adapter=embedding_adapter))
                 else:
                     raise ValueError(f"Metric '{name}' not found in registry")
         

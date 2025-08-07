@@ -15,11 +15,11 @@ if "file_upload" not in st.session_state or not st.session_state["file_upload"]:
 
 available_metrics = {
     "E2E LLM Based Metic" : ["E2ESYNRelevancyMetric", "E2EScoringRelevancyMetric", "E2EQGenRelevancyMetric"],
-    "E2E Non-LLM Based Metric": ["AnswerQuerySimilarity", "e2eCosineConsistencyMetric", "e2eCovarianceConsistencyMetric", "e2eTestMetric"],
-    "Generator LLM Based Metric": ["A2RYNFaithfulnessMetric", "A2RSimpleScoringFaithfulnessMetric", "A2RHallucinationFaithfulnessMetric", "A2RTruthfulFaithfulnessMetric", "A2RYNFaithfulnessMetricSingleCall", "A2RHybridFaithfulnessMetric"],
-    "Generator Non-LLM Based Metric": ["AnswerContextSimilarity", "AnswerCentricSimilarityVariance", "MutualInformation_KSG", "RetrievalDeviationfromAnswer", "RetrievaltopkMeanAnswerSimilarity", "GenerationTestMetric"],
-    "Retriever LLM Based Metric": ["RandomDocumentInjectionEffect"],
-    "Retriever Non-LLM Based Metric": ["KeywordMatchingMetric", "JaccardSimilarityMetric", "CosineSimilarityMetric", "EuclideanDistanceMetric", "ManhattanDistanceMetric", "NegativeRejectionRateMetric", "PrecisionMetric", "RankingConsistencyKendallTau", "DiversityMetric", "GeneralizedEmbeddingCoverageError", "EmbeddingCosineSimilarityEvaluation", "PairwiseCosineSimilarityVariance", "RetrievalTestMetric"]
+    "E2E Non-LLM Based Metric": ["AnswerQuerySimilarity"],
+    "Generator LLM Based Metric": ["A2RYNFaithfulnessMetric", "A2RSimpleScoringFaithfulnessMetric", "A2RTruthfulFaithfulnessMetric", "A2RHybridFaithfulnessMetric", ],
+    "Generator Non-LLM Based Metric": ["AnswerContextSimilarity", "AnswerCentricSimilarityVariance", "MutualInformation_KSG", "RetrievalDeviationfromAnswer"],
+    "Retriever LLM Based Metric": [],
+    "Retriever Non-LLM Based Metric": ["KeywordMatchingMetric", "JaccardSimilarityMetric", "CosineSimilarityMetric", "EuclideanDistanceMetric", "ManhattanDistanceMetric", "NegativeRejectionRateMetric", "DiversityMetric", "GeneralizedEmbeddingCoverageError", "EmbeddingCosineSimilarityEvaluation", "PairwiseCosineSimilarityVariance"]
 }
 
 selected_metrics = {}
