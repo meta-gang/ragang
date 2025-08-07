@@ -1,6 +1,7 @@
 from common.bases.datas.performance_dataclass import Performance
 from common.bases.abstracts.base_metric import BaseMetric
 from adapters.llm_adapter import BaseLLMAdapter
+from adapters.embedding_adapter import BaseEmbeddingAdapter
 import re
 import json
 import numpy as np
@@ -8,7 +9,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class A2RYNFaithfulnessMetric(BaseMetric):
+class BaseBuiltinMetric(BaseMetric):
+    def __init__(self, llm_adapter : BaseLLMAdapter = None, embedding_adapter : BaseEmbeddingAdapter = None):
+        self.llm_adapter = llm_adapter
+        self.embedding_adapter = embedding_adapter
+
+
+class A2RYNFaithfulnessMetric(BaseBuiltinMetric):
     """
     Generator faithfulness metric via Yes/No judgement on claims.
 
@@ -17,8 +24,6 @@ class A2RYNFaithfulnessMetric(BaseMetric):
     :ivar llm_adapter: Stores the LLM model.
     :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, llm_adapter : BaseLLMAdapter):
-        self.llm_adapter = llm_adapter
 
     def evaluate(self, ret_docs: list[str], gen: str) -> Performance:
         """
@@ -130,7 +135,7 @@ class A2RYNFaithfulnessMetric(BaseMetric):
 
 
 
-class A2RSimpleScoringFaithfulnessMetric(BaseMetric):
+class A2RSimpleScoringFaithfulnessMetric(BaseBuiltinMetric):
     """
     Generator faithfulness metric via scoring on claims.
 
@@ -139,8 +144,6 @@ class A2RSimpleScoringFaithfulnessMetric(BaseMetric):
     :ivar llm_adapter: Stores the LLM model.
     :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, llm_adapter : BaseLLMAdapter):
-        self.llm_adapter = llm_adapter
 
     def evaluate(self, ret_docs: list[str], gen: str) -> Performance:
         """
@@ -254,7 +257,7 @@ class A2RSimpleScoringFaithfulnessMetric(BaseMetric):
     
 
 
-class A2RHallucinationFaithfulnessMetric(BaseMetric):
+class A2RHallucinationFaithfulnessMetric(BaseBuiltinMetric):
     """
     Generator hallucination metric via Yes/No judgement.
 
@@ -263,8 +266,6 @@ class A2RHallucinationFaithfulnessMetric(BaseMetric):
     :ivar llm_adapter: Stores the LLM model.
     :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, llm_adapter: BaseLLMAdapter):
-        self.llm_adapter = llm_adapter
 
     def evaluate(self, query: str, ret_docs: list[str], gen: str) -> Performance:
         """
@@ -302,7 +303,7 @@ class A2RHallucinationFaithfulnessMetric(BaseMetric):
 
 
 
-class A2RTruthfulFaithfulnessMetric(BaseMetric):
+class A2RTruthfulFaithfulnessMetric(BaseBuiltinMetric):
     """
     Generator faithfulness metric via truthfulness judgement on claims.
 
@@ -311,8 +312,6 @@ class A2RTruthfulFaithfulnessMetric(BaseMetric):
     :ivar llm_adapter: Stores the LLM model.
     :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, llm_adapter : BaseLLMAdapter):
-        self.llm_adapter = llm_adapter
 
     def evaluate(self, ret_docs: list[str], gen: str) -> Performance:
         """
@@ -423,7 +422,7 @@ class A2RTruthfulFaithfulnessMetric(BaseMetric):
         return Performance(score=score/len(claim_list), unit="", metric="Yes/No Relevancy")
 
 
-class A2RYNFaithfulnessMetricSingleCall(BaseMetric):
+class A2RYNFaithfulnessMetricSingleCall(BaseBuiltinMetric):
     """
     (EXPERIMENTAL) Generator faithfulness metric via a single Yes/No judgement call on all claims.
 
@@ -436,8 +435,6 @@ class A2RYNFaithfulnessMetricSingleCall(BaseMetric):
     :ivar llm_adapter: Stores the LLM model.
     :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, llm_adapter: BaseLLMAdapter):
-        self.llm_adapter = llm_adapter
 
     def evaluate(self, ret_docs: list[str], gen: str, max_docs: int = 5, max_gen_chars: int = 2000) -> Performance:
         """
@@ -529,7 +526,7 @@ class A2RYNFaithfulnessMetricSingleCall(BaseMetric):
         return Performance(score=score, unit="", metric="Faithfulness (Single Call)")
 
 
-class A2RHybridFaithfulnessMetric(BaseMetric):
+class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
     """
     A robust faithfulness metric that separates claim extraction and judgment into two steps.
     It extracts all claims first, then evaluates them in batches to manage context size,
@@ -540,8 +537,8 @@ class A2RHybridFaithfulnessMetric(BaseMetric):
     :param claims_batch_size: The number of claims to evaluate in a single LLM call.
     :type claims_batch_size: int
     """
-    def __init__(self, llm_adapter: BaseLLMAdapter, claims_batch_size: int = 10):
-        self.llm_adapter = llm_adapter
+    def __init__(self, llm_adapter: BaseLLMAdapter, embedding_adapter : BaseEmbeddingAdapter = None, claims_batch_size: int = 10):
+        super().__init__(llm_adapter, embedding_adapter)
         self.claims_batch_size = claims_batch_size
 
     def _extract_claims(self, gen: str) -> list[str]:

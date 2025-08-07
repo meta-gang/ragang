@@ -1,11 +1,17 @@
 import numpy as np
 from common.bases.datas.performance_dataclass import Performance
 from common.bases.abstracts.base_metric import BaseMetric
-from adapters.embedding_adapter import BaseEmbeddingAdapter
 from common.utils.tools import CosineSimilarity
+from adapters.llm_adapter import BaseLLMAdapter
+from adapters.embedding_adapter import BaseEmbeddingAdapter
 
 
-class AnswerContextSimilarity(BaseMetric):
+class BaseBuiltinMetric(BaseMetric):
+    def __init__(self, llm_adapter : BaseLLMAdapter = None, embedding_adapter : BaseEmbeddingAdapter = None):
+        self.llm_adapter = llm_adapter
+        self.embedding_adapter = embedding_adapter
+
+class AnswerContextSimilarity(BaseBuiltinMetric):
     """
     Average of cosine similarity between the generated answer and retrieval chunks
     
@@ -14,9 +20,6 @@ class AnswerContextSimilarity(BaseMetric):
     :ivar embedding_adapter: Stores the embedding model
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
-
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        self.embedding_adapter = embedding_adapter
 
     def evaluate(self, context: list[str], gen: str) -> Performance:
         """
@@ -44,7 +47,7 @@ class AnswerContextSimilarity(BaseMetric):
 
 
 
-class AnswerCentricSimilarityVariance(BaseMetric):
+class AnswerCentricSimilarityVariance(BaseBuiltinMetric):
     """
     Veriance of angles beteween embedded generator's answer and each retrieval chunks
     
@@ -53,9 +56,6 @@ class AnswerCentricSimilarityVariance(BaseMetric):
     :ivar embedding_adapter: Stores the embedding model
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
-
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        self.embedding_adapter = embedding_adapter
 
     def evaluate(self, context: list[str], gen: str):
         """
@@ -82,7 +82,7 @@ class AnswerCentricSimilarityVariance(BaseMetric):
 
 
 
-class MutualInformation_KSG(BaseMetric):
+class MutualInformation_KSG(BaseBuiltinMetric):
     """
     Estimates mutual information between the generated answer and context using KSG estimator.
     
@@ -96,8 +96,8 @@ class MutualInformation_KSG(BaseMetric):
     :vartype k: int
     """
 
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter, k=3):
-        self.embedding_adapter = embedding_adapter
+    def __init__(self, embedding_adapter: BaseEmbeddingAdapter, llm_adapter: BaseLLMAdapter = None, k=3):
+        super().__init__(llm_adapter, embedding_adapter)
         self.k = k
 
     def evaluate(self, context: list[str], generation: str) -> Performance:
@@ -161,7 +161,7 @@ class MutualInformation_KSG(BaseMetric):
 
 
 
-class RetrievalDeviationfromAnswer(BaseMetric):
+class RetrievalDeviationfromAnswer(BaseBuiltinMetric):
     """
     Measure how much the generated answer deviates from the retrieved context embeddings by computing the average embedding dispersion
     
@@ -171,8 +171,6 @@ class RetrievalDeviationfromAnswer(BaseMetric):
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
 
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        self.embedding_adapter = embedding_adapter
     
     def evaluate(self, context: list[str], gen: str) -> Performance:
         """
@@ -202,7 +200,7 @@ class RetrievalDeviationfromAnswer(BaseMetric):
 
 
 
-class RetrievaltopkMeanAnswerSimilarity(BaseMetric):
+class RetrievaltopkMeanAnswerSimilarity(BaseBuiltinMetric):
     """
     Measure how well the generated answer aligns with the most relevant subset of retrieved chunks based on cosine similarity with the query, using dynamic top-k selection and centroid comparison
     
@@ -211,9 +209,6 @@ class RetrievaltopkMeanAnswerSimilarity(BaseMetric):
     :ivar embedding_adapter: Stores the embedding model
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
-    
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        self.embedding_adapter = embedding_adapter
 
     def evaluate(self, context: list[str], gen: str, query: str):
         """
