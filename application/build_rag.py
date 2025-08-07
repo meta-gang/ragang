@@ -38,6 +38,10 @@ class buildRag:
 
     def buildRag(self) -> RAGContainer:
         metric_instances = self.load_metrics()
+
+        RetrievalMetrics = metric_instances.get("Retriever Non-LLM Based Metric", [None]) + metric_instances.get("Retriever LLM Based Metric", [None])
+        GenerationMetrics = metric_instances.get("Generator Non-LLM Based Metric", [None]) + metric_instances.get("Generator LLM Based Metric", [None])
+        E2EMetrics = metric_instances.get("E2E Non-LLM Based Metric", [None]) + metric_instances.get("E2E LLM Based Metric", [None])
         
         rag = RAGContainer(
             u_fid='unique_flow_id',
@@ -46,15 +50,15 @@ class buildRag:
                 MyRetrievalModule(
                     'ret',
                     linker=Linker('starter'),
-                    metric=metric_instances.get("Retriever Non-LLM Based Metric", [None])[0]
+                    metric=RetrievalMetrics[0]
                 ),
                 MyGenerationModule(
                     'gen',
                     linker=Linker('ret'),
-                    metric=metric_instances.get("Generator Non-LLM Based Metric", [None])[0]
+                    metric=GenerationMetrics[0]
                 ),
             ],
-            e2e_metric=metric_instances.get("E2E Non-LLM Based Metric", [None])[0]
+            e2e_metric=E2EMetrics[0]
         )
         
         self.rag = rag
