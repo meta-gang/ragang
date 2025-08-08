@@ -91,7 +91,7 @@ class BaseModule(metaclass=ABCMeta):  # observer
 
         # evaluation
         eval_data: dict[str, Any] | None = new_result.pop('metric', None)
-        performance: Performance = self.__evaluate_performance(eval_data)
+        performance: dict[str, list] = self.__evaluate_performance(eval_data)
 
         # build packet
         new_packet = Packet(self, new_result, performance, x_time)
@@ -126,23 +126,36 @@ class BaseModule(metaclass=ABCMeta):  # observer
     def __evaluate_performance(self, eval_data: dict[str, Any]) -> Performance:
         # or not self.__metrics 추가
         if eval_data is None or not self.__metrics:
-            return Performance(_eval=False)
+            return {"Not evaluated": [0.0, '%']}
+            #return Performance(_eval=False)
 
         # 8/7 수정 부분
         metric_results = {}
         for metric in self.__metrics:
-            signature: dict[str, inspect.Parameter] = dict(inspect.signature(metric.evaluate).parameters)
-            req_params: list[str] = list(signature.keys())
+            metric_name = metric.__class__.__name__
+            # 8/8 수정 부분
+            try:
+                signature: dict[str, inspect.Parameter] = dict(
+                    inspect.signature(metric.evaluate).parameters)
+                req_params: list[str] = list(signature.keys())
 
-            if any([rp not in eval_data.keys() for rp in req_params]):
-                raise MissingMetricArgumentException(self.module_id, metric.__class__.__name__, req_params)
+                if any([rp not in eval_data.keys() for rp in req_params]):
+                    raise MissingMetricArgumentException(
+                        self.module_id, metric_name, req_params)
 
-            args = {rp: eval_data[rp] for rp in req_params}
-            # 각 metric의 결과를 metric 클래스 이름을 키로 하여 저장
-            metric_results[metric.__class__.__name__] = metric.evaluate(**args)
+                args = {rp: eval_data[rp] for rp in req_params}
+                # 각 metric의 결과인 Performance 객체를 result에 임시 저장
+                result = metric.evaluate(**args)
 
-        # Performance 클래스도 여러 metric 결과를 처리할 수 있도록 수정 필요
-        return Performance(_eval=True, metric_results=metric_results)
+                # metric_recults 딕셔너리에 metric_name 키: [점수, unit] 저장
+                metric_results[metric_name] = [result.score, result.unit]
+
+            except Exception as e:
+                # --- 오류 발생 시, 결과에 에러 메시지를 기록 ---
+                metric_results[metric_name] = {"error": str(e)}
+
+        # metric_results 딕셔너리를 execute 함수로 리턴하고 패킷에도 딕셔너리 형태로 저장되게 해보자
+        return metric_results
         """
         # parse arg names via signature of metric.evaluate()
         signature: dict[str, inspect.Parameter] = dict(inspect.signature(self.__metric.evaluate).parameters)

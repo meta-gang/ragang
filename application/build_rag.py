@@ -59,7 +59,7 @@ class buildRag:
                     metrics=GenerationMetrics
                 ),
             ],
-            e2e_metric=E2EMetrics[0]
+            e2e_metric=E2EMetrics
         )
         
         self.rag = rag
@@ -84,14 +84,10 @@ if __name__=="__main__":
     test_query = "What is machine learning?"
     
     # 결과 확인
-    for module in test_rag:
+    for module in test_rag.modules:
         if hasattr(module, '_BaseModule__metrics') and module.storage and module.storage.state.snapshots.get(module.module_id):
             latest_snapshot = module.storage.state.snapshots[module.module_id][-1]
-            if latest_snapshot.performance._Performance__did_eval:
-                print(f"\nModule {module.module_id} metrics results:")
-                print(f"Individual score: {latest_snapshot.performance.score}")  # 기존 단일 score 출력
-                print("All metrics results:")
-                # property 사용
-                for metric_name, result in latest_snapshot.performance.all_results.items():
-                    print(f"{metric_name}: {result}")
+            print(f"\nModule {module.module_id} metrics results:")
+            for metric_name, [score, unit] in latest_snapshot.performances.items():
+                print(f"{metric_name}: {score:.2f}{unit}")
 """

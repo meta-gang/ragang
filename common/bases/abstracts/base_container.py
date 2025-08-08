@@ -11,10 +11,19 @@ from common.utils.ansi_styler import ANSIStyler
 
 
 class BaseContainer(metaclass=ABCMeta):
-    def __init__(self, u_fid: str, modules: list[BaseModule], e2e_metric: BaseMetric = None):
+    # BaseContainer 생성자에 e2e_metrics: list[BaseMetric] | BaseMetric = None로 Metric 리스트 받을 수 있게 수정
+    def __init__(self, u_fid: str, modules: list[BaseModule], e2e_metrics: list[BaseMetric] | BaseMetric = None):
         self.modules: list[BaseModule] = self.__validate_module_id(modules)
         self.starter: BaseModule | None = None
-        self.__metric: BaseMetric | None = e2e_metric
+        #self.__metric: BaseMetric | None = e2e_metric
+        
+        # e2e_metrics를 리스트로 처리하도록 수정
+        self.__e2e_metrics: list[BaseMetric] = []
+        if isinstance(e2e_metrics, list):
+            self.__e2e_metrics.extend(e2e_metrics)
+        elif e2e_metrics is not None:
+            self.__e2e_metrics.append(e2e_metrics)
+        
         self.storage: FlowStorage = FlowStorage(u_fid)
         self.__connect_dependencies()
 

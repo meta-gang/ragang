@@ -87,10 +87,10 @@ class State:
 
 
 class Packet:
-    def __init__(self, src_m: 'BaseModule', data: dict[str, object], performance: Performance, x_time: float):
+    def __init__(self, src_m: 'BaseModule', data: dict[str, object], performance: dict[str, list], x_time: float):
         self.src: str = src_m.module_id  # src_mid
         self.data: dict[str, Any] = data  # {dest_mid: data} TODO: Data 객체 만들고 수정
-        self.performance: Performance = performance
+        self.performance: dict[str, list] = performance
         self.x_time: float = x_time  # sec
         self.destinations: list[str] = list(key for key in data.keys() if key not in ['metric', 'answer'])
         self.is_answer: bool = 'answer' in data.keys()
