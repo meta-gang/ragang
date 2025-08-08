@@ -123,7 +123,7 @@ class BaseModule(metaclass=ABCMeta):  # observer
 
         return output
 
-    def __evaluate_performance(self, eval_data: dict[str, Any]) -> Performance:
+    def __evaluate_performance(self, eval_data: dict[str, Any]) -> dict[str, list]:
         # or not self.__metrics 추가
         if eval_data is None or not self.__metrics:
             return {"Not evaluated": [0.0, '%']}
@@ -144,7 +144,7 @@ class BaseModule(metaclass=ABCMeta):  # observer
                         self.module_id, metric_name, req_params)
 
                 args = {rp: eval_data[rp] for rp in req_params}
-                # 각 metric의 결과인 Performance 객체를 result에 임시 저장
+                # 각 metric의 결과인 Performance 객체를 result에 임시 저장 / evaluate 함수는 Performance 객체 리턴
                 result = metric.evaluate(**args)
 
                 # metric_recults 딕셔너리에 metric_name 키: [점수, unit] 저장
@@ -154,7 +154,7 @@ class BaseModule(metaclass=ABCMeta):  # observer
                 # --- 오류 발생 시, 결과에 에러 메시지를 기록 ---
                 metric_results[metric_name] = {"error": str(e)}
 
-        # metric_results 딕셔너리를 execute 함수로 리턴하고 패킷에도 딕셔너리 형태로 저장되게 해보자
+        # metric_results 딕셔너리를 execute 함수로 리턴하고 패킷에 딕셔너리 형태로 저장
         return metric_results
         """
         # parse arg names via signature of metric.evaluate()
