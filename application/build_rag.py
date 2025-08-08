@@ -59,7 +59,7 @@ class buildRag:
                     metrics=GenerationMetrics
                 ),
             ],
-            e2e_metric=E2EMetrics
+            e2e_metrics=E2EMetrics
         )
         
         self.rag = rag
