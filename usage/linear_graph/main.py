@@ -8,13 +8,13 @@ from usage.linear_graph.modules.impls import AcceptorModule, MyPreRetrievalModul
 rag = RAGContainer(
     u_fid='unique_flow_id',
     modules=[
-        AcceptorModule('starter', metric=None, is_starter=True),
-        MyPreRetrievalModule('pre', linker=Linker('starter'), metric=MyPreRetrievalMetric()),
-        MyRetrievalModule('ret', linker=Linker('pre'), metric=MyRetrievalMetric()),
-        MyPostRetrievalModule('post', linker=Linker('ret'), metric=MyPostRetrievalMetric()),
-        MyGenerationModule('output', linker=Linker('post'), metric=MyGenerationMetric(None)),
+        AcceptorModule('starter', metrics=None, is_starter=True),
+        MyPreRetrievalModule('pre', linker=Linker('starter'), metrics=[MyPreRetrievalMetric()]),
+        MyRetrievalModule('ret', linker=Linker('pre'), metrics=[MyRetrievalMetric()]),
+        MyPostRetrievalModule('post', linker=Linker('ret'), metrics=[MyPostRetrievalMetric()]),
+        MyGenerationModule('output', linker=Linker('post'), metrics=[MyGenerationMetric(None)]),
     ],
-    e2e_metric=MyE2EMetric()
+    e2e_metrics=[MyE2EMetric()]
 )
 
 # answer = rag.invoke('Hello, Ragang')

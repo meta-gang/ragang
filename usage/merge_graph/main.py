@@ -6,14 +6,14 @@ from usage.merge_graph.metrics.impls import *
 rag = RAGContainer(
     u_fid='unique_flow_id',
     modules=[
-        AcceptorModule('starter', metric=None, is_starter=True),
-        MyBranchingModule('branch', linker=Linker('starter'), metric=None),
-        MyRetrievalModule('first_ret', linker=Linker('branch'), metric=MyRetrievalMetric()),
-        MyRetrievalModule('second_ret', linker=Linker('branch'), metric=MyRetrievalMetric()),
-        MyRerankingModule('rerank', linker=Linker('first_ret') & Linker('second_ret'), metric=MyRerankingMetric()),
-        MyGenerationModule('output', linker=Linker('rerank'), metric=MyGenerationMetric(None)),
+        AcceptorModule('starter', metrics=None, is_starter=True),
+        MyBranchingModule('branch', linker=Linker('starter'), metrics=None),
+        MyRetrievalModule('first_ret', linker=Linker('branch'), metrics=[MyRetrievalMetric()]),
+        MyRetrievalModule('second_ret', linker=Linker('branch'), metrics=[MyRetrievalMetric()]),
+        MyRerankingModule('rerank', linker=Linker('first_ret') & Linker('second_ret'), metrics=[MyRerankingMetric()]),
+        MyGenerationModule('output', linker=Linker('rerank'), metrics=[MyGenerationMetric(None)]),
     ],
-    e2e_metric=MyE2EMetric()
+    e2e_metrics=[MyE2EMetric()]
 )
 
 # answer = rag.invoke('Hello, Ragang')

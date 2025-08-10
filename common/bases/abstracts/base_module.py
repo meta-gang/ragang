@@ -14,10 +14,10 @@ from exceptions.frameworks.modules import StarterModuleException
 
 
 class BaseModule(metaclass=ABCMeta):  # observer
-    def __init__(self, module_id: str, linker: Linker = None, metric: BaseMetric = None, is_starter: bool = False):
+    def __init__(self, module_id: str, linker: Linker = None, metrics: list[BaseMetric] | None = None, is_starter: bool = False):
         self.module_id: str = module_id
         self.dependency: Dependency = linker.build(module_id) if linker else Dependency([], False)
-        self.__metric: BaseMetric | None = metric
+        self.__metrics: list[BaseMetric] | None = metrics
         self.storage: 'FlowStorage' | None = None
         self.is_starter: bool = is_starter
 
@@ -74,18 +74,18 @@ class BaseModule(metaclass=ABCMeta):  # observer
 
         # evaluation
         eval_data: dict[str, Any] | None = new_result.pop('metric', None)
-        performance: Performance = self.__evaluate_performance(eval_data)
+        performances: list[Performance] = self.__evaluate_performance(eval_data)
 
         # build packet
-        new_packet = Packet(self.module_id, new_result, performance, x_time)
+        new_packet = Packet(self.module_id, new_result, performances, x_time)
 
         # send packet
         self.storage.send_packet(new_packet)
 
     def __validate_output(self, output: dict[str, Any]) -> dict[str, Any]:
-        if self.__metric is not None and 'metric' not in output.keys():
-            raise MissingMetricDataException(self.module_id, self.__metric.__class__.__name__)
-        if self.__metric is None and 'metric' in output.keys():
+        if self.__metrics is not None and 'metric' not in output.keys():
+            raise MissingMetricDataException(self.module_id, [m.__class__.__name__ for m in self.__metrics])
+        if self.__metrics is None and 'metric' in output.keys():
             output.pop('metric')
 
         subscribers: list[str] = [module.module_id for module in self.storage.subscription[self.module_id]]
@@ -97,19 +97,34 @@ class BaseModule(metaclass=ABCMeta):  # observer
 
         return output
 
-    def __evaluate_performance(self, eval_data: dict[str, Any]) -> Performance:
-        if eval_data is None:
-            return Performance(_eval=False)
+    def __evaluate_performance(self, eval_data: dict[str, Any]) -> list[Performance]:
+        if eval_data is None:  # eval_dat is None -> no metric selected
+            return [Performance(_eval=False)]
 
-        # parse arg names via signature of metric.evaluate()
-        signature: dict[str, inspect.Parameter] = dict(inspect.signature(self.__metric.evaluate).parameters)
-        req_params: list[str] = list(signature.keys())
+        performances: list[Performance] = []
+        """
+        expected output
+        {
+            'next_mid': data,
+            'metric': {
+                'param1_name_for_metric1': data,
+                'param2_name_for_metric1': data,
+                'param1_name_for_metric2': data,
+                ...
+            }
+        }
+        """
+        for metric in self.__metrics:
+            # parse arg names via signature of metric.evaluate()
+            signature: dict[str, inspect.Parameter] = dict(inspect.signature(metric.evaluate).parameters)
+            req_params: list[str] = list(signature.keys())
 
-        if any([rp not in eval_data.keys() for rp in req_params]):
-            raise MissingMetricArgumentException(self.module_id, self.__metric.__class__.__name__, req_params)
+            if any([rp not in eval_data.keys() for rp in req_params]):
+                raise MissingMetricArgumentException(self.module_id, metric.__class__.__name__, req_params)
 
-        args = {rp: eval_data[rp] for rp in req_params}
-        return self.__metric.evaluate(**args)
+            args = {rp: eval_data[rp] for rp in req_params}
+            performances.append(metric.evaluate(**args))
+        return performances
 
     @abstractmethod
     def execute(self, *args, **kwargs):

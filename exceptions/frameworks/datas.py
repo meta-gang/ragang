@@ -1,7 +1,7 @@
 class MissingMetricDataException(Exception):
-    def __init__(self, module_id: str, metric_cls_name: str):
+    def __init__(self, module_id: str, metric_cls_names: list[str]):
         super().__init__(
-            f"Module '{module_id}' uses metric class '{metric_cls_name}' but metric data is not exists in Module output\n"
+            f"Module '{module_id}' uses metric classes '{metric_cls_names}' but metric data is not exists in Module output\n"
             f"Please include data for metric with key 'metric'")
 
 

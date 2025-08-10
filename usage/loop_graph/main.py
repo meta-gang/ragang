@@ -6,12 +6,12 @@ from usage.loop_graph.metrics.impls import *
 rag = RAGContainer(
     u_fid='unique_flow_id',
     modules=[
-        AcceptorModule('starter', metric=None, is_starter=True),
-        MyRetrievalModule('ret', linker=Linker('starter') | Linker('post'), metric=MyRetrievalMetric()),
-        MyPostRetrievalModule('post', linker=Linker('ret'), metric=MyPostRetrievalMetric()),
-        MyGenerationModule('output', linker=Linker('post'), metric=MyGenerationMetric(None)),
+        AcceptorModule('starter', metrics=None, is_starter=True),
+        MyRetrievalModule('ret', linker=Linker('starter') | Linker('post'), metrics=[MyRetrievalMetric()]),
+        MyPostRetrievalModule('post', linker=Linker('ret'), metrics=[MyPostRetrievalMetric(), MySecondPostRetrievalMetric()]),
+        MyGenerationModule('output', linker=Linker('post'), metrics=[MyGenerationMetric(None)]),
     ],
-    e2e_metric=MyE2EMetric()
+    e2e_metrics=[MyE2EMetric()]
 )
 
 # answer = rag.invoke('Hello, Ragang')

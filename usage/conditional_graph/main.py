@@ -6,14 +6,14 @@ from usage.conditional_graph.metrics.impls import *
 rag = RAGContainer(
     u_fid='unique_flow_id',
     modules=[
-        AcceptorModule('starter', metric=None, is_starter=True),
+        AcceptorModule('starter', metrics=None, is_starter=True),
         MyConditionalBranchModule('cond', linker=Linker('starter')),
-        MyFirstRetrievalModule('first_ret', linker=Linker('cond'), metric=MyRetrievalMetric()),
-        MySecondRetrievalModule('second_ret', linker=Linker('cond'), metric=MyRetrievalMetric()),
-        MyMergeModule('merge', linker=Linker('first_ret') | Linker('second_ret'), metric=MyMergeModuleMetric()),
-        MyGenerationModule('output', linker=Linker('merge'), metric=MyGenerationMetric(None)),
+        MyFirstRetrievalModule('first_ret', linker=Linker('cond'), metrics=[MyRetrievalMetric()]),
+        MySecondRetrievalModule('second_ret', linker=Linker('cond'), metrics=[MyRetrievalMetric()]),
+        MyMergeModule('merge', linker=Linker('first_ret') | Linker('second_ret'), metrics=[MyMergeModuleMetric()]),
+        MyGenerationModule('output', linker=Linker('merge'), metrics=[MyGenerationMetric(None)]),
     ],
-    e2e_metric=MyE2EMetric()
+    e2e_metrics=[MyE2EMetric()]
 )
 
 # answer = rag.invoke('Hello, Ragang')

@@ -28,8 +28,8 @@ class FlowStorage:
     def construct(self, x_id: int, query: str):
         self.state = State(x_id=x_id, query=query)
 
-    def destruct(self, performance: Performance):
-        self.state.performance = performance
+    def destruct(self, performances: list[Performance]):
+        self.state.performances = performances
         self.history[self.state.x_id] = self.state
         self.state = None
 

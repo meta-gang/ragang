@@ -9,7 +9,11 @@ class MyRetrievalMetric(BaseMetric):
 
 class MyPostRetrievalMetric(BaseMetric):
     def evaluate(self, retrieved: list[str]) -> Performance:
-        return Performance(score=0.8, unit='', metric='Cosine Similarity')
+        return Performance(score=0.8, unit='', metric='cosim')
+
+class MySecondPostRetrievalMetric(BaseMetric):
+    def evaluate(self, ret_docs: list[str]) -> Performance:
+        return Performance(score=0.2, unit='', metric='std')
 
 
 class MyGenerationMetric(BaseMetric):

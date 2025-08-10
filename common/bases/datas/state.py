@@ -10,7 +10,7 @@ class State:
         self.x_id: int = x_id  # query index or any distinguishable id for each query
         self.x_status: list[tuple[str, str]] = list()  # execution status (for dependency checking)
         self.snapshots: dict[str, list[Packet]] = dict()  # module output packet snapshots
-        self.performance: Performance = Performance()
+        self.performances: list[Performance] = None
         self.gen: str | None = None
 
     def save_snapshots(self, packet: Packet):

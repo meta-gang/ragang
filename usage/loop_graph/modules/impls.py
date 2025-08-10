@@ -44,7 +44,8 @@ class MyPostRetrievalModule(PostRetrievalModule):  # 'post'
                 'data': data
             },
             'metric': {
-                'retrieved': data
+                'retrieved': data,
+                'ret_docs': data
             }
         }
 

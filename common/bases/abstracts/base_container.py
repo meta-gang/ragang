@@ -11,10 +11,10 @@ from common.utils.ansi_styler import ANSIStyler
 
 
 class BaseContainer(metaclass=ABCMeta):
-    def __init__(self, u_fid: str, modules: list[BaseModule], e2e_metric: BaseMetric = None):
+    def __init__(self, u_fid: str, modules: list[BaseModule], e2e_metrics: list[BaseMetric] = None):
         self.modules: list[BaseModule] = self.__validate_module_id(modules)
         self.starter: BaseModule | None = None
-        self.__metric: BaseMetric | None = e2e_metric
+        self.__metrics: list[BaseMetric] | None = e2e_metrics
         self.storage: FlowStorage = FlowStorage(u_fid)
         self.__connect_dependencies()
 
@@ -64,11 +64,12 @@ class BaseContainer(metaclass=ABCMeta):
         if gen is None:
             raise FlowOutputException()
 
-        if self.__metric is None:
-            performance: Performance = Performance(_eval=False)
+        if self.__metrics is None:
+            performances: Performance = [Performance(_eval=False)]
         else:
-            performance: Performance = self.__metric.evaluate(query=query, gen=gen)
-        self.storage.destruct(performance)
+            # parameters for the e2e metrics' evaluate() are limited to 'query' and 'gen'
+            performances: Performance = [metric.evaluate(query=query, gen=gen) for metric in self.__metrics]
+        self.storage.destruct(performances)
         return gen
 
     def print_eval(self):
@@ -79,17 +80,21 @@ class BaseContainer(metaclass=ABCMeta):
             print(ANSIStyler.style(f"Generated Answer: {state.gen}", font_style='bold',
                                    fore_color='light-green'))  # answer
 
-            for mid, packet_list in state.snapshots.items():  # print by packets
-                print(ANSIStyler.style(f"\t'{mid}' Performance:", font_style='normal', fore_color='blue'))
-                for packet in packet_list:  # TODO: update after multi metric usage available
+            for mid, packet_list in state.snapshots.items():  # per modules
+                print(ANSIStyler.style(f"\t'{mid}' Performances:", font_style='normal', fore_color='blue'))
+                for idx, packet in enumerate(packet_list):  # per executions (for loop graph or sth)
                     x_time = packet.x_time * 1000
-                    print(ANSIStyler.style(f"\t\t{packet.performance} ({x_time:.4f}ms)", font_style='normal',
+                    print(ANSIStyler.style(f"\t\texecution {idx} ({x_time:.4f}ms)", font_style='normal',
                                            fore_color='yellow'))
+                    for perf in packet.performances:  # per metrics
+                        print(ANSIStyler.style(f"\t\t\t{perf}", font_style='normal',
+                                               fore_color='yellow'))
                     tot_x_time += x_time
 
-            print(ANSIStyler.style(f"E2E Performance:", font_style='bold', fore_color='light-blue'))
-            print(ANSIStyler.style(f"\t{state.performance} ({tot_x_time:.4f}ms)", font_style='bold',
-                                   fore_color='light-yellow'))
+            print(ANSIStyler.style(f"E2E Performances:", font_style='bold', fore_color='light-blue'))
+            for perf in state.performances:
+                print(ANSIStyler.style(f"\t{perf} ({tot_x_time:.4f}ms)", font_style='bold',
+                                       fore_color='light-yellow'))
 
     @abstractmethod
     def show(self):
