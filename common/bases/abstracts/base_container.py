@@ -65,10 +65,10 @@ class BaseContainer(metaclass=ABCMeta):
             raise FlowOutputException()
 
         if self.__metrics is None:
-            performances: Performance = [Performance(_eval=False)]
+            performances: list[Performance] = [Performance(_eval=False)]
         else:
             # parameters for the e2e metrics' evaluate() are limited to 'query' and 'gen'
-            performances: Performance = [metric.evaluate(query=query, gen=gen) for metric in self.__metrics]
+            performances: list[Performance] = [metric.evaluate(query=query, gen=gen) for metric in self.__metrics]
         self.storage.destruct(performances)
         return gen
 
