@@ -1,4 +1,4 @@
-from common.decorators.serialize import serializable
+from common.decorators.serializable import serializable
 
 
 @serializable

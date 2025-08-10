@@ -1,7 +1,7 @@
 from typing import Any
 
 from common.bases.datas.performance import Performance
-from common.decorators.serialize import serializable
+from common.decorators.serializable import serializable
 
 
 @serializable
