@@ -4,9 +4,10 @@ from abc import ABCMeta, abstractmethod
 from typing import Any
 
 from common.bases.abstracts.base_metric import BaseMetric
-from common.bases.datas.flow_storage import Packet, FlowStorage
+# from common.bases.datas.flow_storage import FlowStorage
+from common.bases.datas.packet import Packet
 from common.bases.datas.linker import Dependency, Linker
-from common.bases.datas.performance_dataclass import Performance
+from common.bases.datas.performance import Performance
 from exceptions.frameworks.datas import MissingMetricDataException, MissingMetricArgumentException, \
     ModuleOutputException
 from exceptions.frameworks.modules import StarterModuleException
@@ -17,22 +18,22 @@ class BaseModule(metaclass=ABCMeta):  # observer
         self.module_id: str = module_id
         self.dependency: Dependency = linker.build(module_id) if linker else Dependency([], False)
         self.__metric: BaseMetric | None = metric
-        self.storage: FlowStorage | None = None
+        self.storage: 'FlowStorage' | None = None
         self.is_starter: bool = is_starter
 
     def trigger_chain_execution(self, query: str):
         if not self.is_starter:
-            raise  StarterModuleException(f"Trying to call trigger method at '{self.module_id}'.\n"
-                                          f"Only starter modules can use trigger method.")
+            raise StarterModuleException(f"Trying to call trigger method at '{self.module_id}'.\n"
+                                         f"Only starter modules can use trigger method.")
 
         signature: list[str] = list(inspect.signature(self.execute).parameters.keys())
         if signature != ['query']:
-            raise StarterModuleException(f"Method execute() of starter module '{self.module_id}' can only accept 'query' parameter.\n"
-                                         f"But received {signature}.")
+            raise StarterModuleException(
+                f"Method execute() of starter module '{self.module_id}' can only accept 'query' parameter.\n"
+                f"But received {signature}.")
 
         args: dict[str, Any] = {'query': query}
         self.__execute(args)
-
 
     def chain_react(self, packet: Packet) -> None:  # event handler
         if not self.__satisfy_dependency(packet):
@@ -76,7 +77,7 @@ class BaseModule(metaclass=ABCMeta):  # observer
         performance: Performance = self.__evaluate_performance(eval_data)
 
         # build packet
-        new_packet = Packet(self, new_result, performance, x_time)
+        new_packet = Packet(self.module_id, new_result, performance, x_time)
 
         # send packet
         self.storage.send_packet(new_packet)
@@ -122,4 +123,3 @@ class BaseModule(metaclass=ABCMeta):  # observer
 #
 #     m = M('hello', None, None, True)
 #     m.trigger_chain_execution('dd')
-

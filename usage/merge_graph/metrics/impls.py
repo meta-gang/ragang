@@ -1,5 +1,5 @@
 from common.bases.abstracts.base_metric import BaseMetric
-from common.bases.datas.performance_dataclass import Performance
+from common.bases.datas.performance import Performance
 
 
 class MyRetrievalMetric(BaseMetric):

@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 
-from common.bases.datas.performance_dataclass import Performance
+from common.bases.datas.performance import Performance
 
 
 class BaseMetric(metaclass=ABCMeta):

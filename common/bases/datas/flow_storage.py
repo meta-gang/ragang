@@ -1,10 +1,11 @@
-# from common.bases.abstracts.base_module import BaseModule
-from dataclasses import dataclass
-from typing import Any
+from common.bases.abstracts.base_module import BaseModule
+from common.bases.datas.packet import Packet
+from common.bases.datas.performance import Performance
+from common.bases.datas.state import State
+from common.decorators.serialize import serializable
 
-from common.bases.datas.performance_dataclass import Performance
 
-
+@serializable
 class FlowStorage:
     def __init__(self, flow_id: str):
         self.flow_id: str = flow_id
@@ -41,63 +42,6 @@ class FlowStorage:
         self.state.save_snapshots(packet)
         # 4. notify listeners
         self.notify_all(packet)
-
-class State:
-    def __init__(self, x_id: int, query: str):
-        self.query: str = query
-        self.x_id: int = x_id  # query index or any distinguishable id for each query
-        self.x_status: list[tuple[str, str]] = list()  # execution status (for dependency checking)
-        self.snapshots: dict[str, list['Packet']] = dict()  # module output packet snapshots
-        self.performance: Performance = Performance()
-        self.gen: str | None = None
-
-    def save_snapshots(self, packet: 'Packet'):
-        if self.snapshots.get(packet.src, None) is None:
-            self.snapshots[packet.src] = [packet]
-        else:
-            self.snapshots[packet.src].append(packet)
-
-        # save gen (for output module)
-        if packet.is_answer:
-            self.gen = packet.data.get('gen', None)
-
-    def add_x_status(self, src_mid: str, dest_mids: list[str]) -> int:
-        status_cnt: int = 0
-        if len(dest_mids) == 0:
-            self.x_status.append((src_mid, None))
-            status_cnt += 1
-        for dest in dest_mids:
-            self.x_status.append((src_mid, dest))
-            status_cnt += 1
-        return status_cnt
-
-    def refresh_x_status(self, src_mid: str, status_cnt: int):
-        current_x: list[tuple[str, str]] = self.x_status[-status_cnt:]
-        self.__refresh_x_status(src_mid, 0)
-        self.x_status.extend(current_x)
-
-    def __refresh_x_status(self, src_mid: str, idx: int):
-        if idx >= len(self.x_status):
-            return
-
-        if self.x_status[idx][0] == src_mid:
-            n_mid: str = self.x_status[idx][1]
-            self.x_status.pop(idx)
-            self.__refresh_x_status(src_mid, idx)  # find next src
-            self.__refresh_x_status(n_mid, 0)  # for chain reaction
-            return
-
-        self.__refresh_x_status(src_mid, idx + 1)
-
-
-class Packet:
-    def __init__(self, src_m: 'BaseModule', data: dict[str, object], performance: Performance, x_time: float):
-        self.src: str = src_m.module_id  # src_mid
-        self.data: dict[str, Any] = data  # {dest_mid: data} TODO: Data 객체 만들고 수정
-        self.performance: Performance = performance
-        self.x_time: float = x_time  # sec
-        self.destinations: list[str] = list(key for key in data.keys() if key not in ['metric', 'gen'])
-        self.is_answer: bool = 'gen' in data.keys()
 
 # if __name__ == '__main__':
 #     state: State = State(0, 'hello')

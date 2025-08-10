@@ -1,3 +1,7 @@
+from common.decorators.serialize import serializable
+
+
+@serializable
 class Performance:
     def __init__(self, score: float = 0, unit: str = '%', metric: str = 'Accuracy', _eval: bool = True):
         self.__score: float = score

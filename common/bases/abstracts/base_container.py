@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from common.bases.abstracts.base_metric import BaseMetric
 from common.bases.abstracts.base_module import BaseModule
 from common.bases.datas.flow_storage import FlowStorage
-from common.bases.datas.performance_dataclass import Performance
+from common.bases.datas.performance import Performance
 from exceptions.frameworks.modules import DuplicateModuleIdException, FlowOutputException, \
     MultipleStarterModuleException, InvalidModuleIdException
 from common.utils.ansi_styler import ANSIStyler
