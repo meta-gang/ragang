@@ -41,7 +41,7 @@ from dotenv import load_dotenv
 
 # --- 공통 기반 클래스 및 어댑터 import ---
 from common.bases.abstracts.base_module import BaseMetric
-from common.bases.datas.performance_dataclass import Performance
+from common.bases.datas.performance import Performance
 from metrics.builtin.retriever.non_llm_based import PrecisionMetric
 from adapters.llm_adapter import BaseLLMAdapter
 from adapters.embedding_adapter import BaseEmbeddingAdapter
