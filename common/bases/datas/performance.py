@@ -17,6 +17,14 @@ class Performance:
     def unit(self) -> str:
         return self.__unit
 
+    @property
+    def metric(self) -> str:
+        return self.__metric
+
+    @property
+    def did_eval(self) -> bool:
+        return self.__did_eval
+
     def __str__(self):
         # light blue colored score text
         if self.__did_eval:
