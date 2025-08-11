@@ -3,4 +3,10 @@ name = "rag-testing-framework"
 version = "0.0.2"
 description = "RAG flow modular testing framework"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "numpy>=2.3.2",
+    "pymilvus>=2.6.0",
+    "requests>=2.32.4",
+    "scikit-learn>=1.7.1",
+    "scipy>=1.16.0",
+]
