@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.13"
 dependencies = [
-    "numpy>=2.3.1",
+    "numpy>=2.3.2",
+    "pymilvus>=2.6.0",
     "requests>=2.32.4",
     "scikit-learn>=1.7.1",
     "scipy>=1.16.0",
