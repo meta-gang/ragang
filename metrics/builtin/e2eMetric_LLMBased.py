@@ -8,7 +8,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class E2ESYNRelevancyMetric(BaseMetric):
+
+class BaseBuiltinMetric(BaseMetric):
+    def __init__(self, llm_adapter: BaseLLMAdapter = None, embedding_adapter: BaseEmbeddingAdapter = None):
+        self.llm_adapter = llm_adapter
+        self.embedding_adapter = embedding_adapter
+
+
+class E2ESYNRelevancyMetric(BaseBuiltinMetric):
     """
     End to end relevancy metric via Yes/No judgement.
 
@@ -17,10 +24,8 @@ class E2ESYNRelevancyMetric(BaseMetric):
     :ivar llm_adapter: Stores the LLM model to use
     :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, llm_adapter: BaseLLMAdapter):
-        self.llm_adapter = llm_adapter
 
-    def evaluate(self, query: str, gen: str) -> Performance:
+    def evaluate(self, query: str = None, gen: str = None) -> Performance:
         """
         Judges the relevancy of the generated answer to the query using a Yes/No response from an LLM.
 
@@ -47,12 +52,12 @@ class E2ESYNRelevancyMetric(BaseMetric):
             "Question:\nWhat is the capital of France?\n"
             "Response:\nIt's a man-made factor of production, meaning it's created by humans rather than being a natural resource\n"
             "Judgement: N\n\n"
-            
+
             "Example 2:\n"
             "Question:\nWhat is the capital of France?\n"
             "Response:\nParis, Lyon, and Strasbourg are the most famous cities of France.\n"
             "Judgement: N\n\n"
-            
+
             "Example 3:\n"
             "Question:\nWhat is the capital of France?\n"
             "Response:\nThe capital of France is Paris.\n"
@@ -76,7 +81,8 @@ class E2ESYNRelevancyMetric(BaseMetric):
             score = np.nan
         return Performance(score=score, unit="", metric="Yes/No Relevancy")
 
-class E2EScoringRelevancyMetric(BaseMetric):
+
+class E2EScoringRelevancyMetric(BaseBuiltinMetric):
     """
     End to end relevancy metric via simple scoring.
 
@@ -85,10 +91,8 @@ class E2EScoringRelevancyMetric(BaseMetric):
     :ivar llm_adapter: Stores the LLM model to use
     :vartype llm_adapter: BaseLLMAdapter
     """
-    def __init__(self, llm_adapter: BaseLLMAdapter):
-        self.llm_adapter = llm_adapter
 
-    def evaluate(self, query: str, gen: str) -> Performance:
+    def evaluate(self, query: str = None, gen: str = None) -> Performance:
         """
         Scores the relevancy of the generated answer to the query on a scale of 0, 1, or 2.
 
@@ -110,17 +114,17 @@ class E2EScoringRelevancyMetric(BaseMetric):
             "Note that whether the answer itself to be correct or not is not a matter here."
             "The only factor you consider is whether the response correctly addresses the type of required information aksed in the question."
             "Output only the score (0, 1, or 2) without explanation.\n\n"
-            
+
             "Example 1:\n"
             "Question:\nWhat is the capital of France?\n"
             "Response:\nIt's a man-made factor of production, meaning it's created by humans rather than being a natural resource\n"
             "Score: 0\n\n"
-            
+
             "Example 2:\n"
             "Question:\nWhat is the capital of France?\n"
             "Response:\nParis, Lyon, and Strasbourg are the most famous cities of France.\n"
             "Score: 1\n\n"
-            
+
             "Example 3:\n"
             "Question:\nWhat is the capital of France?\n"
             "Response:\nThe capital of France is Paris.\n"
@@ -137,7 +141,8 @@ class E2EScoringRelevancyMetric(BaseMetric):
             score = np.nan
         return Performance(score=score, unit="", metric="Simple Score Relevancy")
 
-class E2EQGenRelevancyMetric(BaseMetric):
+
+class E2EQGenRelevancyMetric(BaseBuiltinMetric):
     """
     End to end relevancy metric via question generation.
 
@@ -150,11 +155,8 @@ class E2EQGenRelevancyMetric(BaseMetric):
     :ivar embedding_adapter: Stores the embedding model.
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
-    def __init__(self, llm_adapter: BaseLLMAdapter, embedding_adapter: BaseEmbeddingAdapter):
-        self.llm_adapter = llm_adapter
-        self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, query: str, gen: str) -> Performance:
+    def evaluate(self, query: str = None, gen: str = None) -> Performance:
         """
         Calculates relevancy by generating questions from the answer and measuring their similarity to the original query.
 
@@ -209,8 +211,3 @@ class E2EQGenRelevancyMetric(BaseMetric):
         final_score = np.mean(similarity_scores) if similarity_scores.size > 0 else 0.0
 
         return Performance(score=float(final_score), unit="", metric="Q-Gen Relevancy")
-    
-
-
-
-

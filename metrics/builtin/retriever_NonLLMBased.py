@@ -49,13 +49,22 @@ from dotenv import load_dotenv
 
 # --- 공통 기반 클래스 및 어댑터 import ---
 from adapters.embedding_adapter import BaseEmbeddingAdapter
+from adapters.llm_adapter import BaseLLMAdapter
 
-class KeywordMatchingMetric(BaseMetric):
+
+class BaseBuiltinMetric(BaseMetric):
+    def __init__(self, llm_adapter: BaseLLMAdapter = None, embedding_adapter: BaseEmbeddingAdapter = None):
+        self.llm_adapter = llm_adapter
+        self.embedding_adapter = embedding_adapter
+
+
+class KeywordMatchingMetric(BaseBuiltinMetric):
     """쿼리와 문서 간의 키워드 매칭 비율을 평가합니다.
 
     쿼리 토큰이 각 문서 텍스트의 토큰들과 얼마나 일치하는지 계산하고
     그 평균을 백분율로 반환합니다.
     """
+
     def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
         Keyword Matching 점수를 계산합니다.
@@ -67,41 +76,31 @@ class KeywordMatchingMetric(BaseMetric):
         :return: Keyword Matching 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not isinstance(query, str):
-            raise TypeError("query는 str 타입이어야 합니다.")
-        if not isinstance(ret_docs, list):
-            raise TypeError("ret_docs는 List[str] 타입이어야 합니다")
-        if not all(isinstance(doc, str) for doc in ret_docs):
-            raise TypeError("ret_docs 리스트에는 str 타입만 포함되어야 합니다")
-        
-        try:
-            if not ret_docs:
-                return Performance(score=0.0, unit='%', metric='Keyword Matching Metric')
-            
-            tokenized_query = set(query.split())
-            scores = []
-            for doc in ret_docs:
-                tokenized_doc = doc.split()
-                if not tokenized_doc:
-                    continue
-                
-                matched_tokens = sum(1 for token in tokenized_doc if token in tokenized_query)
-                score_per_doc = matched_tokens / len(tokenized_doc)
-                scores.append(score_per_doc)
-                
-            avg_score = np.mean(scores) * 100 if scores else 0.0
-            return Performance(score=avg_score, unit='%', metric='Keyword Matching Metric')
-        except Exception as e:
-            raise RuntimeError(f"Keyword Matching 점수 계산 중 오류가 발생했습니다: {e}")
-        
+        if not ret_docs:
+            return Performance(score=0.0, unit='%', metric='Keyword Matching Metric')
+
+        tokenized_query = set(query.split())
+        scores = []
+        for doc in ret_docs:
+            tokenized_doc = doc.split()
+            if not tokenized_doc:
+                continue
+
+            matched_tokens = sum(1 for token in tokenized_doc if token in tokenized_query)
+            score_per_doc = matched_tokens / len(tokenized_doc)
+            scores.append(score_per_doc)
+
+        avg_score = np.mean(scores) * 100 if scores else 0.0
+        return Performance(score=avg_score, unit='%', metric='Keyword Matching Metric')
 
 
-class JaccardSimilarityMetric(BaseMetric):
+class JaccardSimilarityMetric(BaseBuiltinMetric):
     """쿼리와 문서 간의 Jaccard 유사도를 평가합니다.
 
     쿼리와 문서 텍스트를 토큰 집합으로 보고, (쿼리와 텍스트의 교집합 토큰 수 / 쿼리와 텍스트의 합집합 토큰 수)를 계산합니다.
     검색된 모든 문서에 대한 평균 Jaccard 유사도를 백분율로 반환합니다.
     """
+
     def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
         Jaccard 유사도 점수를 계산합니다.
@@ -113,37 +112,26 @@ class JaccardSimilarityMetric(BaseMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not isinstance(query, str):
-            raise TypeError("query는 str 타입이어야 합니다.")
-        if not isinstance(ret_docs, list):
-            raise TypeError("ret_docs는 List[str] 타입이어야 합니다")
-        if not all(isinstance(doc, str) for doc in ret_docs):
-            raise TypeError("ret_docs 리스트에는 str 타입만 포함되어야 합니다")
-        
-        try:
-            if not ret_docs:
-                return Performance(score=0.0, unit='%', metric='Jaccard Similarity Metric')
+        if not ret_docs:
+            return Performance(score=0.0, unit='%', metric='Jaccard Similarity Metric')
 
-            tokenized_query = set(query.split())
-            scores = []
-            for doc in ret_docs:
-                tokenized_doc = set(doc.split())
-                if not tokenized_doc:
-                    continue
+        tokenized_query = set(query.split())
+        scores = []
+        for doc in ret_docs:
+            tokenized_doc = set(doc.split())
+            if not tokenized_doc:
+                continue
 
-                intersection = tokenized_query.intersection(tokenized_doc)
-                union = tokenized_query.union(tokenized_doc)
-                score_per_doc = len(intersection) / len(union) if union else 0.0
-                scores.append(score_per_doc)
+            intersection = tokenized_query.intersection(tokenized_doc)
+            union = tokenized_query.union(tokenized_doc)
+            score_per_doc = len(intersection) / len(union) if union else 0.0
+            scores.append(score_per_doc)
 
-            avg_score = np.mean(scores) * 100 if scores else 0.0
-            return Performance(score=avg_score, unit='%', metric='Jaccard Similarity Metric')
-        except Exception as e:
-            raise RuntimeError(f"Jaccard 유사도 점수 계산 중 오류가 발생했습니다: {e}")
+        avg_score = np.mean(scores) * 100 if scores else 0.0
+        return Performance(score=avg_score, unit='%', metric='Jaccard Similarity Metric')
 
 
-
-class CosineSimilarityMetric(BaseMetric):
+class CosineSimilarityMetric(BaseBuiltinMetric):
     """쿼리와 문서 임베딩 간의 평균 코사인 유사도를 평가합니다.
 
     코사인 유사도는 두 벡터가 가리키는 방향의 유사성을 측정하며,
@@ -151,12 +139,6 @@ class CosineSimilarityMetric(BaseMetric):
 
     .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        """
-        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
-        :type embedding_adapter: BaseEmbeddingAdapter
-        """
-        self.embedding_adapter = embedding_adapter
 
     def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
@@ -169,30 +151,20 @@ class CosineSimilarityMetric(BaseMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not isinstance(query, str):
-            raise TypeError("query는 str 타입이어야 합니다.")
-        if not isinstance(ret_docs, list):
-            raise TypeError("ret_docs는 List[str] 타입이어야 합니다")
-        if not all(isinstance(doc, str) for doc in ret_docs):
-            raise TypeError("ret_docs 리스트에는 str 타입만 포함되어야 합니다")
-        
-        try:
-            if not ret_docs:
-                return Performance(score=0.0, unit='-1 to 1', metric='Cosine Similarity Metric')
-            
-            query_vec = self.embedding_adapter.create_embeddings([query])[0]
-            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+        if not ret_docs:
+            return Performance(score=0.0, unit='-1 to 1', metric='Cosine Similarity Metric')
 
-            similarity_scores = cosine_similarity([query_vec], ret_docs_vec)[0]
+        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
 
-            avg_score = np.mean(similarity_scores) if similarity_scores.size else 0.0
+        similarity_scores = cosine_similarity([query_vec], doc_vecs)[0]
 
-            return Performance(score=avg_score, unit="-1 to 1", metric="Cosine Similarity Metric")
-        except Exception as e:
-            raise RuntimeError(f"코사인 유사도 점수 계산 중 오류가 발생했습니다: {e}")
+        avg_score = np.mean(similarity_scores) if similarity_scores.size else 0.0
+
+        return Performance(score=avg_score, unit="-1 to 1", metric="Cosine Similarity Metric")
 
 
-class EuclideanDistanceMetric(BaseMetric):
+class EuclideanDistanceMetric(BaseBuiltinMetric):
     """쿼리와 문서 임베딩 간의 평균 유클리드 거리를 평가합니다.
 
     유클리드 거리는 벡터 공간에서 두 점 사이의 직선 거리를 나타냅니다.
@@ -200,12 +172,6 @@ class EuclideanDistanceMetric(BaseMetric):
 
     .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        """
-        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
-        :type embedding_adapter: BaseEmbeddingAdapter
-        """
-        self.embedding_adapter = embedding_adapter
 
     def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
@@ -218,29 +184,18 @@ class EuclideanDistanceMetric(BaseMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not isinstance(query, str):
-            raise TypeError("query는 str 타입이어야 합니다.")
-        if not isinstance(ret_docs, list):
-            raise TypeError("ret_docs는 List[str] 타입이어야 합니다")
-        if not all(isinstance(doc, str) for doc in ret_docs):
-            raise TypeError("ret_docs 리스트에는 str 타입만 포함되어야 합니다")
-        
-        try:
-            if not ret_docs:
-                return Performance(score=0.0, unit='distance', metric='Euclidean Distance Metric')
+        if not ret_docs:
+            return Performance(score=0.0, unit='distance', metric='Euclidean Distance Metric')
 
-            query_vec = self.embedding_adapter.create_embeddings([query])[0]
-            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
 
-            distances = [np.linalg.norm(query_vec - doc_vec) for doc_vec in ret_docs_vec]
-            avg_distance = np.mean(distances) if distances else 0.0
-            return Performance(score=avg_distance, unit='distance', metric='Euclidean Distance Metric')
-        except Exception as e:
-            raise RuntimeError(f"유클리드 거리 계산 중 오류가 발생했습니다: {e}")
+        distances = [np.linalg.norm(query_vec - doc_vec) for doc_vec in doc_vecs]
+        avg_distance = np.mean(distances) if distances else 0.0
+        return Performance(score=avg_distance, unit='distance', metric='Euclidean Distance Metric')
 
 
-
-class ManhattanDistanceMetric(BaseMetric):
+class ManhattanDistanceMetric(BaseBuiltinMetric):
     """쿼리와 문서 임베딩 간의 평균 맨해튼 거리를 평가합니다.
 
     맨해튼 거리는 각 차원의 차이의 절댓값 합으로, 고차원 데이터에서 유용할 수 있습니다.
@@ -248,12 +203,6 @@ class ManhattanDistanceMetric(BaseMetric):
 
     .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        """
-        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
-        :type embedding_adapter: BaseEmbeddingAdapter
-        """
-        self.embedding_adapter = embedding_adapter
 
     def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
@@ -266,35 +215,25 @@ class ManhattanDistanceMetric(BaseMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not isinstance(query, str):
-            raise TypeError("query는 str 타입이어야 합니다.")
-        if not isinstance(ret_docs, list):
-            raise TypeError("ret_docs는 List[str] 타입이어야 합니다")
-        if not all(isinstance(doc, str) for doc in ret_docs):
-            raise TypeError("ret_docs 리스트에는 str 타입만 포함되어야 합니다")
-        
-        try:
-            if not ret_docs:
-                return Performance(score=0.0, unit='distance', metric='Manhattan Distance Metric')
-            
-            query_vec = self.embedding_adapter.create_embeddings([query])[0]
-            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+        if not ret_docs:
+            return Performance(score=0.0, unit='distance', metric='Manhattan Distance Metric')
 
-            distances = [np.sum(np.abs(query_vec - doc_vec)) for doc_vec in ret_docs_vec]
-            avg_distance = np.mean(distances) if distances else 0.0
-            return Performance(score=avg_distance, unit='distance', metric='Manhattan Distance Metric')
-        except Exception as e:
-            raise RuntimeError(f"맨해튼 거리 계산 중 오류가 발생했습니다: {e}")
-        
+        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
+
+        distances = [np.sum(np.abs(query_vec - doc_vec)) for doc_vec in doc_vecs]
+        avg_distance = np.mean(distances) if distances else 0.0
+        return Performance(score=avg_distance, unit='distance', metric='Manhattan Distance Metric')
 
 
-class NegativeRejectionRateMetric(BaseMetric):
+class NegativeRejectionRateMetric(BaseBuiltinMetric):
     """쿼리와 관련 없는(코사인 유사도 <= 0) 문서의 비율을 평가합니다.
 
     이 비율(NRR)이 낮을수록 검색 결과에 관련 없는 문서가 적게 포함되었다는 것을 의미합니다.
 
     .. note:: 입력되는 벡터들의 크기는 서로 동일해야 합니다.
     """
+
     def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
         NRR(Negative Rejection Rate) 점수를 백분율로 계산합니다.
@@ -306,30 +245,19 @@ class NegativeRejectionRateMetric(BaseMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not isinstance(query, str):
-            raise TypeError("query는 str 타입이어야 합니다.")
-        if not isinstance(ret_docs, list):
-            raise TypeError("ret_docs는 List[str] 타입이어야 합니다")
-        if not all(isinstance(doc, str) for doc in ret_docs):
-            raise TypeError("ret_docs 리스트에는 str 타입만 포함되어야 합니다")
-        
-        try:
-            if not ret_docs:
-                return Performance(score=0.0, unit='%', metric='Negative Rejection Rate Metric')
+        if not ret_docs:
+            return Performance(score=0.0, unit='%', metric='Negative Rejection Rate Metric')
 
-            query_vec = self.embedding_adapter.create_embeddings([query])[0]
-            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
 
-            similarities = cosine_similarity([query_vec], ret_docs_vec)[0]
-            irrelevant_count = np.sum(similarities <= 0)
-            rejection_rate = (irrelevant_count / len(ret_docs_vec)) * 100
-            return Performance(score=rejection_rate, unit='%', metric='Negative Rejection Rate Metric')
-        except Exception as e:
-            raise RuntimeError(f"NRR 점수 계산 중 오류가 발생했습니다: {e}")
+        similarities = cosine_similarity([query_vec], doc_vecs)[0]
+        irrelevant_count = np.sum(similarities <= 0)
+        rejection_rate = (irrelevant_count / len(doc_vecs)) * 100
+        return Performance(score=rejection_rate, unit='%', metric='Negative Rejection Rate Metric')
 
 
-
-class PrecisionMetric(BaseMetric):
+class PrecisionMetric(BaseBuiltinMetric):
     """정밀도(Precision)를 평가합니다.
 
     검색된 문서 중 실제 정답 문서의 비율을 측정합니다.
@@ -343,7 +271,9 @@ class PrecisionMetric(BaseMetric):
     :ivar embedding_adapter: 'embedding' 모드에서 사용될 임베딩 어댑터
     :vartype embedding_adapter: BaseEmbeddingAdapter, optional
     """
-    def __init__(self, mode: str = 'token', threshold: float = 0.5, embedding_adapter: BaseEmbeddingAdapter = None):
+
+    def __init__(self, mode: str = 'token', threshold: float = 0.5, llm_adapter: BaseLLMAdapter = None,
+                 embedding_adapter: BaseEmbeddingAdapter = None):
         """
         :param mode: 'token' 또는 'embedding' 중 평가 모드를 선택합니다. 기본값은 'token'입니다.
         :type mode: str
@@ -353,14 +283,14 @@ class PrecisionMetric(BaseMetric):
         :type embedding_adapter: BaseEmbeddingAdapter, optional
         :raises ValueError: 'embedding' 모드인데 embedding_adapter가 제공되지 않은 경우
         """
+        super().__init__(llm_adapter, embedding_adapter)
         if mode not in ['token', 'embedding']:
             raise ValueError("mode는 'token' 또는 'embedding'만 지원합니다.")
         if mode == 'embedding' and not embedding_adapter:
             raise ValueError("'embedding' 모드에서는 embedding_adapter가 반드시 필요합니다.")
-        
+
         self.mode = mode
         self.threshold = threshold
-        self.embedding_adapter = embedding_adapter
 
     def _jaccard_similarity(self, a: str, b: str) -> float:
         """두 텍스트 간의 Jaccard 유사도를 계산하는 헬퍼 함수입니다."""
@@ -369,7 +299,7 @@ class PrecisionMetric(BaseMetric):
         union = set_a.union(set_b)
         return len(intersection) / len(union) if union else 0.0
 
-    def evaluate(self, ret_docs: List[str], ground_truth: List[str]) -> Performance:
+    def evaluate(self, retrieved: List[str], ground_truth: List[str]) -> Performance:
         """
         설정된 모드에 따라 정밀도 점수를 계산합니다.
 
@@ -380,38 +310,40 @@ class PrecisionMetric(BaseMetric):
         :return: 계산된 정밀도 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if not ret_docs:
+        if not retrieved:
             return Performance(score=0.0, unit='0 to 1', metric='Precision')
-        
+
         relevant_count = 0
         if self.mode == 'token':
-            for ret_doc in ret_docs:
-                is_relevant = any(self._jaccard_similarity(ret_doc, gt_doc) >= self.threshold for gt_doc in ground_truth)
+            for ret_doc in retrieved:
+                is_relevant = any(
+                    self._jaccard_similarity(ret_doc, gt_doc) >= self.threshold for gt_doc in ground_truth)
                 if is_relevant:
                     relevant_count += 1
-        
-        elif self.mode == 'embedding':
-            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
-            ground_truth_vec = self.embedding_adapter.create_embeddings(ground_truth)
-            
-            if ret_docs_vec.size == 0 or ground_truth_vec.size == 0:
-                 return Performance(score=0.0, unit='0 to 1', metric='Precision')
 
-            for ret_doc_vec in ret_docs_vec:
-                sims = cosine_similarity([ret_doc_vec], ground_truth_vec)[0]
+        elif self.mode == 'embedding':
+            retrieved_embs = self.embedding_adapter.create_embeddings(retrieved)
+            ground_truth_embs = self.embedding_adapter.create_embeddings(ground_truth)
+
+            if retrieved_embs.size == 0 or ground_truth_embs.size == 0:
+                return Performance(score=0.0, unit='0 to 1', metric='Precision')
+
+            for ret_emb in retrieved_embs:
+                sims = cosine_similarity([ret_emb], ground_truth_embs)[0]
                 if np.max(sims) >= self.threshold:
                     relevant_count += 1
-        
-        precision = relevant_count / len(ret_docs)
+
+        precision = relevant_count / len(retrieved)
         return Performance(score=precision, unit='0 to 1', metric='Precision')
 
 
-class RankingConsistencyKendallTau(BaseMetric):
+class RankingConsistencyKendallTau(BaseBuiltinMetric):
     """두 랭킹 리스트 간의 순위 일관성을 켄달 타우(Kendall's Tau) 계수로 계산합니다.
-    
+
     두 리스트의 모든 순서쌍을 비교하여 순서가 일치하는 쌍과 불일치하는 쌍의 비율을 계산합니다.
     결과는 -1에서 1 사이의 값을 가지며, 1에 가까울수록 두 랭킹이 일치함을 의미합니다.
     """
+
     def evaluate(self, ranking1: List[int], ranking2: List[int]) -> Performance:
         """
         켄달 타우 점수를 계산합니다.
@@ -422,49 +354,21 @@ class RankingConsistencyKendallTau(BaseMetric):
         :type ranking2: List[int]
         :return: 계산된 켄달 타우 점수를 담은 Performance 객체
         :rtype: Performance
-        :raises ValueError: 두 리스트의 길이가 다르거나, 계산에 필요한 최소 길이(2)보다 짧을 경우
-        :raises TypeError: 리스트가 아니거나, 리스트 내에 숫자가 아닌 값이 포함되어 있을 경우
-        :raises RuntimeError: 그 외 계산 중 예상치 못한 오류가 발생했을 경우
         """
-        # 1. 입력값 타입 유효성 검사
-        if not isinstance(ranking1, list) or not isinstance(ranking2, list):
-            raise TypeError("입력값(ranking1, ranking2)은 반드시 리스트(List) 형태여야 합니다.")
-
-        # 2. 입력값 길이 유효성 검사
-        if len(ranking1) != len(ranking2):
-            raise ValueError("두 랭킹 리스트의 길이가 동일해야 합니다.")
-        
-        if len(ranking1) < 2:
-            raise ValueError("켄달 타우를 계산하려면 리스트에 최소 2개 이상의 요소가 필요합니다.")
-
-        # 3. 켄달 타우 계산 시 발생할 수 있는 연산 오류 처리
-        try:
-            tau, _ = kendalltau(ranking1, ranking2)
-            return Performance(score=tau, unit='-1 to 1', metric="Kendall's Tau")
-        except TypeError as e:
-            # 리스트 안에 숫자가 아닌 값이 포함되어 연산이 불가능한 경우 등
-            raise TypeError(f"랭킹 리스트의 값 타입을 확인해주세요. 숫자만 포함되어야 합니다. 원본 오류: {e}")
-        except Exception as e:
-            # 그 외 scipy 연산 중 발생할 수 있는 예기치 못한 오류
-            raise RuntimeError(f"켄달 타우 계산 중 예상치 못한 오류가 발생했습니다: {e}")
+        if len(ranking1) < 2 or len(ranking2) < 2 or len(ranking1) != len(ranking2):
+            return Performance(score=0.0, unit='-1 to 1', metric="Kendall's Tau")
+        tau, _ = kendalltau(ranking1, ranking2)
+        return Performance(score=tau, unit='-1 to 1', metric="Kendall's Tau")
 
 
-class DiversityMetric(BaseMetric):
+class DiversityMetric(BaseBuiltinMetric):
     """검색된 문서들의 텍스트를 기반으로 다양성을 평가합니다.
 
     모든 문서 임베딩 쌍의 평균 코사인 유사도를 계산한 뒤, `1 - 평균 유사도`로 다양성 점수를 산출합니다.
     값이 1에 가까울수록 문서들이 서로 의미적으로 다르다는 것(다양성이 높음)을 의미합니다.
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        """
-        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
-        :type embedding_adapter: BaseEmbeddingAdapter
-        """
-        if not isinstance(embedding_adapter, BaseEmbeddingAdapter):
-            raise TypeError("embedding_adapter는 BaseEmbeddingAdapter의 인스턴스여야 합니다.")
-        self.embedding_adapter = embedding_adapter
 
-    def evaluate(self, ret_docs: List[str]) -> Performance:
+    def evaluate(self, query: str = None, ret_docs: List[str] = None) -> Performance:
         """
         다양성 점수를 계산합니다.
 
@@ -472,55 +376,28 @@ class DiversityMetric(BaseMetric):
         :type ret_docs: List[str]
         :return: 계산된 다양성 점수를 담은 Performance 객체
         :rtype: Performance
-        :raises ValueError: 문서 리스트의 길이가 2 미만일 경우
-        :raises TypeError: 입력값이 문자열 리스트가 아닐 경우
-        :raises RuntimeError: 임베딩 생성 또는 유사도 계산 중 예상치 못한 오류가 발생했을 경우
         """
-        # 1. 입력값 유효성 검사
-        if not isinstance(ret_docs, list):
-            raise TypeError("입력값(ret_docs)은 반드시 문자열 리스트(List[str]) 형태여야 합니다.")
         if len(ret_docs) < 2:
-            raise ValueError("다양성을 계산하려면 최소 2개 이상의 문서가 필요합니다.")
+            return Performance(score=0.0, unit='0 to 1', metric='Diversity')
 
-        # 2. 임베딩 생성 및 유사도 계산 오류 처리
-        try:
-            # 텍스트 리스트를 임베딩 벡터(Numpy 배열) 리스트로 변환
-            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+        doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
 
-            # 임베딩 결과가 비어있거나 유효하지 않은 경우 에러 발생
-            if not isinstance(ret_docs_vec, np.ndarray) or ret_docs_vec.size == 0:
-                raise ValueError("임베딩 어댑터가 유효한 임베딩 결과를 반환하지 않았습니다.")
-            
-            # 코사인 유사도 계산
-            similarity_matrix = cosine_similarity(ret_docs_vec)
-            indices = np.triu_indices(len(ret_docs_vec), k=1)
-            
-            mean_similarity = np.mean(similarity_matrix[indices]) if indices[0].size > 0 else 0.0
-            
-            diversity_score = 1 - mean_similarity
-            return Performance(score=diversity_score, unit='0 to 1', metric='Diversity')
+        if doc_embeddings.size < 2:  # np.array는 len()보다 .size로 확인하는 것이 더 명확합니다.
+            return Performance(score=0.0, unit='0 to 1', metric='Diversity')
 
-        except Exception as e:
-            # 임베딩 어댑터 API 호출 실패, sklearn 연산 오류 등 모든 예외를 처리
-            # 원본 에러(e)를 포함하여 RuntimeError 발생
-            raise RuntimeError(f"다양성 점수 계산 중 오류가 발생했습니다: {e}")
+        similarity_matrix = cosine_similarity(doc_embeddings)
+        indices = np.triu_indices(len(doc_embeddings), k=1)
+        mean_similarity = np.mean(similarity_matrix[indices]) if indices[0].size > 0 else 0.0
+        diversity_score = 1 - mean_similarity
+        return Performance(score=diversity_score, unit='0 to 1', metric='Diversity')
 
 
-
-class GeneralizedEmbeddingCoverageError(BaseMetric):
+class GeneralizedEmbeddingCoverageError(BaseBuiltinMetric):
     """GECE: 쿼리와 검색 결과의 임베딩 공간상 근접성을 평가합니다.
 
     쿼리 임베딩과 검색된 문서 임베딩들 간의 평균 유클리드 거리를 계산합니다.
     값이 작을수록 검색 결과가 쿼리와 가깝다는 의미(커버리지가 좋음)입니다.
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        """
-        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
-        :type embedding_adapter: BaseEmbeddingAdapter
-        """
-        if not isinstance(embedding_adapter, BaseEmbeddingAdapter):
-            raise TypeError("embedding_adapter는 BaseEmbeddingAdapter의 인스턴스여야 합니다.")
-        self.embedding_adapter = embedding_adapter
 
     def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
@@ -532,58 +409,28 @@ class GeneralizedEmbeddingCoverageError(BaseMetric):
         :type ret_docs: List[str]
         :return: 계산된 평균 거리(coverage_error)를 담은 Performance 객체
         :rtype: Performance
-        :raises ValueError: 문서 리스트가 비어있거나 임베딩 생성에 실패했을 경우
-        :raises TypeError: 입력값의 타입이 올바르지 않을 경우
-        :raises RuntimeError: 거리 계산 중 예상치 못한 오류가 발생했을 경우
         """
-        # 1. 입력값 유효성 검사
-        if not isinstance(query, str) or not isinstance(ret_docs, list):
-            raise TypeError("입력값의 타입이 올바르지 않습니다 (query: str, ret_docs: List[str]).")
         if not ret_docs:
-            raise ValueError("GECE를 계산하려면 최소 1개 이상의 문서가 필요합니다.")
+            return Performance(score=float('inf'), unit='distance', metric='GECE')
 
-        # 2. 임베딩 생성 및 거리 계산 오류 처리
-        try:
-            # 쿼리와 문서를 임베딩 벡터로 변환
-            query_vec_list = self.embedding_adapter.create_embeddings([query])
-            if query_vec_list.size == 0:
-                raise ValueError("쿼리를 임베딩하는 데 실패했습니다.")
-            query_vec = query_vec_list[0]
-            
-            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
-            if ret_docs_vec.size == 0:
-                # 문서가 있었는데 임베딩 결과가 없다면 오류로 간주
-                raise ValueError("문서들을 임베딩하는 데 실패했습니다.")
+        query_embedding = self.embedding_adapter.create_embeddings([query])[0]
+        doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
 
-            # 유클리드 거리 계산
-            distances = [np.linalg.norm(query_vec - doc_vec) for doc_vec in ret_docs_vec]
-            coverage_error = np.mean(distances)
-            
-            return Performance(score=coverage_error, unit='distance', metric='GECE')
-        
-        except ValueError as e:
-            # create_embeddings 결과가 비어있을 때 직접 발생시킨 ValueError
-            raise e
-        except Exception as e:
-            # 임베딩 어댑터 API 호출 실패, Numpy 연산 오류 등 모든 예외를 처리
-            raise RuntimeError(f"GECE 점수 계산 중 오류가 발생했습니다: {e}")
+        if query_embedding.size == 0 or doc_embeddings.size == 0:
+            return Performance(score=float('inf'), unit='distance', metric='GECE')
+
+        distances = [np.linalg.norm(query_embedding - doc_emb) for doc_emb in doc_embeddings]
+        coverage_error = np.mean(distances) if distances else 0.0
+        return Performance(score=coverage_error, unit='distance', metric='GECE')
 
 
-class EmbeddingCosineSimilarityEvaluation(BaseMetric):
+class EmbeddingCosineSimilarityEvaluation(BaseBuiltinMetric):
     """쿼리와 문서 텍스트 간의 코사인 유사도를 기반으로 일관성과 커버리지를 평가합니다.
 
     가장 높은 유사도(local)와 전체 평균 유사도(global)를 구해, 두 값을 평균내어 반환합니다.
     값이 1에 가까울수록 쿼리와 검색 결과가 임베딩 공간에서 잘 맞닿아 있음을 의미합니다.
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        """
-        :param embedding_adapter: 텍스트를 임베딩 벡터로 변환할 어댑터
-        :type embedding_adapter: BaseEmbeddingAdapter
-        """
-        if not isinstance(embedding_adapter, BaseEmbeddingAdapter):
-            raise TypeError("embedding_adapter는 BaseEmbeddingAdapter의 인스턴스여야 합니다.")
-        self.embedding_adapter = embedding_adapter
-        
+
     def evaluate(self, query: str, ret_docs: List[str]) -> Performance:
         """
         임베딩 기반 일관성 점수를 계산합니다.
@@ -594,70 +441,47 @@ class EmbeddingCosineSimilarityEvaluation(BaseMetric):
         :type ret_docs: List[str]
         :return: 계산된 일관성 점수를 담은 Performance 객체
         :rtype: Performance
-        :raises ValueError: 문서 리스트가 비어있거나 임베딩 생성에 실패했을 경우
-        :raises TypeError: 입력값의 타입이 올바르지 않거나 임베딩 벡터 형식이 잘못되었을 경우
-        :raises RuntimeError: 유사도 계산 중 예상치 못한 오류가 발생했을 경우
         """
-        # 1. 입력값 유효성 검사
-        if not isinstance(query, str) or not isinstance(ret_docs, list):
-            raise TypeError("입력값의 타입이 올바르지 않습니다 (query: str, ret_docs: List[str]).")
         if not ret_docs:
-            raise ValueError("일관성 점수를 계산하려면 최소 1개 이상의 문서가 필요합니다.")
+            return Performance(score=0.0, unit='-1 to 1', metric='Embedding Cosine Similarity')
 
-        # 2. 임베딩 생성 및 유사도 계산 오류 처리
-        try:
-            # 쿼리와 문서를 임베딩 벡터로 변환
-            query_vec_list = self.embedding_adapter.create_embeddings([query])
-            if query_vec_list.size == 0:
-                raise ValueError("쿼리를 임베딩하는 데 실패했습니다.")
-            query_vec = query_vec_list[0]
-            
-            ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
-            if ret_docs_vec.size == 0:
-                raise ValueError("문서들을 임베딩하는 데 실패했습니다.")
+        query_embedding = self.embedding_adapter.create_embeddings([query])[0]
+        doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
 
-            # 코사인 유사도 계산
-            sims = cosine_similarity([query_vec], ret_docs_vec)[0]
-            local_score = np.max(sims)
-            global_score = np.mean(sims)
-            final_score = (local_score + global_score) / 2
-            
-            return Performance(score=final_score, unit='-1 to 1', metric='Embedding Cosine Similarity')
+        if query_embedding.size == 0 or doc_embeddings.size == 0:
+            return Performance(score=0.0, unit='-1 to 1', metric='Embedding Cosine Similarity')
 
-        except (ValueError, TypeError, IndexError) as e:
-            # 임베딩 결과가 잘못된 형식일 경우(e.g., shape 불일치) 발생 가능
-            raise TypeError(f"임베딩 벡터의 형식이 올바르지 않습니다. 원본 오류: {e}")
-        except Exception as e:
-            # 임베딩 어댑터 API 호출 실패, Numpy/Sklearn 연산 오류 등 모든 예외 처리
-            raise RuntimeError(f"일관성 점수 계산 중 오류가 발생했습니다: {e}")
+        sims = cosine_similarity([query_embedding], doc_embeddings)[0]
+        local_score = np.max(sims)
+        global_score = np.mean(sims)
+        final_score = (local_score + global_score) / 2
+        return Performance(score=final_score, unit='-1 to 1', metric='Embedding Cosine Similarity')
 
-class PairwiseCosineSimilarityVariance(BaseMetric):
+
+class PairwiseCosineSimilarityVariance(BaseBuiltinMetric):
     """
     Evaluate the semantic diversity of retrieval chunks by measuring the variance of pairwise cosine similarities
-    
+
     :param embedding_adapter: The embedding model to use
     :type embedding_adapter: BaseEmbeddingAdapter
     :ivar embedding_adapter: Stores the embedding model
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
 
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        self.embedding_adapter = embedding_adapter
-
-    def evaluate(self, ret_docs: list[str]) -> Performance:
+    def evaluate(self, query: str = None, ret_docs: list[str] = None) -> Performance:
         """
         Compute the semantic diversity among retrieval chunks by computing the variance of pairwise cosine similarities between their embeddings.
-        
+
         :param context: Retrieved chunks
         :type context: list[str]
         :returns: Variance score of pairwise cosine similarities indicating semantic spread
         :rtype: Performance
         """
-        ret_docs_vec = self.embedding_adapter.create_embeddings(ret_docs)
+        embeddings = self.embedding_adapter.create_embeddings(ret_docs)
         similarity = []
-        for i in range(len(ret_docs_vec)):
-            for j in range(i+1, len(ret_docs_vec)):
-                sim = CosineSimilarity.compute(ret_docs_vec[i], ret_docs_vec[j])
+        for i in range(len(embeddings)):
+            for j in range(i + 1, len(embeddings)):
+                sim = CosineSimilarity.compute(embeddings[i], embeddings[j])
                 similarity.append(sim)
         mean = np.mean(similarity)
         variance = np.mean((np.array(similarity) - mean) ** 2)

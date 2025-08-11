@@ -1,27 +1,32 @@
 import numpy as np
 from common.bases.datas.performance_dataclass import Performance
 from common.bases.abstracts.base_metric import BaseMetric
+from adapters.llm_adapter import BaseLLMAdapter
 from adapters.embedding_adapter import BaseEmbeddingAdapter
 from common.utils.tools import CosineSimilarity
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-class AnswerQuerySimilarity(BaseMetric):
+class BaseBuiltinMetric(BaseMetric):
+    def __init__(self, llm_adapter: BaseLLMAdapter = None, embedding_adapter: BaseEmbeddingAdapter = None):
+        self.llm_adapter = llm_adapter
+        self.embedding_adapter = embedding_adapter
+
+
+class AnswerQuerySimilarity(BaseBuiltinMetric):
     """
-    Cosine similarity between the genrated anser and user 
-    
+    Cosine similarity between the genrated anser and user
+
     :param embedding_adapter: The embedding model to use
     :type: BaseEmbeddingAdapter
     :ivar embedding_adapter: Stores the embedding model
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        self.embedding_adapter = embedding_adapter
-    
-    def evaluate(self, query: str, gen: str) -> Performance:
+
+    def evaluate(self, query: str = None, gen: str = None) -> Performance:
         """
         Compute cosine similarity between the embedded genrated anser and user query
-        
+
         :param query: User query
         :type query: str
         :param gen: Genrateor's answer
@@ -30,15 +35,14 @@ class AnswerQuerySimilarity(BaseMetric):
         :rtype: Performance
         """
         embeddings = self.embedding_adapter.create_embeddings([query, gen])
-        query_vec, gen_vec = embeddings[0], embeddings[1]
+        query_vec, ans_vec = embeddings[0], embeddings[1]
 
-        aqs_score = CosineSimilarity.compute(query_vec, gen_vec)
+        aqs_score = CosineSimilarity.compute(query_vec, ans_vec)
 
         return Performance(score=aqs_score, unit="", metric="AQS")
-    
 
 
-class e2eCosineConsistencyMetric(BaseMetric):
+class e2eCosineConsistencyMetric(BaseBuiltinMetric):
     """
     End to end consistency metric via mean cosine-similarity.
 
@@ -48,10 +52,7 @@ class e2eCosineConsistencyMetric(BaseMetric):
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
 
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        self.embedding_adapter = embedding_adapter
-
-    def evaluate(self, gens: list[str]) -> Performance:
+    def evaluate(self, query: str = None, gens: list[str] = None) -> Performance:
         """
         Calculates the mean cosine similarity between each pair of generated answers.
 
@@ -83,8 +84,7 @@ class e2eCosineConsistencyMetric(BaseMetric):
         return Performance(score=float(score), unit="", metric="E2E Consistency")
 
 
-
-class e2eCovarianceConsistencyMetric(BaseMetric):
+class e2eCovarianceConsistencyMetric(BaseBuiltinMetric):
     """
     End to end consistency metric via variance of cosine-similarity.
 
@@ -94,10 +94,7 @@ class e2eCovarianceConsistencyMetric(BaseMetric):
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
 
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter):
-        self.embedding_adapter = embedding_adapter
-
-    def evaluate(self, query: str, gens: list[str]) -> Performance:
+    def evaluate(self, query: str = None, gens: list[str] = None) -> Performance:
         """
         Calculates the variance of cosine similarities between the query and each generated answer.
 
