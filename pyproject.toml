@@ -1,7 +1,7 @@
 [project]
-name = "rag-testing-framework"
+name = "RAGANG"
 version = "0.0.2"
-description = "RAG flow modular testing framework"
+description = "Retrieval Augmented Generation Assessing tool with No Gold"
 requires-python = ">=3.13"
 dependencies = [
     "numpy>=2.3.2",
