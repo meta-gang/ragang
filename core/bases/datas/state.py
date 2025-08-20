@@ -1,6 +1,6 @@
-from common.bases.datas.packet import Packet
-from common.bases.datas.performance import Performance
-from common.decorators.serializable import serializable
+from core.bases.datas.packet import Packet
+from core.bases.datas.performance import Performance
+from core.decorators.serializable import serializable
 
 
 @serializable

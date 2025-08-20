@@ -1,4 +1,4 @@
-from common.bases.abstracts.base_module import BaseModule
+from core.bases.abstracts.base_module import BaseModule
 
 
 class GenerationModule(BaseModule):

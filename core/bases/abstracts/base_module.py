@@ -3,11 +3,11 @@ import inspect
 from abc import ABCMeta, abstractmethod
 from typing import Any
 
-from common.bases.abstracts.base_metric import BaseMetric
+from core.bases.abstracts.base_metric import BaseMetric
 # from common.bases.datas.flow_storage import FlowStorage
-from common.bases.datas.packet import Packet
-from common.bases.datas.linker import Dependency, Linker
-from common.bases.datas.performance import Performance
+from core.bases.datas.packet import Packet
+from core.bases.datas.linker import Dependency, Linker
+from core.bases.datas.performance import Performance
 from exceptions.frameworks.datas import MissingMetricDataException, MissingMetricArgumentException, \
     ModuleOutputException
 from exceptions.frameworks.modules import StarterModuleException

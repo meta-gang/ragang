@@ -1,4 +1,4 @@
-from common.bases.datas.linker import Linker
+from core.bases.datas.linker import Linker
 from container import RAGContainer
 from usage.linear_graph.metrics.impls import MyPreRetrievalMetric, MyRetrievalMetric, MyPostRetrievalMetric, \
     MyGenerationMetric, MyE2EMetric

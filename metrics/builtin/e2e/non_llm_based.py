@@ -1,9 +1,9 @@
 import numpy as np
-from common.bases.datas.performance import Performance
-from common.bases.abstracts.base_metric import BaseMetric
+from core.bases.datas.performance import Performance
+from core.bases.abstracts.base_metric import BaseMetric
 from adapters.llm_adapter import BaseLLMAdapter
 from adapters.embedding_adapter import BaseEmbeddingAdapter
-from common.utils.tools import CosineSimilarity
+from core.utils.tools import CosineSimilarity
 from sklearn.metrics.pairwise import cosine_similarity
 
 
