@@ -1,13 +1,13 @@
 import re
 from abc import ABCMeta, abstractmethod
 
-from common.bases.abstracts.base_metric import BaseMetric
-from common.bases.abstracts.base_module import BaseModule
-from common.bases.datas.flow_storage import FlowStorage
-from common.bases.datas.performance import Performance
+from core.bases.abstracts.base_metric import BaseMetric
+from core.bases.abstracts.base_module import BaseModule
+from core.bases.datas.flow_storage import FlowStorage
+from core.bases.datas.performance import Performance
 from exceptions.frameworks.modules import DuplicateModuleIdException, FlowOutputException, \
     MultipleStarterModuleException, InvalidModuleIdException
-from common.utils.ansi_styler import ANSIStyler
+from core.utils.ansi_styler import ANSIStyler
 
 
 class BaseContainer(metaclass=ABCMeta):

@@ -1,6 +1,6 @@
 def serializable(cls):
     def __serialize(obj):
-        from common.bases.abstracts.base_module import BaseModule
+        from core.bases.abstracts.base_module import BaseModule
 
         if hasattr(obj, "serialize"):
             return obj.serialize()

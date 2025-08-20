@@ -1,8 +1,8 @@
-from common.bases.abstracts.base_module import BaseModule
-from common.bases.datas.packet import Packet
-from common.bases.datas.performance import Performance
-from common.bases.datas.state import State
-from common.decorators.serializable import serializable
+from core.bases.abstracts.base_module import BaseModule
+from core.bases.datas.packet import Packet
+from core.bases.datas.performance import Performance
+from core.bases.datas.state import State
+from core.decorators.serializable import serializable
 
 
 @serializable

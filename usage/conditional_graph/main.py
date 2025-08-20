@@ -1,4 +1,4 @@
-from common.bases.datas.linker import Linker
+from core.bases.datas.linker import Linker
 from container import RAGContainer
 from usage.conditional_graph.modules.impls import *
 from usage.conditional_graph.metrics.impls import *

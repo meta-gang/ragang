@@ -1,4 +1,4 @@
-from common.bases.abstracts.base_metric import BaseMetric
+from core.bases.abstracts.base_metric import BaseMetric
 
 
 class CustomMetric(BaseMetric):

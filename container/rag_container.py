@@ -1,4 +1,4 @@
-from common.bases.abstracts.base_container import BaseContainer
+from core.bases.abstracts.base_container import BaseContainer
 
 
 class RAGContainer(BaseContainer):
