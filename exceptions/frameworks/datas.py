@@ -13,3 +13,12 @@ class MissingMetricArgumentException(ValueError):
 class ModuleOutputException(Exception):
     def __init__(self, msg: str):
         super().__init__(msg)
+
+
+class NotCorrectStorage(Exception):
+    def __init__(self):
+        super().__init__(f"Storage data is None")
+
+class NoOutputData(Exception):
+    def __init__(self, module_id: str, output):
+        super().__init__(f"Invalid output type in snapshot of module '{module_id}': {type(output)}")
