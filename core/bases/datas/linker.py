@@ -30,14 +30,14 @@ class Linker:
     def __prevent_cross_operator_usage(self, other):
         raise DependencyConnectionException("Dependencies links must be formed exclusively '&' or '|'")
 
-    def build(self, src_mid: str) -> 'Dependency':
+    def build(self, src_mid: str) -> 'Direction':
         all_next = [self.module_id, *self.dependent_ids]
         dependencies: list[tuple[str, str]] = [(src_mid, dest_mid) for dest_mid in all_next]
-        return Dependency(dependencies, self.is_or)
+        return Direction(dependencies, self.is_or)
 
 
 @dataclass
-class Dependency:
+class Direction:
     dependencies: list[tuple[str, str]]
     is_or: bool
 
