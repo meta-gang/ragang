@@ -11,6 +11,7 @@ class FlowEngine:
         self.storage = storage
 
     def run(self, metrics: list[BaseMetric]):
+        self._prepare_storage_from_metrics(metrics)
         performances: list[Performance] = self.__eval(metrics)
         return performances
 
@@ -49,3 +50,27 @@ class FlowEngine:
             return value
         except Exception as e:
             raise ValueError(f"Failed to resolve param '{ref}': {e}")
+
+    def _prepare_storage_from_metrics(self, metrics: list[BaseMetric]) -> None:
+        state = getattr(self.storage, "state", None)
+        if state is None:
+            return
+
+        if getattr(self.storage, "subscription", None) is None:
+            self.storage.subscription = {}
+
+        if getattr(state, "snapshots", None) is None:
+            state.snapshots = {}
+
+        mids: set[str] = set()
+        for m in metrics:
+            for ref in m.param_refs:
+                if '.' in ref:
+                    mid, _ = ref.split('.', 1)
+                    mids.add(mid)
+
+        for mid in mids:
+            if mid not in self.storage.subscription:
+                self.storage.subscription[mid] = []
+            if mid not in state.snapshots or state.snapshots[mid] is None:
+                state.snapshots[mid] = []
