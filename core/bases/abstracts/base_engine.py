@@ -3,8 +3,8 @@ from core.bases.datas.flow_storage import FlowStorage
 from core.bases.abstracts.base_metric import BaseMetric
 from core.bases.datas.packet import Packet 
 
-from exceptions.user.keyname import NotCorrectModuleId, NotCorrectDataKey
-from exceptions.frameworks.datas import NotCorrectStorage, NoOutputData
+from exceptions.user.keyname import NotCorrectModuleId, NotCorrectDataKey  # TODO: rename exception classes
+from exceptions.frameworks.datas import NotCorrectStorage, NoOutputData  # TODO: rename exception classes
 
 class FlowEngine:
     def __init__(self, storage: FlowStorage):
@@ -49,7 +49,7 @@ class FlowEngine:
             
             return value
         except Exception as e:
-            raise ValueError(f"Failed to resolve param '{ref}': {e}")
+            raise ValueError(f"Failed to resolve param '{ref}': {e}")  # TODO: replace with custom exception class
 
     def _prepare_storage_from_metrics(self, metrics: list[BaseMetric]) -> None:
         state = getattr(self.storage, "state", None)
