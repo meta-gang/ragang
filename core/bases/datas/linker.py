@@ -38,15 +38,15 @@ class Linker:
 
 @dataclass
 class Direction:
-    dependencies: list[tuple[str, str]]
+    directions: list[tuple[str, str]]
     is_or: bool
 
-    def check_dependencies(self, status: list[tuple[str, str]]) -> bool:
+    def check_dependencies(self, status: list[tuple[str, str]], deps: list[tuple[str, str]]) -> bool:
         check = any if self.is_or else all
-        return check(dependency in status for dependency in self.dependencies)
+        return check(dependency in status for dependency in deps)
 
     def get_dependent_mids(self) -> list[str]:
-        return [link[1] for link in self.dependencies]
+        return [link[1] for link in self.directions]
 
 # if __name__ == '__main__':
 #     link: Linker = Linker('m1') & Linker('m2') | Linker('m3')
