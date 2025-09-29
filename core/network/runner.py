@@ -1,9 +1,9 @@
 import asyncio
 import datetime as dt
 import traceback
-from typing import Dict
+from typing import Dict, Tuple, List
 
-from core.utils.query_generator import generate_query_from_chunks
+from core.utils.query_generator import generate_query_from_data
 
 def _ts_str() -> str:
     kst = dt.timezone(dt.timedelta(hours=9))
@@ -38,6 +38,9 @@ class Runner:
             })
         setattr(self.rag.storage, "_on_module_status", on_status_async)
 
+    async def setup_handlers(self):
+        await self._broadcast_container_topology()
+
     async def _broadcast_rag_result_from_history(self):
         hist = {qid: st.serialize() for qid, st in self.rag.storage.history.items()}
         await self.handler.broadcast("rag-result-data", {
@@ -47,6 +50,28 @@ class Runner:
                 "history": hist
             }
         })
+
+    async def _broadcast_container_topology(self):
+        edges: List[Tuple[str, str]] = []
+        for m in getattr(self.rag, "modules", []): # TODO: self.rag.modules에 리스트로 모듈 저장
+            dep = getattr(m, "dependency", None)
+            if dep and hasattr(dep, "directions"):
+                edges.extend(dep.directions)
+        await self.handler.broadcast("rag-container", {"rag-container": edges})
+
+    async def dispatch(self, msg: dict, ws):
+        topic = msg.get("topic")
+        fn = self.topic_map.get(topic)
+        if not fn:
+            return
+        try:
+            await fn(msg, ws)
+        except Exception as e:
+            await self.handler.broadcast("error", {
+                "module": "runner",
+                "message": str(e),
+                "traceback": traceback.format_exc()
+            })
 
     async def _on_run_rag_file_query(self, msg: dict, ws):
         files = msg.get("files") or []
@@ -65,15 +90,17 @@ class Runner:
         query_id = settings.get("query_id") or "query_1"
 
         if llm_option in ("새 질문 생성", "make-query"):
-            chunks = ["chunk 1", "chunk 2"]  # TODO: 실제 청크 데이터로 교체
-            query = generate_query_from_chunks(
+            file_path = settings.get("file_path", "./data/default.txt") # TODO: 기본 파일 경로 설정
+            
+            query = generate_query_from_data(
                 getattr(self.rag, "llm_adapter", None),
-                chunks
+                file_path
             )
+
         elif llm_option in ("기존 질문 사용", "made-query"):
-            query = self._query_store.get(query_id)
+            query = self._query_store.get(query_id, "Default query")
         else:
-            query = settings.get("query")
+            query = settings.get("query", "Default query")
 
         self._query_store[query_id] = query
 
@@ -83,7 +110,7 @@ class Runner:
         await self._broadcast_rag_result_from_history()
 
     async def _on_test_query(self, msg: dict, ws):
-        query = msg.get("query")
+        query = msg.get("query", "Hello?")
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.rag.invoke, query)
         await self._broadcast_rag_result_from_history()

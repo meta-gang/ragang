@@ -17,7 +17,6 @@ def load_rag_from_path(py_path: str, preferred_symbol: str = "rag"):
     if not path.exists():
         raise FileNotFoundError(f"RAG file not found: {path}")
 
-    # 고유 모듈명으로 동적 import
     mod_name = f"rag_user_{abs(hash(str(path)))}"
     spec = importlib.util.spec_from_file_location(mod_name, str(path))
     if spec is None or spec.loader is None:
@@ -26,13 +25,11 @@ def load_rag_from_path(py_path: str, preferred_symbol: str = "rag"):
     sys.modules[mod_name] = module
     spec.loader.exec_module(module)
 
-    # 'rag' 심볼 우선 사용
     if hasattr(module, preferred_symbol):
         candidate = getattr(module, preferred_symbol)
         _ensure_instance(candidate)
         return candidate
 
-    # fallback: 모듈 전역에서 BaseContainer 인스턴스 탐색
     instances = []
     for name, obj in vars(module).items():
         if _is_rag_container_instance(obj):
@@ -81,7 +78,7 @@ async def main():
 
     handler = SocketHandler()
     runner = Runner(handler, rag_container=rag)
-    runner.setup_handlers()
+    await runner.setup_handlers()
 
     async def _on_message(msg: dict, ws, h: SocketHandler):
         await runner.dispatch(msg, ws)

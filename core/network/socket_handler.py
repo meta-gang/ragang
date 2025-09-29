@@ -2,8 +2,9 @@ import asyncio
 import json
 import time
 from collections import defaultdict
-from typing import Dict, Set, Callable, Awaitable, Optional, Any
+from typing import Dict, Set, Any, Callable, Awaitable, Optional
 from websockets.server import WebSocketServerProtocol
+
 
 def _ts() -> float:
     return time.time()
@@ -16,11 +17,10 @@ class SocketHandler:
     - broadcast(topic, payload) -> 해당 topic 구독자에게 전송
     - handle_connection(): subscribe/unsubscribe는 자체 처리, 나머지는 runner.topic_map을 통해 실행 함수 호출
     """
-    def __init__(self, runner: Any):
+    def __init__(self):
         self.subscribers: Dict[str, Set[WebSocketServerProtocol]] = defaultdict(set)
-        self.runner = runner
+        self.on_message: Optional[Callable[[dict, WebSocketServerProtocol, "SocketHandler"], Awaitable[None]]] = None
 
-    # 구독/해지
     def _normalize_topics(self, topics: Any) -> Set[str]:
         if isinstance(topics, str):
             return {topics}
@@ -40,7 +40,6 @@ class SocketHandler:
         for t in list(self.subscribers.keys()):
             self.subscribers[t].discard(ws)
 
-    # 서버 -> 클라
     async def broadcast(self, topic: str, payload: dict):
         msg = {"topic": topic, "ts": _ts(), **payload}
         dead = []
@@ -52,7 +51,6 @@ class SocketHandler:
         for ws in dead:
             self.subscribers[topic].discard(ws)
 
-    # 클라 -> 서버
     async def handle_connection(self, ws: WebSocketServerProtocol):
         try:
             async for raw in ws:
@@ -66,23 +64,15 @@ class SocketHandler:
                     continue
 
                 if t == "subscribe":
-                    await self.subscribe(ws, msg.get("topics") or msg.get("topic_list") or [])
+                    await self.subscribe(ws, msg.get("topics") or [])
                     continue
 
                 if t == "unsubscribe":
-                    await self.unsubscribe(ws, msg.get("topics") or msg.get("topic_list") or [])
+                    await self.unsubscribe(ws, msg.get("topics") or [])
                     continue
 
-                # runner.topic_map에 등록된 함수 실행
-                fn = self.runner.topic_map.get(t)
-                if fn:
-                    try:
-                        await fn(msg, ws)
-                    except Exception as e:
-                        await self.broadcast("error", {
-                            "module": "runner",
-                            "message": str(e),
-                        })
+                if callable(self.on_message):
+                    await self.on_message(msg, ws, self)
 
         finally:
             self._purge_ws(ws)
