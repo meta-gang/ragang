@@ -1,4 +1,3 @@
-import asyncio
 import datetime as dt
 import traceback
 from typing import Dict, Tuple, List
@@ -12,9 +11,11 @@ def _ts_str() -> str:
 
 class Runner:
     """
-    - 실제 실행 함수만 보관
-    - topic_map: {topic: handler_func}
-    - 모듈 상태 및 결과 브로드캐스트는 handler.broadcast 사용
+    - rag container와 socket handler를 연결
+    - topic_map: { topic(str) -> handler(async fn) }
+    - dispatch(msg, ws): topic_map을 통해 msg 처리
+    - rag container의 상태 변화(start, end)를 socket handler로 브로드캐스트
+    - rag container의 storage 변화(history 추가 등)를 socket handler로 브로드캐스트
     """
     def __init__(self, handler, rag_container):
         self.handler = handler
@@ -23,13 +24,13 @@ class Runner:
 
         self._install_status_callback()
 
-        # topic 매핑
         self.topic_map = {
             "run-rag-file-query": self._on_run_rag_file_query,
             "run-rag-llm-query": self._on_run_rag_llm_query,
             "test-query": self._on_test_query,
         }
 
+    # rag 모듈 상태(start, end) 브로드캐스트 -> engine에서 호출
     def _install_status_callback(self):
         async def on_status_async(module_id: str, statu: str):
             await self.handler.broadcast("module-statu", {
@@ -41,8 +42,13 @@ class Runner:
     async def setup_handlers(self):
         await self._broadcast_container_topology()
 
-    async def _broadcast_rag_result_from_history(self):
-        hist = {qid: st.serialize() for qid, st in self.rag.storage.history.items()}
+    # query_id list로 storage 내용 브로드캐스트
+    async def _broadcast_rag_result(self, query_ids: List[str]):
+        hist = {
+            qid: st.serialize()
+            for qid, st in self.rag.storage.history.items()
+            if qid in query_ids
+        }
         await self.handler.broadcast("rag-result-data", {
             "ts": _ts_str(),
             "storage": {
@@ -51,9 +57,10 @@ class Runner:
             }
         })
 
+    # rag container topology 브로드캐스트
     async def _broadcast_container_topology(self):
         edges: List[Tuple[str, str]] = []
-        for m in getattr(self.rag, "modules", []): # TODO: self.rag.modules에 리스트로 모듈 저장
+        for m in getattr(self.rag, "modules", []):
             dep = getattr(m, "dependency", None)
             if dep and hasattr(dep, "directions"):
                 edges.extend(dep.directions)
@@ -73,44 +80,63 @@ class Runner:
                 "traceback": traceback.format_exc()
             })
 
+    # query 파일
     async def _on_run_rag_file_query(self, msg: dict, ws):
         files = msg.get("files") or []
         if not isinstance(files, list):
             files = []
-        queries = [f"file:{name}" for name in files]
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self.rag.invoke_batch, queries)
+        queries = []
+        for file_path in files:
+            with open(file_path, "r", encoding="utf-8") as f:
+                queries.extend([line.strip() for line in f if line.strip()])
 
-        await self._broadcast_rag_result_from_history()
+        if not queries:
+            raise ValueError("No queries extracted from files.")
 
+        self.rag.invokes(queries)
+        recent_items = list(self.rag.storage.history.items())[-len(queries):]
+        query_ids = [qid for qid, _ in recent_items]
+        await self._broadcast_rag_result(query_ids)
+
+    # LLM 생성 query
     async def _on_run_rag_llm_query(self, msg: dict, ws):
         settings = msg.get("settings") or {}
         llm_option = (settings.get("llm_option") or "").lower()
-        query_id = settings.get("query_id") or "query_1"
 
         if llm_option in ("새 질문 생성", "make-query"):
-            file_path = settings.get("file_path", "./data/default.txt") # TODO: 기본 파일 경로 설정
-            
-            query = generate_query_from_data(
+            file_path = settings.get("file_path", "./data/default.txt")
+            queries = generate_query_from_data(
                 getattr(self.rag, "llm_adapter", None),
                 file_path
             )
-
+            if not isinstance(queries, list):
+                queries = [queries]
+            for idx, q in enumerate(queries, 1):
+                qid = f"llm_query_{idx}"
+                self._query_store[qid] = q
         elif llm_option in ("기존 질문 사용", "made-query"):
-            query = self._query_store.get(query_id, "Default query")
+            file_path = settings.get("file_path")
+            if not file_path:
+                raise ValueError("file_path must be provided when using 'made-query'")
+            with open(file_path, "r", encoding="utf-8") as f:
+                queries = [line.strip() for line in f if line.strip()]
         else:
-            query = settings.get("query", "Default query")
+            raise ValueError(f"Unsupported llm_option: {llm_option}")
 
-        self._query_store[query_id] = query
+        if not queries:
+            raise ValueError("No queries extracted for execution.")
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self.rag.invoke, query)
+        self.rag.invokes(queries)
+        recent_items = list(self.rag.storage.history.items())[-len(queries):]
+        query_ids = [qid for qid, _ in recent_items]
+        await self._broadcast_rag_result(query_ids)
 
-        await self._broadcast_rag_result_from_history()
-
+    # test query
     async def _on_test_query(self, msg: dict, ws):
-        query = msg.get("query", "Hello?")
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self.rag.invoke, query)
-        await self._broadcast_rag_result_from_history()
+        query = msg.get("query")
+
+        self.rag.invoke(query)
+
+        last_qid = list(self.rag.storage.history.keys())[-1]
+        await self._broadcast_rag_result([last_qid])

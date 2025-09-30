@@ -28,18 +28,22 @@ class SocketHandler:
             return {t for t in topics if isinstance(t, str)}
         return set()
 
+    # 구독
     async def subscribe(self, ws: WebSocketServerProtocol, topics: Any):
         for t in self._normalize_topics(topics):
             self.subscribers[t].add(ws)
 
+    # 구독 혜지
     async def unsubscribe(self, ws: WebSocketServerProtocol, topics: Any):
         for t in self._normalize_topics(topics):
             self.subscribers[t].discard(ws)
 
+    # 연결 종료시 해당 ws를 모든 토픽에서 제거
     def _purge_ws(self, ws: WebSocketServerProtocol):
         for t in list(self.subscribers.keys()):
             self.subscribers[t].discard(ws)
 
+    # 브로드케스트로 메시지 전송
     async def broadcast(self, topic: str, payload: dict):
         msg = {"topic": topic, "ts": _ts(), **payload}
         dead = []
@@ -51,6 +55,7 @@ class SocketHandler:
         for ws in dead:
             self.subscribers[topic].discard(ws)
 
+    # WebSocket 연결 핸들러
     async def handle_connection(self, ws: WebSocketServerProtocol):
         try:
             async for raw in ws:
