@@ -5,7 +5,7 @@ def serializable(cls):
         if hasattr(obj, "serialize"):
             return obj.serialize()
         elif isinstance(obj, BaseModule):
-            return obj.module_id
+            return obj.to_dict()
         elif isinstance(obj, dict):
             return {k: __serialize(v) for k, v in obj.items()}
         elif isinstance(obj, (list, tuple)):

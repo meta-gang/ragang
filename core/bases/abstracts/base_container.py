@@ -1,22 +1,25 @@
 import re
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 
 from core.bases.abstracts.base_metric import BaseMetric
 from core.bases.abstracts.base_module import BaseModule
 from core.bases.datas.flow_storage import FlowStorage
-from core.bases.datas.performance import Performance
-from exceptions.frameworks.modules import DuplicateModuleIdException, FlowOutputException, \
+from exceptions.frameworks.modules import DuplicateModuleIdException, \
     MultipleStarterModuleException, InvalidModuleIdException
 from core.utils.ansi_styler import ANSIStyler
 
 
 class BaseContainer(metaclass=ABCMeta):
-    def __init__(self, u_fid: str, modules: list[BaseModule], e2e_metrics: list[BaseMetric] = None):
-        self.modules: list[BaseModule] = self.__validate_module_id(modules)
+    def __init__(self, modules: list[BaseModule], e2e_metrics: list[BaseMetric] = None):
+        self.modules: dict[str, BaseModule] = {m.module_id: m for m in self.__validate_module_id(modules)}
         self.starter: BaseModule | None = None
-        self.__metrics: list[BaseMetric] | None = e2e_metrics
-        self.storage: FlowStorage = FlowStorage(u_fid)
-        self.__connect_dependencies()
+        self.metrics: list[BaseMetric] | None = e2e_metrics
+        self.storage: FlowStorage = FlowStorage(self.__class__.__name__, self.__init_graph(modules))
+        self.__set_starter_module()
+        self.__set_directions()
+
+    def get_module_by_id(self, m_id: str) -> BaseModule:
+        return self.modules[m_id]
 
     def __validate_module_id(self, modules: list[BaseModule]) -> list[BaseModule]:
         ids: list[str] = []
@@ -24,9 +27,9 @@ class BaseContainer(metaclass=ABCMeta):
             if re.fullmatch(r'^[A-Za-z0-9_]+$', module.module_id) is None:  # only allows alphabet, number, underscore
                 raise InvalidModuleIdException(module.module_id,
                                                "Only combination of alphabets, numbers, and underscores are allowed.")
-            if module.module_id in ['gen', 'metric']:
-                raise InvalidModuleIdException(module.module_id,
-                                               "'gen', 'metric' are reserved. Use the other one instead.")
+            # if module.module_id in ['gen']:  # next도 없게해야할까
+            #     raise InvalidModuleIdException(module.module_id,
+            #                                    "'gen' is reserved. Use the other one instead.")
             ids.append(module.module_id)
         u_ids: set[str] = set(ids)
 
@@ -35,48 +38,34 @@ class BaseContainer(metaclass=ABCMeta):
             raise DuplicateModuleIdException(duplicate_ids)
         return modules
 
-    def __connect_dependencies(self):
-        for module in self.modules:  # initialization
-            self.storage.subscription[module.module_id] = []  # init subscription
-            module.storage = self.storage  # inject dependency
-            self.__set_starter_module(module)  # set flow starter
+    def __init_graph(self, modules: list[BaseModule]) -> list[tuple[str, str]]:
+        # gather all links from modules
+        res: list[tuple[str, str]] = []
+        for module in modules:
+            res.extend(module.dependency.dependencies)
+        return res
 
-        for module in self.modules:
-            for dep_mid in module.dependency.get_dependent_mids():
-                self.storage.subscribe(module, dep_mid)
+    def __set_starter_module(self):
+        for _, module in self.modules.items():
+            if module.is_starter:
+                if self.starter is not None:
+                    raise MultipleStarterModuleException(self.starter.module_id, module.module_id)
+                self.starter = module
 
-    def __set_starter_module(self, module: BaseModule):
-        if module.is_starter:
-            if self.starter is not None:
-                raise MultipleStarterModuleException(self.starter.module_id, module.module_id)
-            self.starter = module
-
-    def invoke_batch(self, queries: list[str]) -> list[tuple[str, str]]:
-        answers: list[tuple[str, str]] = []
-        for idx, query in enumerate(queries):
-            answers.append((query, self.invoke(query, idx)))
-        return answers
-
-    def invoke(self, query: str, query_id: int = 0) -> str:
-        self.storage.construct(query_id, query)
-        self.starter.trigger_chain_execution(query)
-        gen: str = self.storage.state.gen
-        if gen is None:
-            raise FlowOutputException()
-
-        if self.__metrics is None:
-            performances: list[Performance] = [Performance(_eval=False)]
-        else:
-            # parameters for the e2e metrics' evaluate() are limited to 'query' and 'gen'
-            performances: list[Performance] = [metric.evaluate(query=query, gen=gen) for metric in self.__metrics]
-        self.storage.destruct(performances)
-        return gen
+    def __set_directions(self) -> None:
+        for _, module in self.modules.items():
+            dependencies: list[tuple[str, str]] = module.dependency.dependencies
+            for link in dependencies:
+                self.modules[link[0]].direction.add_direction(link)
 
     def print_eval(self):
-        for query_idx, state in self.storage.history.items():
+        for query_idx, state in self.storage.results.items():
             tot_x_time: float = 0  # ms
             print()
-            print(ANSIStyler.style(f'Query: {state.query}', font_style='bold', fore_color='light-green'))  # query
+            print(ANSIStyler.style(f"[{self.__class__.__name__}]", font_style='bold',
+                                   fore_color='light-green'))  # flow name
+            print(ANSIStyler.style(f'Query({state.x_id}): {state.query}', font_style='bold',
+                                   fore_color='light-green'))  # query
             print(ANSIStyler.style(f"Generated Answer: {state.gen}", font_style='bold',
                                    fore_color='light-green'))  # answer
 
@@ -95,7 +84,3 @@ class BaseContainer(metaclass=ABCMeta):
             for perf in state.performances:
                 print(ANSIStyler.style(f"\t{perf} ({tot_x_time:.4f}ms)", font_style='bold',
                                        fore_color='light-yellow'))
-
-    @abstractmethod
-    def show(self):
-        raise NotImplementedError(f"Please implement '{self.__class__.__name__}.show()'")

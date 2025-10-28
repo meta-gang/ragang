@@ -6,55 +6,37 @@ from modules import *
 class AcceptorModule(CustomModule):  # 'starter'
     def execute(self, query: str):
         return {
-            'ret': {
-                'data': f"{query} - starter"
-            }
+            'query': query + '-starter'
         }
 
 
 class MyRetrievalModule(RetrievalModule):  # 'ret'
-    def execute(self, starter: dict, post: dict):
-        data: dict = starter or post
-        string_data: str = data['data']
-
-        if starter:
-            my_data: str = string_data + ' - ret1'
+    def execute(self, query: str):
+        if query.count('-') == 1:
+            my_data: str = query + '-ret1'
         else:
-            my_data: str = string_data + str(int(string_data[-1]) + 1)
+            my_data: str = query + str(int(query[-1]) + 1)
         return {
-            'post': {
-                'data': my_data
-            },
-            'metric': {
-                'context': my_data
-            }
+           'sfn_query': my_data
         }
 
 
 class MyPostRetrievalModule(PostRetrievalModule):  # 'post'
-    def execute(self, ret: dict):
-        if int(ret['data'][-1]) >= 5:
-            target: str = 'output'
-            data = ret['data'] + ' - post'
-        else:
-            target: str = 'ret'
-            data = ret['data']
-        return {
-            target: {
-                'data': data
-            },
-            'metric': {
-                'retrieved': data,
-                'ret_docs': data
+    def execute(self, sfn_query: str):
+        if int(sfn_query[-1]) >= 5:
+            return {
+                'next': ['output'],
+                'result': sfn_query + '-post'
             }
+        return {
+            'next': ['ret'],
+            'query': sfn_query
         }
 
 
 class MyGenerationModule(GenerationModule):  # 'output'
-    def execute(self, post: dict):
+    def execute(self, result: str):
+        print([(p.metric,p.score) for p in self.get_performance('post')])
         return {
-            'gen': post['data'] + ' - output',
-            'metric': {
-                'gen': post['data'] + ' - output'
-            }
+            'gen': result + '-output',
         }

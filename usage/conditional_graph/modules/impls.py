@@ -6,69 +6,47 @@ from modules import *
 class AcceptorModule(CustomModule):  # 'starter'
     def execute(self, query: str):
         return {
-            'cond': {
-                'data': f"{query} - starter"
-            }
+            'query': query + '-starter'
         }
 
 
 class MyConditionalBranchModule(CustomModule):  # 'cond'
-    def execute(self, starter: dict):
+    def execute(self, query: str):
         if random.random() > 0.5:
             target: str = 'first_ret'
         else:
             target: str = 'second_ret'
 
         return {
-            target: {
-                'data': starter['data'] + ' - cond'
-            }
+            'next': [target],
+            'query': query + '-cond',
+            'a': 'for metric'
         }
 
 
 class MyFirstRetrievalModule(RetrievalModule):  # 'first_ret'
-    def execute(self, cond: dict):
+    def execute(self, query: str):
         return {
-            'merge': {
-                'data': cond['data'] + ' - first_ret'
-            },
-            'metric': {
-                'context': cond['data'] + ' - first_ret'
-            }
+            'query': query + '-first_ret'
         }
 
 
 class MySecondRetrievalModule(RetrievalModule):  # 'second_ret'
-    def execute(self, cond: dict):
+    def execute(self, query: str):
         return {
-            'merge': {
-                'data': cond['data'] + ' - second_ret'
-            },
-            'metric': {
-                'context': cond['data'] + ' - second_ret'
-            }
+            'query': query + '-second_ret'
         }
 
 
 class MyMergeModule(CustomModule):  # 'merge'
-    def execute(self, first_ret: dict, second_ret: dict):
-        input_data: dict = first_ret or second_ret
-
+    def execute(self, query: str):
         return {
-            'output': {
-                'data': input_data['data'] + ' - merge',
-            },
-            'metric': {
-                'retrieved': input_data['data'] + ' - merge'
-            }
+            'query': query + '-merge'
         }
 
 
 class MyGenerationModule(GenerationModule):  # 'output'
-    def execute(self, merge: dict):
+    def execute(self, query: str):
         return {
-            'gen': merge['data'] + ' - output',
-            'metric': {
-                'gen': merge['data'] + ' - output'
-            }
+            'gen': query + '-output'
         }
