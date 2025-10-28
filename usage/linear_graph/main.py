@@ -1,3 +1,4 @@
+from core.bases.abstracts.base_engine import FlowEngine
 from core.bases.datas.linker import Linker
 from container import RAGContainer
 from usage.linear_graph.metrics.impls import MyPreRetrievalMetric, MyRetrievalMetric, MyPostRetrievalMetric, \
@@ -6,25 +7,26 @@ from usage.linear_graph.modules.impls import AcceptorModule, MyPreRetrievalModul
     MyPostRetrievalModule, MyGenerationModule
 
 rag = RAGContainer(
-    u_fid='unique_flow_id',
     modules=[
-        AcceptorModule('starter', metrics=None, is_starter=True),
-        MyPreRetrievalModule('pre', linker=Linker('starter'), metrics=[MyPreRetrievalMetric()]),
-        MyRetrievalModule('ret', linker=Linker('pre'), metrics=[MyRetrievalMetric()]),
-        MyPostRetrievalModule('post', linker=Linker('ret'), metrics=[MyPostRetrievalMetric()]),
-        MyGenerationModule('output', linker=Linker('post'), metrics=[MyGenerationMetric(None)]),
+        AcceptorModule('starter', is_starter=True),
+        MyPreRetrievalModule('pre', linker=Linker('starter'), metrics=[MyPreRetrievalMetric(param_refs=['pre.query'])]),
+        MyRetrievalModule('ret', linker=Linker('pre'), metrics=[MyRetrievalMetric(param_refs=['ret.ctx'])]),
+        MyPostRetrievalModule('post', linker=Linker('ret'), metrics=[MyPostRetrievalMetric(param_refs=['ret.ctx'])]),
+        MyGenerationModule('output', linker=Linker('post'), metrics=[MyGenerationMetric(['output.gen'], None)]),
     ],
-    e2e_metrics=[MyE2EMetric()]
+    e2e_metrics=[MyE2EMetric([])]
 )
 
-# answer = rag.invoke('Hello, Ragang')
-# print(f'Answer: {answer}')
-# rag.print_eval()
+engine: FlowEngine = FlowEngine([rag])
 
-rag.invoke_batch([
+# answer = engine.invoke('Hello, Ragang')
+# print(f'Answer: {answer}')
+# engine.print_eval()
+
+engine.invoke_batch([
     'Hello, Ragang',
     'Hello, Starbucks',
     'Hello, SKKU',
     'Hello, Metabuild'
 ])
-rag.print_eval()
+engine.print_eval()
