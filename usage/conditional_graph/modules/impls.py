@@ -4,14 +4,14 @@ from modules import *
 
 
 class AcceptorModule(CustomModule):  # 'starter'
-    def execute(self, query: str):
+    async def execute(self, query: str):
         return {
             'query': query + '-starter'
         }
 
 
 class MyConditionalBranchModule(CustomModule):  # 'cond'
-    def execute(self, query: str):
+    async def execute(self, query: str):
         if random.random() > 0.5:
             target: str = 'first_ret'
         else:
@@ -25,28 +25,28 @@ class MyConditionalBranchModule(CustomModule):  # 'cond'
 
 
 class MyFirstRetrievalModule(RetrievalModule):  # 'first_ret'
-    def execute(self, query: str):
+    async def execute(self, query: str):
         return {
             'query': query + '-first_ret'
         }
 
 
 class MySecondRetrievalModule(RetrievalModule):  # 'second_ret'
-    def execute(self, query: str):
+    async def execute(self, query: str):
         return {
             'query': query + '-second_ret'
         }
 
 
 class MyMergeModule(CustomModule):  # 'merge'
-    def execute(self, query: str):
+    async def execute(self, query: str):
         return {
             'query': query + '-merge'
         }
 
 
 class MyGenerationModule(GenerationModule):  # 'output'
-    def execute(self, query: str):
+    async def execute(self, query: str):
         return {
             'gen': query + '-output'
         }

@@ -53,7 +53,8 @@ from adapters.llm_adapter import BaseLLMAdapter
 
 
 class BaseBuiltinMetric(BaseMetric):
-    def __init__(self, llm_adapter: BaseLLMAdapter = None, embedding_adapter: BaseEmbeddingAdapter = None):
+    def __init__(self, param_src: list[str], llm_adapter: BaseLLMAdapter = None, embedding_adapter: BaseEmbeddingAdapter = None):
+        super().__init__(param_src)
         self.llm_adapter = llm_adapter
         self.embedding_adapter = embedding_adapter
 
