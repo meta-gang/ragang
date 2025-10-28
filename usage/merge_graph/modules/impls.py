@@ -4,55 +4,35 @@ from modules import *
 class AcceptorModule(CustomModule):  # 'starter'
     def execute(self, query: str):
         return {
-            'branch': {
-                'data': f"{query} - starter"
-            }
+            'query': query + '-starter'
         }
 
 
 class MyBranchingModule(CustomModule):  # 'branch'
-    def execute(self, starter: dict):
+    def execute(self, query: str):
         return {
-            'first_ret': {
-                'data': starter['data'] + ' - branch'
-            },
-            'second_ret': {
-                'data': starter['data'] + ' - branch'
-            }
+            'next': ['first_ret', 'second_ret'],
+            'query': query + '-branch'
         }
 
 
 class MyRetrievalModule(RetrievalModule):  # 'first_ret', 'second_ret'
-    def execute(self, branch: dict):
+    def execute(self, query: str):
         return {
-            'rerank': {
-                'data': branch['data'] + f' - {self.module_id}'
-            },
-            'metric': {
-                'ret_docs': branch['data'] + f' - {self.module_id}'
-            }
+            self.module_id: query + f'-{self.module_id}'
         }
 
 
 class MyRerankingModule(CustomModule):  # 'rerank'
-    def execute(self, first_ret: dict, second_ret: dict):
-        data: str = f"[{first_ret['data']} & {second_ret['data']}]"
+    def execute(self, first_ret: str, second_ret: str):
+        data: str = f"[{first_ret} & {second_ret}]"
         return {
-            'output': {
-                'data': f'{data} - rerank',
-            },
-            'metric': {
-                'ret_docs': f'{data} - rerank',
-            }
+           'query': data
         }
 
 
 class MyGenerationModule(GenerationModule):  # 'output'
-    def execute(self, rerank: dict):
-        print('generation')
+    def execute(self, query: str):
         return {
-            'gen': rerank['data'] + ' - output',
-            'metric': {
-                'gen': rerank['data'] + ' - output'
-            }
+            'gen': query + '-output',
         }

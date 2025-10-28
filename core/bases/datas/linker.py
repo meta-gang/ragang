@@ -1,15 +1,12 @@
 from dataclasses import dataclass
 
-from exceptions.frameworks.modules import DependencyConnectionException
+from exceptions.frameworks.modules import DirectionConnectionException
 
 
 class Linker:
-    """
-      Linker(next_mid): 자신 다음에 실행될 모듈 ID
-    """
-    def __init__(self, next_module_id: str):
-        self.module_id: str = next_module_id
-        self.dependent_ids: list[str] = []
+    def __init__(self, module_id: str):
+        self.module_id: str = module_id
+        self.dependency_ids: list[str] = []
         self.is_or: bool = False
 
     def __and__(self, other: 'Linker') -> 'Linker':
@@ -24,32 +21,39 @@ class Linker:
         return self
 
     def __add_dependency(self, other: 'Linker') -> None:
-        self.dependent_ids.append(other.module_id)
-        self.dependent_ids.extend(other.dependent_ids)
+        self.dependency_ids.append(other.module_id)
+        self.dependency_ids.extend(other.dependency_ids)
 
     def __prevent_cross_operator_usage(self, other):
-        raise DependencyConnectionException("Dependencies links must be formed exclusively '&' or '|'")
+        raise DirectionConnectionException("Direction links must be formed exclusively '&' or '|'")
 
-    def build(self, src_mid: str) -> 'Direction':
-        all_next = [self.module_id, *self.dependent_ids]
-        dependencies: list[tuple[str, str]] = [(src_mid, dest_mid) for dest_mid in all_next]
-        return Direction(dependencies, self.is_or)
+    def build(self, dest_mid: str) -> 'Direction':
+        dep_mids = [self.module_id, *self.dependency_ids]
+        dependencies: list[tuple[str, str]] = [(src_mid, dest_mid) for src_mid in dep_mids]
+        return Dependency(dependencies, self.is_or)
+
+
+class Direction:
+    def __init__(self):
+        self.directions: list[tuple[str, str]] = []
+
+    def add_direction(self, direction: list[tuple[str, str]]):
+        self.directions.append(direction)
+
+    def get_directions(self) -> list[str]:
+        return [d for _, d in self.directions]
 
 
 @dataclass
-class Direction:
-    directions: list[tuple[str, str]]
-    is_or: bool
+class Dependency:
+    dependencies: list[tuple[str, str]]
+    is_or: bool = False  # means and dep (basically module links are and relation)
 
-    def check_dependencies(self, status: list[tuple[str, str]], deps: list[tuple[str, str]]) -> bool:
-        check = any if self.is_or else all
-        return check(dependency in status for dependency in deps)
+    def get_dependencies(self) -> list[str]:
+        return [d for d, _ in self.dependencies]
 
-    def get_dependent_mids(self) -> list[str]:
-        return [link[1] for link in self.directions]
 
-# if __name__ == '__main__':
-#     link: Linker = Linker('m1') & Linker('m2') | Linker('m3')
-#     dep: Dependency = link.build('m4')
-#     print(dep)
-#     print(dep.check_dependencies([('m1', 'm4'), ('m3', 'm4'), ('m2', 'm4')]))
+if __name__ == '__main__':
+    link: Linker = Linker('m1') | Linker('m2') | Linker('m3')
+    dep: Dependency = link.build('m4')
+    print(dep)

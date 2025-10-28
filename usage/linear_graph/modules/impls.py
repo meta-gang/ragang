@@ -1,56 +1,38 @@
 from modules import *
 
 
-class AcceptorModule(CustomModule):
+class AcceptorModule(CustomModule):  # starter
     def execute(self, query: str):
         return {
-            'pre': {
-                'data': f"{query} - starter"
-            }
+            'some': query,
+            'thing': "[advanced]"
         }
 
 
-class MyPreRetrievalModule(PreRetrievalModule):
-    def execute(self, starter: dict):
+class MyPreRetrievalModule(PreRetrievalModule):  # pre
+    def execute(self, some: str, thing: str):
         return {
-            'ret': {
-                'data': starter['data'] + ' - pre'
-            },
-            'metric': {
-                'query': 'dldldl'
-            }
+            'query': some,
+            'advanced_q': some + thing
         }
 
 
-class MyRetrievalModule(RetrievalModule):
-    def execute(self, pre: dict):
+class MyRetrievalModule(RetrievalModule):  # ret
+    def execute(self, advanced_q: str):
         return {
-            'post': {
-                'data': pre['data'] + ' - ret'
-            },
-            'metric': {
-                'context': 'dldldl'
-            }
+            'ctx': [advanced_q],
         }
 
 
-class MyPostRetrievalModule(PostRetrievalModule):
-    def execute(self, ret: dict):
+class MyPostRetrievalModule(PostRetrievalModule):  # post
+    def execute(self, ctx: list[str]):
         return {
-            'output': {
-                'data': ret['data'] + ' - post'
-            },
-            'metric': {
-                'context': 'dldldl'
-            }
+            'ret': ' '.join(ctx),
         }
 
 
-class MyGenerationModule(GenerationModule):
-    def execute(self, post: dict):
+class MyGenerationModule(GenerationModule):  # output
+    def execute(self, ret: str):
         return {
-            'gen': post['data'] + ' - output',
-            'metric': {
-                'gen': post['data'] + ' - output'
-            }
+            'gen': ret
         }
