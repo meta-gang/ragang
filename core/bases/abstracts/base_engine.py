@@ -16,12 +16,21 @@ from core.utils.ansi_styler import ANSIStyler
 
 from exceptions.user.keyname import NotCorrectModuleId, NotCorrectDataKey  # TODO: rename exception classes
 from exceptions.frameworks.datas import NoOutputData  # TODO: rename exception classes
-from exceptions.user.modules import UnlinkedModuleException
+from exceptions.user.module import UnlinkedModuleException
+from exceptions.user.container import DuplicateFlowIdException
 
 
 class FlowEngine:
-    def __init__(self, container: list[BaseContainer]):
-        self.container: dict[str, BaseContainer] = {c.__class__.__name__: c for c in container}
+    def __init__(self, containers: list[BaseContainer]):
+        self.__validate_flow_id(containers)
+        self.container: dict[str, BaseContainer] = {c.flow_id: c for c in containers}
+
+    def __validate_flow_id(self, containers: list[BaseContainer]):
+        flow_ids: list[str] = [c.flow_id for c in containers]
+        if len(set(flow_ids)) != len(flow_ids):
+            for dup_id in set(flow_ids):
+                flow_ids.remove(dup_id)
+            raise DuplicateFlowIdException(flow_ids)
 
     def __validate_output(self, cont: BaseContainer, module: BaseModule, output: dict[str, Any]) -> dict[
         str, dict[str, Any]]:
@@ -201,7 +210,7 @@ class FlowEngine:
 
         state.performances = performances
 
-        self.container[cont.__class__.__name__].storage.results[q_id] = state  # save result
+        self.container[cont.flow_id].storage.results[q_id] = state  # save result
 
         return gen
 
@@ -229,9 +238,15 @@ class FlowEngine:
                 answers[cont_name][q_id] = ans
         return answers
 
-    def print_eval(self, cont_name: str = None):
-        if (cont := self.container.get(cont_name)) is not None:
-            cont.print_eval()
+    def print_eval(self, flow_ids: list[str] = None):
+        if flow_ids is None:
+            containers: list[BaseContainer] = self.container.values()
         else:
-            for cont in self.container.values():
-                cont.print_eval()
+            containers: list[BaseContainer] = []
+            for flow_id in flow_ids:
+                if (cont := self.container.get(flow_id, None)) is None:
+                    warnings.warn(f"Trying to access container '{flow_id}' which is not exist", UserWarning)
+                containers.append(cont)
+
+        for cont in containers:
+            cont.print_eval()

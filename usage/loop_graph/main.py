@@ -5,6 +5,7 @@ from usage.loop_graph.modules.impls import *
 from usage.loop_graph.metrics.impls import *
 
 rag = RAGContainer(
+    flow_id="loop_graph",
     modules=[
         AcceptorModule('starter', metrics=None, is_starter=True),
         MyRetrievalModule('ret', linker=Linker('starter') | Linker('post'), metrics=[MyRetrievalMetric(['starter.query'])]),

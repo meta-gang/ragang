@@ -7,6 +7,7 @@ from usage.linear_graph.modules.impls import AcceptorModule, MyPreRetrievalModul
     MyPostRetrievalModule, MyGenerationModule
 
 rag = RAGContainer(
+    flow_id="linear_graph",
     modules=[
         AcceptorModule('starter', is_starter=True),
         MyPreRetrievalModule('pre', linker=Linker('starter'), metrics=[MyPreRetrievalMetric(param_refs=['pre.query'])]),
