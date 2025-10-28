@@ -5,7 +5,6 @@ import inspect
 
 from core.bases.abstracts.base_metric import BaseMetric
 from core.bases.datas.linker import Direction, Dependency, Linker
-from core.bases.datas.packet import Packet
 from core.bases.datas.performance import Performance
 from core.bases.datas.state import State
 
@@ -42,6 +41,6 @@ class BaseModule(metaclass=ABCMeta):  # observer
         return None
 
     @abstractmethod
-    def execute(self, *args, **kwargs):
+    async def execute(self, *args, **kwargs):
         """ TODO: Define this module's responsibility """
         raise NotImplementedError(f"Please implement '{self.__class__.__name__}.execute()'")

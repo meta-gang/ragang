@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from exceptions.frameworks.modules import DirectionConnectionException
+from exceptions.user.module import DirectionConnectionException
 
 
 class Linker:

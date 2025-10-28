@@ -1,6 +1,3 @@
-from core.bases.abstracts.base_module import BaseModule
-from core.bases.datas.packet import Packet
-from core.bases.datas.performance import Performance
 from core.bases.datas.state import State
 from core.decorators.serializable import serializable
 
@@ -11,3 +8,6 @@ class FlowStorage:
         self.flow_id: str = flow_id
         self.flow_graph: list[tuple[str, str]] = flow_graph
         self.results: dict[str, State] = {}
+
+    def set_result(self, q_id: str, result: State) -> None:
+        self.results[q_id] = result
