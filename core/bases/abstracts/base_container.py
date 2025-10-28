@@ -1,10 +1,13 @@
 import re
 from abc import ABCMeta
+from asyncio import Lock
 
 from core.bases.abstracts.base_metric import BaseMetric
 from core.bases.abstracts.base_module import BaseModule
 from core.bases.datas.flow_storage import FlowStorage
-from exceptions.frameworks.modules import DuplicateModuleIdException, \
+from core.bases.datas.state import State
+from core.decorators.use_lock import use_async_lock
+from exceptions.user.module import DuplicateModuleIdException, \
     MultipleStarterModuleException, InvalidModuleIdException
 from core.utils.ansi_styler import ANSIStyler
 
@@ -16,11 +19,18 @@ class BaseContainer(metaclass=ABCMeta):
         self.starter: BaseModule | None = None
         self.metrics: list[BaseMetric] | None = e2e_metrics
         self.storage: FlowStorage = FlowStorage(flow_id, self.__init_graph(modules))
+        self._storage_state_lock: Lock = Lock()
         self.__set_starter_module()
         self.__set_directions()
 
     def get_module_by_id(self, m_id: str) -> BaseModule:
         return self.modules[m_id]
+
+    async def save_state(self, q_id: str, state: State) -> None:
+        @use_async_lock(self._storage_state_lock)
+        async def run():
+            self.storage.set_result(q_id, state)
+        await run()
 
     def __validate_module_id(self, modules: list[BaseModule]) -> list[BaseModule]:
         ids: list[str] = []
@@ -28,7 +38,7 @@ class BaseContainer(metaclass=ABCMeta):
             if re.fullmatch(r'^[A-Za-z0-9_]+$', module.module_id) is None:  # only allows alphabet, number, underscore
                 raise InvalidModuleIdException(module.module_id,
                                                "Only combination of alphabets, numbers, and underscores are allowed.")
-            # if module.module_id in ['gen']:  # next도 없게해야할까
+            # if module.module_id in ['gen']:
             #     raise InvalidModuleIdException(module.module_id,
             #                                    "'gen' is reserved. Use the other one instead.")
             ids.append(module.module_id)
