@@ -5,6 +5,7 @@ from usage.merge_graph.modules.impls import *
 from usage.merge_graph.metrics.impls import *
 
 rag = RAGContainer(
+    flow_id='merge_graph',
     modules=[
         AcceptorModule('starter', metrics=None, is_starter=True),
         MyBranchingModule('branch', linker=Linker('starter'), metrics=None),

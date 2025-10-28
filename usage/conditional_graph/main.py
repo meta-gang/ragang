@@ -5,6 +5,7 @@ from usage.conditional_graph.modules.impls import *
 from usage.conditional_graph.metrics.impls import *
 
 rag = RAGContainer(
+    flow_id='conditional_graph',
     modules=[
         AcceptorModule('starter', metrics=None, is_starter=True),
         MyConditionalBranchModule('cond', linker=Linker('starter')),
