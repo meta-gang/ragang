@@ -10,11 +10,12 @@ from core.utils.ansi_styler import ANSIStyler
 
 
 class BaseContainer(metaclass=ABCMeta):
-    def __init__(self, modules: list[BaseModule], e2e_metrics: list[BaseMetric] = None):
+    def __init__(self, flow_id: str, modules: list[BaseModule], e2e_metrics: list[BaseMetric] = None):
+        self.flow_id: str = flow_id
         self.modules: dict[str, BaseModule] = {m.module_id: m for m in self.__validate_module_id(modules)}
         self.starter: BaseModule | None = None
         self.metrics: list[BaseMetric] | None = e2e_metrics
-        self.storage: FlowStorage = FlowStorage(self.__class__.__name__, self.__init_graph(modules))
+        self.storage: FlowStorage = FlowStorage(flow_id, self.__init_graph(modules))
         self.__set_starter_module()
         self.__set_directions()
 
@@ -62,7 +63,7 @@ class BaseContainer(metaclass=ABCMeta):
         for query_idx, state in self.storage.results.items():
             tot_x_time: float = 0  # ms
             print()
-            print(ANSIStyler.style(f"[{self.__class__.__name__}]", font_style='bold',
+            print(ANSIStyler.style(f"[{self.flow_id}]", font_style='bold',
                                    fore_color='light-green'))  # flow name
             print(ANSIStyler.style(f'Query({state.x_id}): {state.query}', font_style='bold',
                                    fore_color='light-green'))  # query
