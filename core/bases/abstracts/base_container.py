@@ -60,11 +60,9 @@ class BaseContainer(metaclass=ABCMeta):
                 self.modules[link[0]].direction.add_direction(link)
 
     def print_eval(self):
+        print(ANSIStyler.style(f"[{self.flow_id}]", font_style='bold', fore_color='light-magenta'))  # flow name
         for query_idx, state in self.storage.results.items():
             tot_x_time: float = 0  # ms
-            print()
-            print(ANSIStyler.style(f"[{self.flow_id}]", font_style='bold',
-                                   fore_color='light-green'))  # flow name
             print(ANSIStyler.style(f'Query({state.x_id}): {state.query}', font_style='bold',
                                    fore_color='light-green'))  # query
             print(ANSIStyler.style(f"Generated Answer: {state.gen}", font_style='bold',
@@ -85,3 +83,4 @@ class BaseContainer(metaclass=ABCMeta):
             for perf in state.performances:
                 print(ANSIStyler.style(f"\t{perf} ({tot_x_time:.4f}ms)", font_style='bold',
                                        fore_color='light-yellow'))
+            print()
