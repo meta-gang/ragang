@@ -47,33 +47,54 @@ class Runner:
         await self._broadcast_container_topology()
 
     # query_id list로 해당 결과만 브로드캐스트
+    # async def _broadcast_rag_result(self, query_ids: List[str]):
+    #     cont = self.engine.containers[self.flow_id]
+    #     hist = {
+    #         qid: st.serialize()
+    #         for qid, st in cont.storage.history.items()
+    #         if qid in query_ids
+    #     }
+    #     await self.handler.broadcast("rag-result-data", {
+    #         "ts": _ts_str(),
+    #         "storage": {
+    #             "flow_id": cont.storage.flow_id,
+    #             "history": hist
+    #         }
+    #     })
+
     async def _broadcast_rag_result(self, query_ids: List[str]):
         cont = self.engine.containers[self.flow_id]
-        hist = {
-            qid: st.serialize()
-            for qid, st in cont.storage.history.items()
-            if qid in query_ids
+        states_payload = {
+            qid: cont.states[qid].serialize()
+            for qid in query_ids
+            if qid in cont.states
         }
         await self.handler.broadcast("rag-result-data", {
             "ts": _ts_str(),
             "storage": {
-                "flow_id": cont.storage.flow_id,
-                "history": hist
+                "flow_id": cont.flow_id,
+                "states": states_payload
             }
         })
 
-    # 컨테이너 토폴로지 브로드캐스트
+
+    # # 컨테이너 토폴로지 브로드캐스트
+    # async def _broadcast_container_topology(self):
+    #     cont = self.engine.containers[self.flow_id]
+    #     edges: List[Tuple[str, str]] = []
+    #     for m in getattr(cont, "modules", []):
+    #         try:
+    #             # direction 객체에서 다음 모듈 id 목록을 받아와 (src, dst) 형식으로 추가
+    #             for dst in m.direction.get_directions():
+    #                 edges.append((m.module_id, dst))
+    #         except Exception:
+    #             continue
+    #     await self.handler.broadcast("rag-container", {"rag-container": edges})
+
     async def _broadcast_container_topology(self):
         cont = self.engine.containers[self.flow_id]
-        edges: List[Tuple[str, str]] = []
-        for m in getattr(cont, "modules", []):
-            try:
-                # direction 객체에서 다음 모듈 id 목록을 받아와 (src, dst) 형식으로 추가
-                for dst in m.direction.get_directions():
-                    edges.append((m.module_id, dst))
-            except Exception:
-                continue
-        await self.handler.broadcast("rag-container", {"rag-container": edges})
+        edges: List[Tuple[str, str]] = getattr(cont.storage, "flow_graph", [])
+        await self.handler.broadcast("rag-container", {"rag-container": edges})    
 
     async def dispatch(self, msg: dict, ws):
         topic = msg.get("topic")
@@ -155,3 +176,35 @@ class Runner:
         results = self.engine.invoke(query, flow_ids=[self.flow_id])
         query_ids = list(results.get(self.flow_id, {}).keys())
         await self._broadcast_rag_result(query_ids)
+    
+    # rag가 실행을 시작하였을 때 실행할 query 전체 개수와 함께 시작 알람 송신 -> rag가 실행되면 프론트에서 rag실행이 끝날 때 까지 화면 정지(프로그래스 바만)
+    async def _rag_on_run(self, query_num: int):
+        await self.handler.broadcast("rag-on", {
+            "ts": _ts_str(),
+            "query-num": int(query_num),
+        })
+
+    # genertor을 통해 만든 query file 리스트를 송신(data/generted_query 폴더에 있는 파일 이름들을 list로 만들어 송신)
+    #   -> 프론트에서 generted query list를 출력하여 사용자가 선택할 때 이용
+    async def _end_query(self, query_id: int):
+        await self.handler.broadcast("ended-query", {
+            "ts": _ts_str(),
+            "end-query": int(query_id),
+        })
+    
+    # rag continer가 하나의 query에 대해 실행이 완료될 때마다 해당 query_id 송신 -> 프로그래스 바에 사용
+    async def _generated_query_files(self, query_num: int):
+        from pathlib import Path
+        base_dir = Path("data/generated_query")
+        file_list = []
+        try:
+            if base_dir.exists() and base_dir.is_dir():
+                for p in sorted(base_dir.rglob("*.txt")):
+                    file_list.append(str(p.as_posix()))
+        except Exception:
+            file_list = []
+
+        await self.handler.broadcast("generated-query-files", {
+            "ts": _ts_str(),
+            "files": file_list
+        })
