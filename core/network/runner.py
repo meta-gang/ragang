@@ -46,21 +46,6 @@ class Runner:
     async def setup_handlers(self):
         await self._broadcast_container_topology()
 
-    # query_id list로 해당 결과만 브로드캐스트
-    # async def _broadcast_rag_result(self, query_ids: List[str]):
-    #     cont = self.engine.containers[self.flow_id]
-    #     hist = {
-    #         qid: st.serialize()
-    #         for qid, st in cont.storage.history.items()
-    #         if qid in query_ids
-    #     }
-    #     await self.handler.broadcast("rag-result-data", {
-    #         "ts": _ts_str(),
-    #         "storage": {
-    #             "flow_id": cont.storage.flow_id,
-    #             "history": hist
-    #         }
-    #     })
 
     async def _broadcast_rag_result(self, query_ids: List[str]):
         cont = self.engine.containers[self.flow_id]
@@ -73,23 +58,9 @@ class Runner:
             "ts": _ts_str(),
             "storage": {
                 "flow_id": cont.flow_id,
-                "states": states_payload
+                "states": states_payload # 이부분을 state 객체가 아닌 cont.storage.result[qid] 형태로 바꿔야 되는지
             }
         })
-
-
-    # # 컨테이너 토폴로지 브로드캐스트
-    # async def _broadcast_container_topology(self):
-    #     cont = self.engine.containers[self.flow_id]
-    #     edges: List[Tuple[str, str]] = []
-    #     for m in getattr(cont, "modules", []):
-    #         try:
-    #             # direction 객체에서 다음 모듈 id 목록을 받아와 (src, dst) 형식으로 추가
-    #             for dst in m.direction.get_directions():
-    #                 edges.append((m.module_id, dst))
-    #         except Exception:
-    #             continue
-    #     await self.handler.broadcast("rag-container", {"rag-container": edges})
 
     async def _broadcast_container_topology(self):
         cont = self.engine.containers[self.flow_id]
