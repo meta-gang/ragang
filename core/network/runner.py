@@ -50,7 +50,7 @@ class Runner:
     async def _broadcast_rag_result(self, query_ids: List[str]):
         cont = self.engine.containers[self.flow_id]
         states_payload = {
-            qid: cont.storage.result[qid]
+            qid: cont.storage.results[qid]
             for qid in query_ids
             if qid in cont.storage.result.keys()
         }
