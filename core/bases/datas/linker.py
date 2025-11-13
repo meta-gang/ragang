@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from exceptions.user.module import DirectionConnectionException
+from exceptions.user.module import DependencyConnectionException
 
 
 class Linker:
@@ -25,7 +25,7 @@ class Linker:
         self.dependency_ids.extend(other.dependency_ids)
 
     def __prevent_cross_operator_usage(self, other):
-        raise DirectionConnectionException("Direction links must be formed exclusively '&' or '|'")
+        raise DependencyConnectionException("Dependency links must be formed exclusively '&' or '|'")
 
     def build(self, dest_mid: str) -> 'Direction':
         dep_mids = [self.module_id, *self.dependency_ids]

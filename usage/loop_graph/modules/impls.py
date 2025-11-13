@@ -1,5 +1,4 @@
 import asyncio
-import random
 
 from modules import *
 
