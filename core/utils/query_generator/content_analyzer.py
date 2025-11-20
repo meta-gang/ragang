@@ -1,6 +1,7 @@
 from core.utils.query_generator.prompts import prompt_summarize_chunks, prompt_summarize_summaries
 from adapters.llm_adapter import BaseLLMAdapter
 from core.utils.query_generator.models import Chunk, DocSummary, Explanation
+from core.utils.query_generator.config import MAX_WORKERS
 import asyncio
 import logging
 import re
@@ -19,7 +20,7 @@ class ContentAnalyzer:
         self.llm_adapter = llm_adapter
         pass
 
-    async def _call_llm(self, prompts: List[str], max_workers: int = 10) -> List[dict]:
+    async def _call_llm(self, prompts: List[str], max_workers: int = MAX_WORKERS) -> List[dict]:
         """
         LLM 어댑터를 사용하여 프롬프트 배치를 비동기적으로 전송합니다.
         """
@@ -158,7 +159,7 @@ class ContentAnalyzer:
                         # 6. keywordSearch[keyword]에 related_chunks 추가
                         keywordSearch_set[normalized_keyword].update(related_chunks)
                         
-        # 7. (선택적) 딕셔너리의 값(set)을 list[int]로 변환하여 반환
+        # 7. 딕셔너리의 값(set)을 list[int]로 변환하여 반환
         # 결과를 정렬하여 일관성을 유지
         keywordSearch_list: Dict[str, List[int]] = {
             keyword: sorted(list(chunks_set))

@@ -23,6 +23,7 @@ class Chunk:
 @dataclass
 class Query:
     query: str
+    answer: str | None
     type: QueryType
     reference: list[int] | None
 

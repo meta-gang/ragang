@@ -1,11 +1,14 @@
-import os
-
-# Data IO
+# Query Generation
 DATA_PATH = "./core/utils/query_generator/my_pdfs"
 OUTPUT_PATH = "./datas/queries"
+MAX_NUM_QUERIES = 400
+CHUNK_SIZE = 5
+CHUNK_OVERLAP = 1
+NUM_QUERIES_PER_PAGE = 1
 
 
 # LLM call
-LLM_MODEL = "gpt-5-mini"
-API_KEY = os.environ.get("OPENAI_API_KEY", "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")
-MAX_WORKERS = 10
+LLM_MODEL = "gemini-2.5-flash"
+API_KEY = ""
+MAX_WORKERS = 20
+MAX_CONTEXT_LENGTH = 8000

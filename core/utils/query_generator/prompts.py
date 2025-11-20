@@ -1,3 +1,7 @@
+# ==============================================================================
+# 1. 문서 요약 프롬프트
+# ==============================================================================
+
 prompt_summarize_chunks = '''
 {text}
 [지시 사항]
@@ -17,6 +21,7 @@ prompt_summarize_chunks = '''
 결과는 다음 형식을 정확히 지켜서 응답하라.
 요약: 요약 내용
 키워드: [키워드1, 키워드2, ...]'''
+
 prompt_summarize_summaries = '''
 {text}
 [지시 사항]
@@ -37,6 +42,7 @@ prompt_summarize_summaries = '''
 요약: 요약 내용
 키워드: [키워드1, 키워드2, ...]
 '''
+
 prompt_match_jobs = """
 문서 요약:
 ---
@@ -54,163 +60,47 @@ prompt_match_jobs = """
 출력 형식: 10개의 직업을 쉼표(,)로 구분된 단일 문자열로 반환해주세요. (예: 직업1, 직업2, 직업3, ...)
 """
 
-prompt_generate_simple_search_queries_wr = '''
+# ==============================================================================
+# 2. 쿼리 생성 공통 템플릿
+# ==============================================================================
+
+# WR (With Reference): 정답(Gold)과 근거 포함
+TEMPLATE_WR = '''
 [페르소나]
 {persona}
 
 [수행 작업]
 {task}
 
-[참고 본문]
+[발췌]
 {context}
 
 [지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 단순 사실을 묻는, 명확한 답이 있는 질문이다.
-- 참고 본문을 RAG 서비스가 검색한 후 답할 수 있는 내용이어야 한다.
-예: "우리 회사의 2025년 총 매출액이 얼마야?", "삼성전자의 회장이 누구야?"
+당신은 RAG 시스템을 테스트하기 위한 질의응답(Q&A) 세트를 생성하는 AI입니다.
+위 [페르소나]를 가진 사용자가 RAG 이용 시 할 법한 질문과 정답을 {num_queries} 개 생성하시오.
 
+[질문 조건]
+1. **[발췌] 언급 금지:** [발췌]은 질문 생성을 위한 구체적인 정보 습득, 맥락 파악을 위해서만 사용하세요. 질문자는 [발췌]에 대해 알지 못한다고 가정합니다. 질문에 "문서에 따르면", "본문에서 언급된" "이 문서" 같은 표현을 절대 사용하지 마십시오. 
+2. **자연스러운 어투:** RAG 이용자가 질문 시 사용하는 어투를 사용하세요. "야", "어이" 금지
+3. **명확한 정답:** 질문은 모호하지 않아야 하며, 반드시 [발췌] 내에서 명확한 근거를 찾을 수 있어야 합니다.
+4. **유형 준수:** 아래 [쿼리 유형]에 맞는 질문만 생성하세요.
 
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
+[쿼리 유형]
+{instruction}
+
+[출력 포맷]
+반드시 아래 JSON 포맷(List of Objects)으로만 응답하세요. 다른 설명은 포함하지 마세요.
+[
+  {{{{
+    "question": "생성된 질문",
+    "answer": "질문에 대한 정답 (본문 내용을 바탕으로 요약)"
+  }}}},
+  ...
+]
 '''
 
-prompt_generate_simple_expln_queries_wr = '''
-[페르소나]
-{persona}
-
-[수행 작업]
-{task}
-
-[참고 본문]
-{context}
-
-[지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 개념, 프로세스, 또는 원인에 대한 설명을 요구한다.
-- 참고 본문을 RAG 서비스가 검색한 후 답할 수 있는 내용이어야 한다.
-예: "레지스탕스의 역사에 대해 자세히 설명해줘", "우리 회사의 감사 절차에 대해 자세히 설명해줘."
-
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
-'''
-
-prompt_generate_simple_tf_queries_wr = '''
-[페르소나]
-{persona}
-
-[수행 작업]
-{task}
-
-[참고 본문]
-{context}
-
-[지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 진술의 참/거짓을 묻는다
-- 참고 본문을 RAG 서비스가 검색한 후 답할 수 있는 내용이어야 한다.
-예: "BAYC가 2022년에 시작된 프로젝트 맞지?", "우황청심환의 부작용은 가벼운 미열만 있는 걸로 알고 있는데 맞아?"
-
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
-'''
-
-prompt_generate_complex_multi_queries_wr = '''
-[페르소나]
-{persona}
-
-[수행 작업]
-{task}
-
-[참고 본문]
-{context}
-
-[지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 첫 번째 정보(A)를 알아낸 뒤, 그 정보를 이용해 두 번째 정보(B)를 찾아야 하는 다단계 질문이다
-- 참고 본문을 RAG 서비스가 검색한 후 답할 수 있는 내용이어야 한다.
-예: "현 구글 CEO가 최근 AI에 대해 언급한 인터뷰를 모두 찾아줘", "소설 <아큐정전>의 작가가 쓴 다른 소설을 모두 나열해줘."
-
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
-'''
-
-prompt_generate_complex_comp_queries_wr = '''
-[페르소나]
-{persona}
-
-[수행 작업]
-{task}
-
-[참고 본문]
-{context}
-
-[지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 비교 가능한 두 대상의 공통점/차이점을 묻는 질문이다.
-- 특정한 비교 기준을 제시하거나 생략할 수 있다.
-- 참고 본문을 RAG 서비스가 검색한 후 답할 수 있는 내용이어야 한다.
-예: "삼성전자와 SK하이닉스의 HBM 제조 역량을 비교해줘", "가격과 디자인을 기준으로 아이폰과 갤럭시폰을 비교해줘."
-
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
-'''
-
-prompt_generate_complex_infer_queries_wr = '''
-[페르소나]
-{persona}
-
-[수행 작업]
-{task}
-
-[참고 본문]
-{context}
-
-[지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 검색된 정보를 토대로 논리적 추론을 해야만 답할 수 있는 질문이다.
-- 어떤 사건이나 현상이 발생한 원인이나, 이후의 영향을 묻는 질문이다.
-- 참고 본문을 RAG 서비스가 검색한 후 답할 수 있는 내용이어야 한다.
-예: "아편전쟁 당시 청나라 정부의 대응이 왜 미흡했던 거야?", "세계적인 국방비 지출 증액이 국제정세에 끼칠 영향은 뭐가 있을까?"
-
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
-'''
-
-prompt_generate_complex_cond_queries_wr = '''
-[페르소나]
-{persona}
-
-[수행 작업]
-{task}
-
-[참고 본문]
-{context}
-
-[지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 특정한 조건을 만족하는 정보를 찾는 질문이다.
-- 두 개 이상의 조건을 제시할 수 있다.
-- 참고 본문을 RAG 서비스가 검색한 후 답할 수 있는 내용이어야 한다.
-예: "서울 시내에 보증금 2000 이하, 월세 100 이하 원룸 찾아줘.", "2025년 사내 회의록에서 AI가 언급된 회의록 모두 나열해줘."
-
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
-'''
-
-
-# --- 2. No Reference (NR) Prompts ---
-# context: 요약본
-# 목표: context의 주제와 관련있지만, 답이 원문에 없을 수도 있는 쿼리 생성
-
-prompt_generate_simple_search_queries_nr = '''
+# NR (No Reference): 정답 없이 질문(String)만 생성
+TEMPLATE_NR = '''
 [페르소나]
 {persona}
 
@@ -221,148 +111,82 @@ prompt_generate_simple_search_queries_nr = '''
 {context}
 
 [지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 단순 사실을 묻는, 명확한 답이 있는 질문이다.
-- 문서가 다루는 주제와 관련이 있다.
-- 그러나 문서 내부에 꼭 답이 있지는 않아도 된다.
-예: "우리 회사의 2025년 총 매출액이 얼마야?", "삼성전자의 회장이 누구야?"
+당신은 RAG 시스템을 테스트하기 위한 질의응답(Q&A) 세트를 생성하는 AI입니다.
+위 [페르소나]를 가진 사용자가 RAG 이용 시 할 법한 질문을 생성하시오.
+위 [문서 내용 요약]을 참고하여 자연스러운 질문을 {num_queries}개 생성하세요.
 
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
+[질문 조건]
+1. **관련성:** 문서가 다루는 주제와 관련이 있어야 합니다.
+2. **탐색적 성격:** 문서 내부에 꼭 명확한 답이 있지 않아도 됩니다. (사용자의 호기심이나 일반적인 검색 의도 반영)
+3. **[문서 내용 요약] 언급 금지:** 질문자는 [문서 내용 요약] 자체에 대해선 알지 못한다고 가정합니다. 질문 생성을 위한 구체적인 정보 습득, 맥락 파악을 위해서만 사용하세요. "요약문에 따르면", "여기서 언급된", "이 문서" 같은 표현을 쓰지 마세요. 
+4. **자연스러운 어투:** RAG 이용자가 질문 시 사용하는 어투를 사용하세요. "야", "어이" 금지
+5. **유형 준수:** 아래 [쿼리 유형]에 맞는 질문만 생성하세요.
+
+[쿼리 유형]
+{instruction}
+
+[출력 포맷]
+반드시 아래 JSON 문자열 리스트(List of Strings) 형식으로만 응답하세요.
+["질문 1", "질문 2", ...]
 '''
 
-prompt_generate_simple_expln_queries_nr = '''
-[페르소나]
-{persona}
+# ==============================================================================
+# 3. 쿼리 유형별 지시사항 (Instruction)
+# ==============================================================================
 
-[수행 작업]
-{task}
-
-[참고 요약본]
-{context}
-
-[지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 개념, 프로세스, 또는 원인에 대한 설명을 요구한다.
-- 문서가 다루는 주제와 관련이 있다.
-- 그러나 문서 내부에 꼭 답이 있지는 않아도 된다.
-예: "레지스탕스의 역사에 대해 자세히 설명해줘", "우리 회사의 감사 절차에 대해 자세히 설명해줘."
-
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
+INST_SIMPLE_SEARCH = '''
+- **단순 정보 검색 (Simple Search):** 육하원칙(누가, 언제, 어디서, 무엇을, 어떻게, 왜)에 해당하는 단순 사실을 묻는 질문.
+- 예: "우리 회사의 2025년 총 매출액이 얼마야?", "삼성전자의 회장이 누구야?"
 '''
 
-prompt_generate_simple_tf_queries_nr = '''
-[페르소나]
-{persona}
-
-[수행 작업]
-{task}
-
-[참고 요약본]
-{context}
-
-[지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 진술의 참/거짓을 묻는다
-- 문서가 다루는 주제와 관련이 있다.
-- 그러나 문서 내부에 꼭 답이 있지는 않아도 된다.
-예: "BAYC가 2022년에 시작된 프로젝트 맞지?", "우황청심환의 부작용은 가벼운 미열만 있는 걸로 알고 있는데 맞아?"
-
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
+INST_SIMPLE_EXPLN = '''
+- **설명 요구 (Explanation):** 특정 개념, 프로세스, 정책, 원인 등에 대한 상세한 설명을 요구하는 질문.
+- 예: "레지스탕스의 역사에 대해 자세히 설명해줘", "감사 절차가 어떻게 진행되는지 알려줘."
 '''
 
-prompt_generate_complex_multi_queries_nr = '''
-[페르소나]
-{persona}
-
-[수행 작업]
-{task}
-
-[참고 요약본]
-{context}
-
-[지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 첫 번째 정보(A)를 알아낸 뒤, 그 정보를 이용해 두 번째 정보(B)를 찾아야 하는 다단계 질문이다
-- 문서가 다루는 주제와 관련이 있다.
-- 그러나 문서 내부에 꼭 답이 있지는 않아도 된다.
-예: "현 구글 CEO가 최근 AI에 대해 언급한 인터뷰를 모두 찾아줘", "소설 <아큐정전>의 작가가 쓴 다른 소설을 모두 나열해줘."
-
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
+INST_SIMPLE_TF = '''
+- **사실 확인 (True/False):** 특정 진술이 맞는지 틀린지 확인하는 질문.
+- 예: "BAYC가 2022년에 시작된 프로젝트 맞지?", "우황청심환은 부작용이 전혀 없어?"
 '''
 
-prompt_generate_complex_comp_queries_nr = '''
-[페르소나]
-{persona}
-
-[수행 작업]
-{task}
-
-[참고 요약본]
-{context}
-
-[지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 비교 가능한 두 대상의 공통점/차이점을 묻는 질문이다.
-- 특정한 비교 기준을 제시하거나 생략할 수 있다.
-- 문서가 다루는 주제와 관련이 있다.
-- 그러나 문서 내부에 꼭 답이 있지는 않아도 된다.
-예: "삼성전자와 SK하이닉스의 HBM 제조 역량을 비교해줘", "가격과 디자인을 기준으로 아이폰과 갤럭시폰을 비교해줘."
-
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
+INST_COMPLEX_MULTI = '''
+- **복합 추론 (Multi-hop):** 첫 번째 정보를 통해 두 번째 정보를 찾아야 하는 다단계 질문.
+- 예: "현 구글 CEO가 최근 AI에 대해 언급한 인터뷰 내용을 찾아줘", "이 소설의 작가가 쓴 다른 작품들은 뭐야?"
 '''
 
-prompt_generate_complex_infer_queries_nr = '''
-[페르소나]
-{persona}
-
-[수행 작업]
-{task}
-
-[참고 요약본]
-{context}
-
-[지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 검색된 정보를 토대로 논리적 추론을 해야만 답할 수 있는 질문이다.
-- 어떤 사건이나 현상이 발생한 원인이나, 이후의 영향을 묻는 질문이다.
-- 문서가 다루는 주제와 관련이 있다.
-- 그러나 문서 내부에 꼭 답이 있지는 않아도 된다.
-예: "아편전쟁 당시 청나라 정부의 대응이 왜 미흡했던 거야?", "세계적인 국방비 지출 증액이 국제정세에 끼칠 영향은 뭐가 있을까?"
-
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
+INST_COMPLEX_COMP = '''
+- **비교 분석 (Comparison):** 두 개 이상의 대상을 특정 기준(가격, 성능, 특징 등)으로 비교하는 질문.
+- 예: "삼성전자와 SK하이닉스의 HBM 기술 차이점을 비교해줘."
 '''
 
-prompt_generate_complex_cond_queries_nr = '''
-[페르소나]
-{persona}
-
-[수행 작업]
-{task}
-
-[참고 요약본]
-{context}
-
-[지시]
-너는 RAG 서비스를 이용하는 사용자다. 위 페르소나를 기반으로 자연스러운 질문을 {num_queries}개 생성하라. 이때, 생성된 질문은
-- 특정한 조건을 만족하는 정보를 찾는 질문이다.
-- 두 개 이상의 조건을 제시할 수 있다.
-- 문서가 다루는 주제와 관련이 있다.
-- 그러나 문서 내부에 꼭 답이 있지는 않아도 된다.
-예: "서울 시내에 보증금 2000 이하, 월세 100 이하 원룸 찾아줘.", "2025년 사내 회의록에서 AI가 언급된 회의록 모두 나열해줘."
-
-[출력 형식]
-다른 설명 없이 JSON 문자열 리스트(Array[string]) 형식으로만 즉시 응답하십시오.
-(예: ["질문 1", "질문 2"])
+INST_COMPLEX_INFER = '''
+- **논리적 추론 (Inference):** 텍스트에 명시되지 않았지만, 정보를 종합하여 논리적으로 유추해야 하는 질문. (원인, 영향, 의도 등)
+- 예: "아편전쟁 당시 청나라의 대응이 미흡했던 근본적인 이유가 뭐라고 생각해?"
 '''
+
+INST_COMPLEX_COND = '''
+- **조건부 검색 (Conditional):** 하나 이상의 제약 조건(시간, 장소, 수치 등)을 만족하는 정보를 찾는 질문.
+- 예: "서울 시내 보증금 2000 이하, 월세 100 이하인 원룸만 찾아줘."
+'''
+
+# ==============================================================================
+# 4. 최종 프롬프트 조립
+# ==============================================================================
+
+# With Reference (Gold O)
+prompt_generate_simple_search_queries_wr = TEMPLATE_WR.format(instruction=INST_SIMPLE_SEARCH, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+prompt_generate_simple_expln_queries_wr = TEMPLATE_WR.format(instruction=INST_SIMPLE_EXPLN, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+prompt_generate_simple_tf_queries_wr = TEMPLATE_WR.format(instruction=INST_SIMPLE_TF, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+prompt_generate_complex_multi_queries_wr = TEMPLATE_WR.format(instruction=INST_COMPLEX_MULTI, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+prompt_generate_complex_comp_queries_wr = TEMPLATE_WR.format(instruction=INST_COMPLEX_COMP, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+prompt_generate_complex_infer_queries_wr = TEMPLATE_WR.format(instruction=INST_COMPLEX_INFER, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+prompt_generate_complex_cond_queries_wr = TEMPLATE_WR.format(instruction=INST_COMPLEX_COND, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+
+# No Reference (Gold X)
+prompt_generate_simple_search_queries_nr = TEMPLATE_NR.format(instruction=INST_SIMPLE_SEARCH, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+prompt_generate_simple_expln_queries_nr = TEMPLATE_NR.format(instruction=INST_SIMPLE_EXPLN, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+prompt_generate_simple_tf_queries_nr = TEMPLATE_NR.format(instruction=INST_SIMPLE_TF, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+prompt_generate_complex_multi_queries_nr = TEMPLATE_NR.format(instruction=INST_COMPLEX_MULTI, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+prompt_generate_complex_comp_queries_nr = TEMPLATE_NR.format(instruction=INST_COMPLEX_COMP, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+prompt_generate_complex_infer_queries_nr = TEMPLATE_NR.format(instruction=INST_COMPLEX_INFER, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
+prompt_generate_complex_cond_queries_nr = TEMPLATE_NR.format(instruction=INST_COMPLEX_COND, persona='{persona}', task='{task}', context='{context}', num_queries='{num_queries}')
