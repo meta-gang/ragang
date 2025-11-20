@@ -12,6 +12,7 @@ from core.bases.abstracts.base_container import BaseContainer
 from core.bases.datas.packet import Packet
 from core.bases.datas.state import State
 from core.bases.datas.status import Status
+from core.network.socket_sender import SocketSender
 from core.utils.ansi_styler import ANSIStyler
 
 from exceptions.user.module import FlowOutputException, InvalidModuleIdException
@@ -23,6 +24,10 @@ class FlowEngine:
     def __init__(self, containers: list[BaseContainer]):
         self.__validate_unique_flow_ids(containers)
         self.containers: dict[str, BaseContainer] = {c.flow_id: c for c in containers}
+        self.ws_sender: SocketSender = None
+
+    def set_ws_sender(self, ws_sender: SocketSender):
+        self.ws_sender = ws_sender
 
     def __validate_unique_flow_ids(self, containers: list[BaseContainer]):
         flow_ids: list[str] = [c.flow_id for c in containers]
@@ -198,12 +203,21 @@ class FlowEngine:
         mod_queue: list[tuple[BaseModule, dict[str, Any]]] = [(cont.starter, {'query': query})]
         while len(mod_queue) != 0:
             c_module, param = mod_queue.pop(0)
+
+            # send start module execution signal
+            if self.ws_sender:
+                await self.ws_sender.send_module_status(c_module.module_id, True)
+
             out: Packet = await self.__run_module(cont, state, c_module, param)
 
             state.save_snapshots(out)
 
             # optimize / refresh module execution status (manages each module's dependency)
             status.optimize_n_add_xs([(c_module.module_id, dst) for dst in c_module.direction.get_directions()])
+
+            # send end module execution signal
+            if self.ws_sender:
+                await self.ws_sender.send_module_status(c_module.module_id, False)
 
             # exit if it is output
             if out.is_answer:
@@ -230,6 +244,10 @@ class FlowEngine:
     async def __run_query(self, query: str, flow_id: str) -> dict[str, dict[str, dict[str, str]]]:
         q_id: str = str(uuid4())
         res = await self.__execute_flow(self.containers[flow_id], q_id, query)
+
+        if self.ws_sender:
+            await self.ws_sender.send_query_end(q_id)  # send query end signal
+
         return {flow_id: {q_id: {'query': query, 'answer': res}}}
 
     async def __run_container(self, flow_id: str, queries: list[str]):
@@ -246,7 +264,7 @@ class FlowEngine:
                 merged.setdefault(k, {}).update(v)
         return merged
 
-    def invoke(self, query: str, flow_ids: list[str] = None):
+    async def async_invoke(self, query: str, flow_ids: list[str] = None):
         async def run():
             tasks = []
 
@@ -259,6 +277,9 @@ class FlowEngine:
             for f_id in f_ids:
                 tasks.append(self.__run_query(query, f_id))
 
+            if self.ws_sender:
+                await self.ws_sender.send_rag_preparation_sig(n_query=1)  # send rag preparation signal
+
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             merged = {}
@@ -270,10 +291,14 @@ class FlowEngine:
 
             return merged
 
-        return asyncio.run(
-            run())  # return {flow_id1: {q_id1: {'query': query, 'answer': gen}, q_id2: {...}}, flow_id2: {...}}
+        return await run()
 
-    def invoke_batch(self, queries: list[str], flow_ids: list[str] = None):  # threading
+    def invoke(self, query: str, flow_ids: list[str] = None):
+        return asyncio.run(
+            self.async_invoke(query, flow_ids)
+        )  # return {flow_id1: {q_id1: {'query': query, 'answer': gen}, q_id2: {...}}, flow_id2: {...}}
+
+    async def async_invoke_batch(self, queries: list[str], flow_ids: list[str] = None):  # threading
         async def run():
             tasks = []
 
@@ -286,6 +311,9 @@ class FlowEngine:
             for f_id in f_ids:
                 tasks.append(self.__run_container(f_id, queries))
 
+            if self.ws_sender:
+                await self.ws_sender.send_rag_preparation_sig(len(queries))  # send rag preparation signal
+
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             merged = {}
@@ -297,8 +325,12 @@ class FlowEngine:
 
             return merged
 
+        return await run()
+
+    def invoke_batch(self, queries: list[str], flow_ids: list[str] = None):
         return asyncio.run(
-            run())  # return {flow_id1: {q_id1: {'query': query, 'answer': gen}, q_id2: {...}}, flow_id2: {...}}
+            self.async_invoke_batch(queries, flow_ids)
+        )  # return {flow_id1: {q_id1: {'query': query, 'answer': gen}, q_id2: {...}}, flow_id2: {...}}
 
     def print_eval(self, flow_ids: list[str] = None):
         containers: list[BaseContainer] = []

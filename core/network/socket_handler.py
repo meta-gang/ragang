@@ -3,7 +3,7 @@ import json
 import time
 from collections import defaultdict
 from typing import Dict, Set, Any, Callable, Awaitable, Optional
-from websockets.server import WebSocketServerProtocol
+from websockets import ServerConnection
 
 
 def _ts() -> float:
@@ -18,8 +18,8 @@ class SocketHandler:
     - handle_connection(): subscribe/unsubscribe는 자체 처리, 나머지는 runner.topic_map을 통해 실행 함수 호출
     """
     def __init__(self):
-        self.subscribers: Dict[str, Set[WebSocketServerProtocol]] = defaultdict(set)
-        self.on_message: Optional[Callable[[dict, WebSocketServerProtocol, "SocketHandler"], Awaitable[None]]] = None
+        self.subscribers: Dict[str, Set[ServerConnection]] = defaultdict(set)
+        self.on_message: Optional[Callable[[dict, ServerConnection, "SocketHandler"], Awaitable[None]]] = None
 
     def _normalize_topics(self, topics: Any) -> Set[str]:
         if isinstance(topics, str):
@@ -29,17 +29,17 @@ class SocketHandler:
         return set()
 
     # 구독
-    async def subscribe(self, ws: WebSocketServerProtocol, topics: Any):
+    async def subscribe(self, ws: ServerConnection, topics: Any):
         for t in self._normalize_topics(topics):
             self.subscribers[t].add(ws)
 
     # 구독 혜지
-    async def unsubscribe(self, ws: WebSocketServerProtocol, topics: Any):
+    async def unsubscribe(self, ws: ServerConnection, topics: Any):
         for t in self._normalize_topics(topics):
             self.subscribers[t].discard(ws)
 
     # 연결 종료시 해당 ws를 모든 토픽에서 제거
-    def _purge_ws(self, ws: WebSocketServerProtocol):
+    def _purge_ws(self, ws: ServerConnection):
         for t in list(self.subscribers.keys()):
             self.subscribers[t].discard(ws)
 
@@ -56,7 +56,7 @@ class SocketHandler:
             self.subscribers[topic].discard(ws)
 
     # WebSocket 연결 핸들러
-    async def handle_connection(self, ws: WebSocketServerProtocol):
+    async def handle_connection(self, ws: ServerConnection):
         try:
             async for raw in ws:
                 try:

@@ -50,9 +50,9 @@ class Runner:
     async def _broadcast_rag_result(self, query_ids: List[str]):
         cont = self.engine.containers[self.flow_id]
         states_payload = {
-            qid: cont.storage.results[qid]
+            qid: cont.storage.results[qid].serialize()
             for qid in query_ids
-            if qid in cont.storage.result.keys()
+            if qid in cont.storage.results.keys()
         }
         await self.handler.broadcast("rag-result-data", {
             "ts": _ts_str(),
@@ -96,7 +96,7 @@ class Runner:
             raise ValueError("No queries extracted from files.")
 
         # 선택한 flow_id 컨테이너만 실행
-        results = self.engine.invoke_batch(queries, flow_ids=[self.flow_id])
+        results = await self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id])
         # 반환 포맷: { flow_id: { qid1:{...}, qid2:{...}, ... } }
         query_ids = list(results.get(self.flow_id, {}).keys())
         await self._broadcast_rag_result(query_ids)
@@ -134,7 +134,7 @@ class Runner:
         if not queries:
             raise ValueError("No queries extracted for execution.")
 
-        results = self.engine.invoke_batch(queries, flow_ids=[self.flow_id])
+        results = await self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id])
         query_ids = list(results.get(self.flow_id, {}).keys())
         await self._broadcast_rag_result(query_ids)
 
@@ -144,7 +144,7 @@ class Runner:
         if not isinstance(query, str) or not query.strip():
             raise ValueError("`query` must be a non-empty string.")
 
-        results = self.engine.invoke(query, flow_ids=[self.flow_id])
+        results = await self.engine.async_invoke(query, flow_ids=[self.flow_id])
         query_ids = list(results.get(self.flow_id, {}).keys())
         await self._broadcast_rag_result(query_ids)
     
@@ -157,10 +157,10 @@ class Runner:
 
     # genertor을 통해 만든 query file 리스트를 송신(data/generted_query 폴더에 있는 파일 이름들을 list로 만들어 송신)
     #   -> 프론트에서 generted query list를 출력하여 사용자가 선택할 때 이용
-    async def _end_query(self, query_id: int):
+    async def _end_query(self, query_id: str):
         await self.handler.broadcast("ended-query", {
             "ts": _ts_str(),
-            "end-query": int(query_id),
+            "end-query": query_id,
         })
     
     # rag continer가 하나의 query에 대해 실행이 완료될 때마다 해당 query_id 송신 -> 프로그래스 바에 사용

@@ -8,6 +8,7 @@ import websockets
 from core.network.socket_handler import SocketHandler
 from core.network.runner import Runner
 from core.bases.abstracts.base_engine import FlowEngine
+from core.network.socket_sender import SocketSender
 
 
 def _is_rag_container_instance(obj) -> bool:
@@ -65,7 +66,7 @@ def load_engine_with_flow(py_path: str, flow_id: str) -> FlowEngine:
 
 async def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--rag-file", type=str, default=str(Path("./usage/main.py").resolve()))
+    parser.add_argument("--rag-file", type=str, default=str(Path("./usage/linear_graph/main.py").resolve()))
     parser.add_argument("--flow-id", type=str, default="linear_graph")
     parser.add_argument("--host", type=str, default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8081)
@@ -75,6 +76,8 @@ async def main():
     print(f"[Engine] loaded from {args.rag_file} (flow_id={args.flow_id})")
 
     handler = SocketHandler()
+    engine.set_ws_sender(SocketSender(handler))
+
     runner = Runner(handler, engine=engine, flow_id=args.flow_id)
     await runner.setup_handlers()
 

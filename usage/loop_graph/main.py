@@ -21,10 +21,10 @@ engine: FlowEngine = FlowEngine([rag])
 # print(f'Answer: {answer}')
 # engine.print_eval()
 
-engine.invoke_batch([
-    'Hello, Ragang',
-    'Hello, Starbucks',
-    'Hello, SKKU',
-    'Hello, Metabuild'
-])
-engine.print_eval()
+# engine.invoke_batch([
+#     'Hello, Ragang',
+#     'Hello, Starbucks',
+#     'Hello, SKKU',
+#     'Hello, Metabuild'
+# ])
+# engine.print_eval()
