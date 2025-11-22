@@ -1,0 +1,14 @@
+# Query Generation
+DATA_PATH = "./core/utils/query_generator/my_pdfs"
+OUTPUT_PATH = "./datas/queries"
+MAX_NUM_QUERIES = 400
+CHUNK_SIZE = 5
+CHUNK_OVERLAP = 1
+NUM_QUERIES_PER_PAGE = 1
+
+
+# LLM call
+LLM_MODEL = "gemini-2.5-flash"
+API_KEY = ""
+MAX_WORKERS = 20
+MAX_CONTEXT_LENGTH = 8000
