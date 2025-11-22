@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "RAGANG"
 version = "0.0.2"
@@ -11,3 +15,18 @@ dependencies = [
     "scipy>=1.16.0",
     "websockets>=15.0.1",
 ]
+authors = [
+    {name = "Park-SeungWoo", email = "tmd24710@g.skku.edu"},
+    {name = "Kim-YunTae", email = "unte2002@g.skku.edu"},
+    {name = "Lee-JungWoo", email = "smartljw2004@g.skku.edu"},
+    {name = "Jung-MoonGyu", email = "jmoongyu24@gmail.com"},
+    {name = "Kim-JaeJun", email = "jaeiko@g.skku.edu"},
+]
+keywords = ["rag", "llm"]
+
+
+[project.scripts]
+ragang = 'ragang.cli_script.entry:main'
+
+[tool.setuptools.package-data]
+ragang = ['templates/**/*', 'web/**/*']

@@ -166,4 +166,7 @@ cython_debug/
 uv.lock
 
 # custom (test files, data files, etc)
-test/
+ragang/test/
+
+# command line tests
+test_user_proj/

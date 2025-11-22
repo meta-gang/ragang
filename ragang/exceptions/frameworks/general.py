@@ -1,0 +1,2 @@
+class RagangLoadError(Exception):
+    pass
