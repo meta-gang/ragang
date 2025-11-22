@@ -14,6 +14,7 @@ from ragang.core.bases.datas.state import State
 from ragang.core.bases.datas.status import Status
 from ragang.core.network.socket_sender import SocketSender
 from ragang.core.utils.ansi_styler import ANSIStyler
+from ragang.exceptions.frameworks.engine import FlowIdNotFoundException
 
 from ragang.exceptions.user.module import FlowOutputException, InvalidModuleIdException
 from ragang.exceptions.user.module import UnlinkedModuleException, ModuleOutputException
@@ -343,3 +344,10 @@ class FlowEngine:
 
         for cont in containers:
             cont.print_eval()
+
+    def get_result(self, flow_id: str, q_id: str) -> State:
+        cont: BaseContainer = self.containers.get(flow_id, None)
+        if cont is None:
+            raise FlowIdNotFoundException(f"Flow id: {flow_id} not found in engine")
+
+        return cont.get_result(q_id)

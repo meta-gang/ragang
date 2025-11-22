@@ -5,9 +5,9 @@ from ragang.core.decorators.serializable import serializable
 
 @serializable
 class State:
-    def __init__(self, x_id: str, query: str):
+    def __init__(self, q_id: str, query: str):
         self.query: str = query
-        self.x_id: str = x_id  # any distinguishable id for each query
+        self.q_id: str = q_id  # any distinguishable id for each query
         self.snapshots: dict[str, list[Packet]] = dict()  # module output packet snapshots
         self.performances: list[Performance] = None
         self.gen: str | None = None

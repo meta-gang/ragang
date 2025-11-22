@@ -11,3 +11,6 @@ class FlowStorage:
 
     def set_result(self, q_id: str, result: State) -> None:
         self.results[q_id] = result
+
+    def get_result(self, q_id: str) -> State:
+        return self.results[q_id]

@@ -1,0 +1,2 @@
+class FlowIdNotFoundException(Exception):
+    pass

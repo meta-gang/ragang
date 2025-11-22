@@ -1,3 +1,4 @@
+import json
 import os
 import logging
 from typing import List, Union
@@ -6,8 +7,7 @@ from datetime import datetime
 from collections import Counter
 
 # Configuration & Models
-from ragang.core.utils.query_generator.config import LLM_MODEL, API_KEY, MAX_WORKERS, MAX_NUM_QUERIES, CHUNK_SIZE, \
-    CHUNK_OVERLAP, NUM_QUERIES_PER_PAGE, OUTPUT_PATH
+from ragang.core.utils.cli import load_user_config
 from ragang.core.utils.query_generator.models import Chunk, Query
 
 # Modules
@@ -31,9 +31,12 @@ class Orchestrator:
     """
 
     def __init__(self):
+        # load user config
+        self.USER_CONFIG = load_user_config()
+
         # 1. LLM Adapter 초기화
         # config.py의 설정을 사용하여 어댑터 생성
-        self.llm_adapter = GeminiAdapter(model_name=LLM_MODEL, api_key=API_KEY)
+        self.llm_adapter = GeminiAdapter(model_name=self.USER_CONFIG.LLM_MODEL, api_key=self.USER_CONFIG.API_KEY)
 
         # 2. 하위 모듈 초기화 (Dependency Injection)
         self.processor = DocumentProcessor()
@@ -44,6 +47,7 @@ class Orchestrator:
     def generate_queries(
             self,
             source: Union[str, List[Chunk]],
+            output_path: str
     ) -> str:
         """
         전체 파이프라인을 실행하여 쿼리를 생성하고 저장합니다.
@@ -74,9 +78,9 @@ class Orchestrator:
             doc_names = [p.name for p in sorted(list(Path(source).glob('*.[pP][dD][fF]')))]
             all_chunks, lookup_index = self.processor.chunker(
                 text_addr=source,
-                size=CHUNK_SIZE,
-                overlap=CHUNK_OVERLAP,
-                max_workers=MAX_WORKERS
+                size=self.USER_CONFIG.CHUNK_SIZE,
+                overlap=self.USER_CONFIG.CHUNK_OVERLAP,
+                max_workers=self.USER_CONFIG.MAX_WORKERS
             )
 
         elif isinstance(source, list):
@@ -97,14 +101,14 @@ class Orchestrator:
         # *. Calculate Total Queries (페이지 수 기반 동적 계산)
         # ---------------------------------------------------------
         total_pages = len(set((c.doc_idx, c.page_idx) for c in all_chunks))
-        num_total_queries = min(total_pages * NUM_QUERIES_PER_PAGE, MAX_NUM_QUERIES)
+        num_total_queries = min(total_pages * self.USER_CONFIG.NUM_QUERIES_PER_PAGE, self.USER_CONFIG.MAX_NUM_QUERIES)
         logger.info(f"총 {total_pages} 페이지에 대해 약 {num_total_queries}개의 쿼리를 생성합니다.")
 
         # ---------------------------------------------------------
         # 2. Content Analysis (요약 및 키워드 추출)
         # ---------------------------------------------------------
         logger.info("ContentAnalyzer를 시작합니다 (요약 및 키워드 생성)...")
-        summaries = self.analyzer.summarize_chunks(all_chunks, max_workers=MAX_WORKERS)
+        summaries = self.analyzer.summarize_chunks(all_chunks, max_workers=self.USER_CONFIG.MAX_WORKERS)
         keyword_index = self.analyzer.build_keyword_index(summaries)
 
         # ---------------------------------------------------------
@@ -129,40 +133,60 @@ class Orchestrator:
         # ---------------------------------------------------------
         # 5. Save Results (저장)
         # ---------------------------------------------------------
-        logger.info(f"생성된 {len(all_queries)}개의 쿼리를 저장합니다: {OUTPUT_PATH}")
-        self._save_results_to_txt(all_queries, doc_names, OUTPUT_PATH)
+        logger.info(f"생성된 {len(all_queries)}개의 쿼리를 저장합니다: {output_path}")
+        self._save_results_to_txt(all_queries, doc_names, output_path)
 
         logger.info("모든 작업이 완료되었습니다.")
-        return OUTPUT_PATH
+        return output_path
 
     def _save_results_to_txt(self, queries: List[Query], doc_names: List[str], output_path: str):
         """
         생성된 쿼리 리스트를 지정된 형식의 텍스트 파일로 저장합니다.
         파일 상단에 메타데이터를 포함합니다.
         """
-        # 디렉토리가 없으면 생성
-        output_dir = os.path.dirname(output_path)
-        if output_dir and not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        # # 디렉토리가 없으면 생성
+        # output_dir = os.path.dirname(output_path)
+        # if output_dir and not os.path.exists(output_dir):
+        #     os.makedirs(output_dir)
 
         with open(output_path, "w", encoding="utf-8") as f:
+            output: dict = {}
+            output['metadata'] = dict()
+            output['query'] = list()
+
             # --- 메타데이터 작성 ---
-            f.write(f"# Generated from: {', '.join(doc_names)}\n")
-            f.write(f"# Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"# Total Queries: {len(queries)}\n")
+            output['metadata']['generated_from'] = ', '.join(doc_names)
+            output['metadata']['generated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            output['metadata']['n_queries'] = len(queries)
+            # f.write(f"# Generated from: {', '.join(doc_names)}\n")
+            # f.write(f"# Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            # f.write(f"# Total Queries: {len(queries)}\n")
 
             type_counts = Counter(q.type.value for q in queries)
+            output['metadata']['query_types'] = {}
             for q_type, count in sorted(type_counts.items()):
-                f.write(f"#   - {q_type}: {count}\n")
+                output['metadata']['query_types'][q_type] = count
+                # f.write(f"#   - {q_type}: {count}\n")
 
-            f.write("\n" + "=" * 40 + "\n\n")
+            # f.write("\n" + "=" * 40 + "\n\n")
 
             # --- 쿼리 데이터 작성 ---
             for i, q in enumerate(queries):
-                f.write(f"# idx: {i + 1}\n")
-                f.write(f"# type: {q.type.value}\n")
+                query = {}
+                query['idx'] = i + 1
+                query['type'] = q.type.value
+                query['query'] = q.query.replace('\n', ' ')
                 if q.reference:
-                    f.write(f"# reference: {q.reference}\n")
-                f.write(f"{q.query.replace('\n', ' ')}\n")
+                    query['reference'] = q.reference
                 if q.answer:
-                    f.write(f"# answer: {q.answer.replace('\n', ' ')}\n")
+                    query['answer'] = q.answer
+                # f.write(f"# idx: {i + 1}\n")
+                # f.write(f"# type: {q.type.value}\n")
+                # if q.reference:
+                #     f.write(f"# reference: {q.reference}\n")
+                # f.write(f"{q.query.replace('\n', ' ')}\n")
+                # if q.answer:
+                #     f.write(f"# answer: {q.answer.replace('\n', ' ')}\n")
+                output['query'].append(query)
+
+            f.write(json.dumps(output, ensure_ascii=False))

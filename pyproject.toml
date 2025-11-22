@@ -26,9 +26,11 @@ authors = [
 ]
 keywords = ["rag", "llm"]
 
-
 [project.scripts]
 ragang = 'ragang.cli_script.entry:main'
+
+[tool.setuptools]
+packages = ['ragang']
 
 [tool.setuptools.package-data]
 ragang = ['templates/**/*', 'web/**/*']

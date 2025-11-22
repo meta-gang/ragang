@@ -1,7 +1,7 @@
+from ragang.core.utils.cli import load_user_config
 from ragang.core.utils.query_generator.prompts import prompt_summarize_chunks, prompt_summarize_summaries
 from ragang.adapters.llm_adapter import BaseLLMAdapter
 from ragang.core.utils.query_generator.models import Chunk, DocSummary, Explanation
-from ragang.core.utils.query_generator.config import MAX_WORKERS
 import asyncio
 import logging
 import re
@@ -18,12 +18,15 @@ class ContentAnalyzer:
         이를 list[DocSummary] 및 keywordSearch 딕셔너리로 구조화합니다.
         """
         self.llm_adapter = llm_adapter
+        self.USER_CONFIG = load_user_config()
         pass
 
-    async def _call_llm(self, prompts: List[str], max_workers: int = MAX_WORKERS) -> List[dict]:
+    async def _call_llm(self, prompts: List[str], max_workers: int = None) -> List[dict]:
         """
         LLM 어댑터를 사용하여 프롬프트 배치를 비동기적으로 전송합니다.
         """
+        if max_workers is None:
+            max_workers = self.USER_CONFIG.MAX_WORKERS
         queries = [""] * len(prompts)
         results = await self.llm_adapter.request_async_batch(prompts, queries, max_workers=max_workers)
         return results

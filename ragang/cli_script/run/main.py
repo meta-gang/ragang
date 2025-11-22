@@ -1,9 +1,13 @@
+import json
 import os
+import time
 from argparse import Namespace
 from pathlib import Path
 
 from ragang.core.utils.ansi_styler import ANSIStyler
+from ragang.core.utils.cli import update_history
 from ragang.core.utils.modules import create_engine
+from ragang.exceptions.user.cli import NotAllowedQueryFileException
 
 
 def run(args: Namespace):
@@ -15,15 +19,37 @@ def run(args: Namespace):
 
     engine = create_engine(user_root, flow_id)
     queries = []
-    with open(query_path, "r") as f:
-        for line in f:
-            queries.append(line.strip())
 
-    engine.invoke_batch(queries)
+    with open(query_path, "r") as f:
+        q_source = args.query_path.split('/')[0]
+        if q_source == 'custom':
+            # custom query files: .txt
+            if query_path.suffix != '.txt':
+                raise NotAllowedQueryFileException(query_path)
+            # load queries
+            for line in f:
+                queries.append(line.strip())
+        elif q_source == 'generated':
+            # generated query files: .json
+            if query_path.suffix != '.json':
+                raise NotAllowedQueryFileException(query_path)
+            # load queries
+            data = json.load(f)
+            query = data['query']
+            for q in query:
+                queries.append(q['query'])
+        else:
+            raise NotAllowedQueryFileException(query_path)
+
+    res = engine.invoke_batch(queries)
     engine.print_eval()
 
     if args.x_save:  # without saving results into history
         return
 
-    # TODO: add result into history
-    pass
+    # add result to history
+    for flow_id, tot_res in res.items():
+        formed = []
+        for q_id in tot_res.keys():
+            formed.append(engine.get_result(flow_id, q_id))
+        update_history(flow_id, time.time(), formed)

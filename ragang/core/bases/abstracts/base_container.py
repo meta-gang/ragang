@@ -32,6 +32,9 @@ class BaseContainer(metaclass=ABCMeta):
             self.storage.set_result(q_id, state)
         await run()
 
+    def get_result(self, q_id: str) -> State:
+        return self.storage.get_result(q_id)
+
     def __validate_module_id(self, modules: list[BaseModule]) -> list[BaseModule]:
         ids: list[str] = []
         for module in modules:  # check id format
@@ -73,7 +76,7 @@ class BaseContainer(metaclass=ABCMeta):
         print(ANSIStyler.style(f"[{self.flow_id}]", font_style='bold', fore_color='light-magenta'))  # flow name
         for query_idx, state in self.storage.results.items():
             tot_x_time: float = 0  # ms
-            print(ANSIStyler.style(f'Query({state.x_id}): {state.query}', font_style='bold',
+            print(ANSIStyler.style(f'Query({state.q_id}): {state.query}', font_style='bold',
                                    fore_color='light-green'))  # query
             print(ANSIStyler.style(f"Generated Answer: {state.gen}", font_style='bold',
                                    fore_color='light-green'))  # answer

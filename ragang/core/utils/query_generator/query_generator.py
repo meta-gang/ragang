@@ -8,6 +8,7 @@ from collections import defaultdict
 
 # LLM 어댑터 및 모델 임포트
 from ragang.adapters.llm_adapter import BaseLLMAdapter
+from ragang.core.utils.cli import load_user_config
 from ragang.core.utils.query_generator.models import (
     Chunk, Query, QueryType, Scenario, DocSummary
 )
@@ -29,7 +30,6 @@ from ragang.core.utils.query_generator.prompts import (
     prompt_generate_complex_infer_queries_nr,
     prompt_generate_complex_cond_queries_nr
 )
-from ragang.core.utils.query_generator.config import MAX_WORKERS, MAX_CONTEXT_LENGTH
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,7 @@ class QueryGenerator:
     """
 
     def __init__(self, llm_adapter: BaseLLMAdapter):
+        self.USER_CONFIG = load_user_config()
         self.llm_adapter = llm_adapter
 
     # --- 5.1. Private Methods (Helper) ---
@@ -192,7 +193,7 @@ class QueryGenerator:
                 results = await self.llm_adapter.request_async_batch(
                     prompts=[prompt], 
                     queries=[""], 
-                    max_workers=MAX_WORKERS
+                    max_workers=self.USER_CONFIG.MAX_WORKERS
                 )
                 
                 if not results:
@@ -261,11 +262,11 @@ class QueryGenerator:
 
         context_text = "\n---\n".join(combined_parts)
         
-        if len(context_text) > MAX_CONTEXT_LENGTH:
+        if len(context_text) > self.USER_CONFIG.MAX_CONTEXT_LENGTH:
             original_len = len(context_text)
-            context_text = context_text[:MAX_CONTEXT_LENGTH]
+            context_text = context_text[:self.USER_CONFIG.MAX_CONTEXT_LENGTH]
             last_separator = context_text.rfind("\n---\n")
-            if last_separator > MAX_CONTEXT_LENGTH * 0.7: 
+            if last_separator > self.USER_CONFIG.MAX_CONTEXT_LENGTH * 0.7:
                 context_text = context_text[:last_separator]
             logger.warning(f"컨텍스트 길이가 초과되어 잘림. (원본: {original_len}자)")
 
@@ -442,7 +443,7 @@ class QueryGenerator:
         for _ in range(num_search):
             page_exp = next(page_iter)
             scenario = next(scenario_iter)
-            context_text = page_exp.explanation[:MAX_CONTEXT_LENGTH]
+            context_text = page_exp.explanation[:self.USER_CONFIG.MAX_CONTEXT_LENGTH]
             tasks.append(self._call_llm_and_parse_async(
                 context_text, scenario, prompt_generate_simple_search_queries_nr,
                 QueryType.SIMPLE_SEARCH, 1, None
@@ -453,7 +454,7 @@ class QueryGenerator:
         for _ in range(num_expln):
             page_exp = next(page_iter)
             scenario = next(scenario_iter)
-            context_text = page_exp.explanation[:MAX_CONTEXT_LENGTH]
+            context_text = page_exp.explanation[:self.USER_CONFIG.MAX_CONTEXT_LENGTH]
             tasks.append(self._call_llm_and_parse_async(
                 context_text, scenario, prompt_generate_simple_expln_queries_nr,
                 QueryType.SIMPLE_EXPLN, 1, None
@@ -464,7 +465,7 @@ class QueryGenerator:
         for _ in range(num_tf):
             page_exp = next(page_iter)
             scenario = next(scenario_iter)
-            context_text = page_exp.explanation[:MAX_CONTEXT_LENGTH]
+            context_text = page_exp.explanation[:self.USER_CONFIG.MAX_CONTEXT_LENGTH]
             tasks.append(self._call_llm_and_parse_async(
                 context_text, scenario, prompt_generate_simple_tf_queries_nr,
                 QueryType.SIMPLE_TF, 1, None
@@ -507,7 +508,7 @@ class QueryGenerator:
         for _ in range(num_multi):
             doc_exp = next(doc_iter)
             scenario = next(scenario_iter)
-            context_text = doc_exp.explanation[:MAX_CONTEXT_LENGTH]
+            context_text = doc_exp.explanation[:self.USER_CONFIG.MAX_CONTEXT_LENGTH]
             tasks.append(self._call_llm_and_parse_async(
                 context_text, scenario, prompt_generate_complex_multi_queries_nr,
                 QueryType.COMPLEX_MULTI, 1, None
@@ -518,7 +519,7 @@ class QueryGenerator:
         for _ in range(num_comp):
             doc_exp = next(doc_iter)
             scenario = next(scenario_iter)
-            context_text = doc_exp.explanation[:MAX_CONTEXT_LENGTH]
+            context_text = doc_exp.explanation[:self.USER_CONFIG.MAX_CONTEXT_LENGTH]
             tasks.append(self._call_llm_and_parse_async(
                 context_text, scenario, prompt_generate_complex_comp_queries_nr,
                 QueryType.COMPLEX_COMP, 1, None
@@ -529,7 +530,7 @@ class QueryGenerator:
         for _ in range(num_infer):
             doc_exp = next(doc_iter)
             scenario = next(scenario_iter)
-            context_text = doc_exp.explanation[:MAX_CONTEXT_LENGTH]
+            context_text = doc_exp.explanation[:self.USER_CONFIG.MAX_CONTEXT_LENGTH]
             tasks.append(self._call_llm_and_parse_async(
                 context_text, scenario, prompt_generate_complex_infer_queries_nr,
                 QueryType.COMPLEX_INFER, 1, None
@@ -540,7 +541,7 @@ class QueryGenerator:
         for _ in range(num_cond):
             doc_exp = next(doc_iter)
             scenario = next(scenario_iter)
-            context_text = doc_exp.explanation[:MAX_CONTEXT_LENGTH]
+            context_text = doc_exp.explanation[:self.USER_CONFIG.MAX_CONTEXT_LENGTH]
             tasks.append(self._call_llm_and_parse_async(
                 context_text, scenario, prompt_generate_complex_cond_queries_nr,
                 QueryType.COMPLEX_COND, 1, None

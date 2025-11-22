@@ -36,7 +36,7 @@ class MyPostRetrievalModule(PostRetrievalModule):  # 'post'
 
 class MyGenerationModule(GenerationModule):  # 'output'
     async def execute(self, result: str):
-        for _ in range(300000000): pass  # wait for some amt of time
+        for _ in range(100000000): pass  # wait for some amt of time
         await asyncio.sleep(5)  # wait for 5 sec; run another coroutine
         # print([(p.metric,p.score) for p in self.get_performance('post')])  # printed at regular intervals
         return {
