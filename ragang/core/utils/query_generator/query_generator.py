@@ -7,13 +7,13 @@ from typing import List, Dict, Optional, Tuple, Set, Iterator, Any
 from collections import defaultdict
 
 # LLM 어댑터 및 모델 임포트
-from adapters.llm_adapter import BaseLLMAdapter
-from core.utils.query_generator.models import (
-    Chunk, Query, QueryType, Scenario, Explanation, DocSummary
+from ragang.adapters.llm_adapter import BaseLLMAdapter
+from ragang.core.utils.query_generator.models import (
+    Chunk, Query, QueryType, Scenario, DocSummary
 )
 
 # 프롬프트 임포트
-from core.utils.query_generator.prompts import (
+from ragang.core.utils.query_generator.prompts import (
     prompt_generate_simple_search_queries_wr,
     prompt_generate_simple_expln_queries_wr,
     prompt_generate_simple_tf_queries_wr,
@@ -29,7 +29,7 @@ from core.utils.query_generator.prompts import (
     prompt_generate_complex_infer_queries_nr,
     prompt_generate_complex_cond_queries_nr
 )
-from core.utils.query_generator.config import MAX_WORKERS, MAX_CONTEXT_LENGTH
+from ragang.core.utils.query_generator.config import MAX_WORKERS, MAX_CONTEXT_LENGTH
 
 logger = logging.getLogger(__name__)
 

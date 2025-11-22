@@ -1,7 +1,7 @@
-from core.utils.query_generator.prompts import prompt_summarize_chunks, prompt_summarize_summaries
-from adapters.llm_adapter import BaseLLMAdapter
-from core.utils.query_generator.models import Chunk, DocSummary, Explanation
-from core.utils.query_generator.config import MAX_WORKERS
+from ragang.core.utils.query_generator.prompts import prompt_summarize_chunks, prompt_summarize_summaries
+from ragang.adapters.llm_adapter import BaseLLMAdapter
+from ragang.core.utils.query_generator.models import Chunk, DocSummary, Explanation
+from ragang.core.utils.query_generator.config import MAX_WORKERS
 import asyncio
 import logging
 import re
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class ContentAnalyzer:
-    def __init__(self, llm_adapter : BaseLLMAdapter):
+    def __init__(self, llm_adapter: BaseLLMAdapter):
         """
         list[Chunk]를 입력받아 LLM을 통해 요약 및 키워드를 추출하고,
         이를 list[DocSummary] 및 keywordSearch 딕셔너리로 구조화합니다.
@@ -55,7 +55,6 @@ class ContentAnalyzer:
                 parsed_results.append(("", []))
 
         return parsed_results
-        
 
     def summarize_chunks(self, all_chunks: List[Chunk], max_workers: int = 10) -> List[DocSummary]:
         """
@@ -84,29 +83,30 @@ class ContentAnalyzer:
 
             for page_idx in sorted(grouped_chunks[doc_idx].keys()):
                 chunks_on_page = sorted(grouped_chunks[doc_idx][page_idx], key=lambda c: c.chunk_idx)
-                
+
                 all_sentences = []
                 for chunk in chunks_on_page:
                     # 마침표 뒤에 공백이 있는 경우를 기준으로 문장 분리
                     sentences = [s.strip() for s in chunk.text.split('. ') if s.strip()]
                     all_sentences.extend(sentences)
-                
+
                 # dict.fromkeys를 사용하여 순서를 유지하면서 중복 제거
                 unique_sentences = list(dict.fromkeys(all_sentences))
                 page_text = ". ".join(unique_sentences)
-                if page_text: # 문장이 하나 이상 있을 경우 마침표 추가
+                if page_text:  # 문장이 하나 이상 있을 경우 마침표 추가
                     page_text += "."
 
                 page_chunk_indices_map[page_idx] = [chunk.chunk_idx for chunk in chunks_on_page]
                 page_prompts.append(prompt_summarize_chunks.format(text=page_text))
-            
+
             page_llm_responses = asyncio.run(self._call_llm(page_prompts, max_workers=max_workers))
             parsed_page_results = self._process_answers(page_llm_responses)
 
             for i, (page_idx, chunk_indices) in enumerate(sorted(page_chunk_indices_map.items())):
                 summary, keywords = parsed_page_results[i]
-                page_explanations.append(Explanation(index=page_idx, explanation=summary, keywords=keywords, related_chunks=chunk_indices))
-            
+                page_explanations.append(
+                    Explanation(index=page_idx, explanation=summary, keywords=keywords, related_chunks=chunk_indices))
+
             combined_page_summaries_text = "\n".join([exp.explanation for exp in page_explanations])
             doc_level_prompt = prompt_summarize_summaries.format(text=combined_page_summaries_text)
 
@@ -114,17 +114,16 @@ class ContentAnalyzer:
             parsed_doc_result = self._process_answers(doc_llm_response)[0]
 
             doc_summary_text, doc_keywords = parsed_doc_result
-            
-            all_doc_chunks_indices = [chunk.chunk_idx for page_idx in sorted(grouped_chunks[doc_idx].keys()) for chunk in grouped_chunks[doc_idx][page_idx]]
 
-            doc_explanation = Explanation(index=doc_idx, explanation=doc_summary_text, keywords=doc_keywords, related_chunks=sorted(list(set(all_doc_chunks_indices))))
+            all_doc_chunks_indices = [chunk.chunk_idx for page_idx in sorted(grouped_chunks[doc_idx].keys()) for chunk
+                                      in grouped_chunks[doc_idx][page_idx]]
+
+            doc_explanation = Explanation(index=doc_idx, explanation=doc_summary_text, keywords=doc_keywords,
+                                          related_chunks=sorted(list(set(all_doc_chunks_indices))))
 
             doc_summaries.append(DocSummary(docExplanation=doc_explanation, pageExplanations=page_explanations))
-        
+
         return doc_summaries
-
-
-
 
     def build_keyword_index(self, summaries: List[DocSummary]) -> Dict[str, List[int]]:
         """
@@ -136,34 +135,34 @@ class ContentAnalyzer:
         출력:
             Dict[str, List[int]]: { "키워드": [1, 5, 10], ... } 형태의 딕셔너리.
         """
-        
+
         # 1. keywordSearch: dict[str, set[int]] 초기화 (중복 방지용 set 사용)
         keywordSearch_set: Dict[str, Set[int]] = defaultdict(set)
-        
+
         # 2. summaries 리스트 순회
         for docSummary in summaries:
-            
+
             # 3. 페이지 요약(pageExplanations)만을 순회하여 인덱싱합니다.
             # 문서 전체 요약(docExplanation)은 관련 청크 범위가 너무 넓어 제외합니다.
             for explanation in docSummary.pageExplanations:
                 # 4. keywords와 related_chunks 가져오기
                 keywords = explanation.keywords
                 related_chunks = explanation.related_chunks
-                
+
                 # 5. keywords 리스트의 각 keyword에 대해
                 for keyword in keywords:
                     # (선택적) 키워드 정규화 (소문자 변환, 양쪽 공백 제거)
                     normalized_keyword = keyword.lower().strip()
-                    
+
                     if normalized_keyword:
                         # 6. keywordSearch[keyword]에 related_chunks 추가
                         keywordSearch_set[normalized_keyword].update(related_chunks)
-                        
+
         # 7. 딕셔너리의 값(set)을 list[int]로 변환하여 반환
         # 결과를 정렬하여 일관성을 유지
         keywordSearch_list: Dict[str, List[int]] = {
             keyword: sorted(list(chunks_set))
             for keyword, chunks_set in keywordSearch_set.items()
         }
-        
+
         return keywordSearch_list

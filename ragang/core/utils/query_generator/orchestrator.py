@@ -6,21 +6,23 @@ from datetime import datetime
 from collections import Counter
 
 # Configuration & Models
-from core.utils.query_generator.config import LLM_MODEL, API_KEY, MAX_WORKERS, MAX_NUM_QUERIES, CHUNK_SIZE, CHUNK_OVERLAP, NUM_QUERIES_PER_PAGE, OUTPUT_PATH
-from core.utils.query_generator.models import Chunk, Query
+from ragang.core.utils.query_generator.config import LLM_MODEL, API_KEY, MAX_WORKERS, MAX_NUM_QUERIES, CHUNK_SIZE, \
+    CHUNK_OVERLAP, NUM_QUERIES_PER_PAGE, OUTPUT_PATH
+from ragang.core.utils.query_generator.models import Chunk, Query
 
 # Modules
-from core.utils.query_generator.document_loader import DocumentProcessor
-from core.utils.query_generator.content_analyzer import ContentAnalyzer
-from core.utils.query_generator.scenario_generator import ScenarioGenerator
-from core.utils.query_generator.query_generator import QueryGenerator
+from ragang.core.utils.query_generator.document_loader import DocumentProcessor
+from ragang.core.utils.query_generator.content_analyzer import ContentAnalyzer
+from ragang.core.utils.query_generator.scenario_generator import ScenarioGenerator
+from ragang.core.utils.query_generator.query_generator import QueryGenerator
 
 # Adapters (Assuming correct import path based on context)
-from adapters.llm_adapter import OpenAIAdapter, GeminiAdapter
+from ragang.adapters.llm_adapter import OpenAIAdapter, GeminiAdapter
 
 # Logging Setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
 
 class Orchestrator:
     """
@@ -32,7 +34,7 @@ class Orchestrator:
         # 1. LLM Adapter 초기화
         # config.py의 설정을 사용하여 어댑터 생성
         self.llm_adapter = GeminiAdapter(model_name=LLM_MODEL, api_key=API_KEY)
-        
+
         # 2. 하위 모듈 초기화 (Dependency Injection)
         self.processor = DocumentProcessor()
         self.analyzer = ContentAnalyzer(llm_adapter=self.llm_adapter)
@@ -40,8 +42,8 @@ class Orchestrator:
         self.query_gen = QueryGenerator(llm_adapter=self.llm_adapter)
 
     def generate_queries(
-        self, 
-        source: Union[str, List[Chunk]], 
+            self,
+            source: Union[str, List[Chunk]],
     ) -> str:
         """
         전체 파이프라인을 실행하여 쿼리를 생성하고 저장합니다.
@@ -56,7 +58,7 @@ class Orchestrator:
         Returns:
             str: 저장된 파일의 경로.
         """
-        
+
         all_chunks: List[Chunk] = []
         doc_names: List[str] = []
 
@@ -68,22 +70,22 @@ class Orchestrator:
             logger.info(f"입력이 디렉토리 경로입니다: {source}")
             if not os.path.exists(source):
                 raise FileNotFoundError(f"지정된 디렉토리를 찾을 수 없습니다: {source}")
-            
+
             doc_names = [p.name for p in sorted(list(Path(source).glob('*.[pP][dD][fF]')))]
             all_chunks, lookup_index = self.processor.chunker(
-                text_addr=source, 
-                size=CHUNK_SIZE, 
-                overlap=CHUNK_OVERLAP, 
+                text_addr=source,
+                size=CHUNK_SIZE,
+                overlap=CHUNK_OVERLAP,
                 max_workers=MAX_WORKERS
             )
-            
+
         elif isinstance(source, list):
             # Case B: 이미 처리된 청크 리스트가 들어온 경우 -> 로더 패스
             logger.info(f"입력이 청크 리스트({len(source)}개)입니다. DocumentProcessor를 건너뜁니다.")
             all_chunks = source
             unique_doc_indices = sorted(list(set(c.doc_idx for c in all_chunks)))
             doc_names = [f"doc_{i}" for i in unique_doc_indices]
-            
+
         else:
             raise ValueError("source 인자는 '디렉토리 경로(str)' 또는 'Chunk 리스트(List[Chunk])'여야 합니다.")
 
@@ -129,7 +131,7 @@ class Orchestrator:
         # ---------------------------------------------------------
         logger.info(f"생성된 {len(all_queries)}개의 쿼리를 저장합니다: {OUTPUT_PATH}")
         self._save_results_to_txt(all_queries, doc_names, OUTPUT_PATH)
-        
+
         logger.info("모든 작업이 완료되었습니다.")
         return OUTPUT_PATH
 
@@ -148,16 +150,16 @@ class Orchestrator:
             f.write(f"# Generated from: {', '.join(doc_names)}\n")
             f.write(f"# Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"# Total Queries: {len(queries)}\n")
-            
+
             type_counts = Counter(q.type.value for q in queries)
             for q_type, count in sorted(type_counts.items()):
                 f.write(f"#   - {q_type}: {count}\n")
-            
-            f.write("\n" + "="*40 + "\n\n")
+
+            f.write("\n" + "=" * 40 + "\n\n")
 
             # --- 쿼리 데이터 작성 ---
             for i, q in enumerate(queries):
-                f.write(f"# idx: {i+1}\n")
+                f.write(f"# idx: {i + 1}\n")
                 f.write(f"# type: {q.type.value}\n")
                 if q.reference:
                     f.write(f"# reference: {q.reference}\n")
