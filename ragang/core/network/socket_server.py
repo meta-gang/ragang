@@ -1,4 +1,6 @@
 import asyncio
+import logging
+
 import websockets
 
 from ragang.core.network.socket_handler import SocketHandler
@@ -8,6 +10,10 @@ from ragang.core.utils.modules import create_engine
 
 
 async def main(root_path: str, flow_id: str, host: str, port: int):
+    # disable websocket log to appear inside user console
+    # further we should handle these logs with some log file
+    logging.getLogger('websockets').setLevel(logging.CRITICAL)
+
     engine = create_engine(root_path, flow_id)
 
     handler = SocketHandler()

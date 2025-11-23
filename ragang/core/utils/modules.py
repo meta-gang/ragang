@@ -31,11 +31,16 @@ def create_engine(root_path: str, flow_id: str) -> FlowEngine:
     load_containers = load_user_containers(root_path)  # load entrypoint
     containers = load_containers()
     target_containers = []
+
+    if flow_id is None:
+        return FlowEngine(containers)
+
     for container in containers:
         if container.flow_id == flow_id:
             target_containers.append(container)
 
     if len(target_containers) == 0:
         raise InvalidFlowIdException(f"Flow id '{flow_id}' is invalid.\n Please choose from flow ids defined in the entrypoint 'manager.py'")
+
 
     return FlowEngine(target_containers)
