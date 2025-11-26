@@ -105,37 +105,26 @@ class Runner:
 
     # LLM 생성 query
     async def _on_run_rag_llm_query(self, msg: dict, ws):
+        # from pathlib import Path
+
+        # # 정해진 쿼리 폴더
+        # QUERY_DIR = Path("../datas/llm_generated_query_folder")
+
         # settings = msg.get("settings") or {}
-        # llm_option = (settings.get("llm_option") or "").lower()
-        #
-        # cont = self.engine.containers[self.flow_id]
-        #
-        # if llm_option in ("새 질문 생성", "make-query"):
-        #     file_path = settings.get("file_path", "./data/default.txt")
-        #     queries = generate_query_from_data(
-        #         getattr(cont, "llm_adapter", None),
-        #         file_path
-        #     )
-        #     if not isinstance(queries, list):
-        #         queries = [queries]
-        #     # 생성된 질의를 내부 저장(선택 사용)
-        #     for idx, q in enumerate(queries, 1):
-        #         qid = f"llm_query_{idx}"
-        #         self._query_store[qid] = q
-        #
-        # elif llm_option in ("기존 질문 사용", "made-query"):
-        #     file_path = settings.get("file_path")
-        #     if not file_path:
-        #         raise ValueError("file_path must be provided when using 'made-query'")
-        #     with open(file_path, "r", encoding="utf-8") as f:
-        #         queries = [line.strip() for line in f if line.strip()]
-        #
-        # else:
-        #     raise ValueError(f"Unsupported llm_option: {llm_option}")
-        #
+
+        # file_name = settings.get("file_name")
+        # if not file_name:
+        #     raise ValueError("file_name must be provided when using 'made-query'")
+
+        # file_path = QUERY_DIR / file_name
+        # if not file_path.is_file():
+        #     raise FileNotFoundError(f"Query file not found: {file_path}")
+        # with open(file_path, "r", encoding="utf-8") as f:
+        #     queries = [line.strip() for line in f if line.strip()]
+
         # if not queries:
         #     raise ValueError("No queries extracted for execution.")
-        #
+
         # results = await self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id])
         # query_ids = list(results.get(self.flow_id, {}).keys())
         # await self._broadcast_rag_result(query_ids)
