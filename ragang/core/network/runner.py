@@ -2,6 +2,8 @@ import datetime as dt
 import traceback
 from typing import Dict, Tuple, List
 
+from utils.cli import get_history
+
 
 def _ts_str() -> str:
     kst = dt.timezone(dt.timedelta(hours=9))
@@ -28,6 +30,7 @@ class Runner:
             "run-rag-file-query": self._on_run_rag_file_query,
             "run-rag-llm-query": self._on_run_rag_llm_query,
             "test-query": self._on_test_query,
+            "start!": self._start_react,
         }
 
     # 모듈 상태(start, end) 브로드캐스트 -> 엔진/모듈 실행 지점에서 호출
@@ -57,7 +60,7 @@ class Runner:
             "ts": _ts_str(),
             "storage": {
                 "flow_id": cont.flow_id,
-                "states": states_payload  # 이부분을 state 객체가 아닌 cont.storage.result[qid] 형태로 바꿔야 되는지
+                "states": states_payload
             }
         })
 
@@ -178,4 +181,13 @@ class Runner:
         await self.handler.broadcast("generated-query-files", {
             "ts": _ts_str(),
             "files": file_list
+        })
+
+    async def _start_react(self, msg: dict, ws):
+        flow_id = msg.get("flow_id")
+        history = get_history(flow_id)
+
+        await self.handler.broadcast("history", {
+            "ts": _ts_str(),
+            "history": history
         })
