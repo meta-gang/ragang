@@ -1,6 +1,8 @@
 import datetime as dt
+import os
 import traceback
 from typing import Dict, Tuple, List
+from pathlib import Path
 
 from ragang.core.utils.cli import get_history
 
@@ -85,7 +87,10 @@ class Runner:
 
     # query 파일 (txt)에서 줄바꿈 기준으로 질의들을 뽑아 배치 실행
     async def _on_run_rag_file_query(self, msg: dict, ws):
+        # user_workspace/datas/queries/custom/을 base로 이 위체에서의 query file 상대경로를 받아야 함
+        base_path = Path(os.getcwd()) / 'datas/queries/custom'
         files = msg.get("files") or []
+        files = [base_path / f for f in files]  # concatenate
         if not isinstance(files, list):
             files = []
 
@@ -105,30 +110,27 @@ class Runner:
 
     # LLM 생성 query
     async def _on_run_rag_llm_query(self, msg: dict, ws):
-        # from pathlib import Path
+        # 정해진 쿼리 폴더
+        QUERY_DIR = Path(os.getcwd()) / 'datas/queries/generated'  # generated query base file path
 
-        # # 정해진 쿼리 폴더
-        # QUERY_DIR = Path("../datas/llm_generated_query_folder")
+        settings = msg.get("settings") or {}
 
-        # settings = msg.get("settings") or {}
+        file_name = settings.get("file_name")
+        if not file_name:
+            raise ValueError("file_name must be provided when using 'made-query'")
 
-        # file_name = settings.get("file_name")
-        # if not file_name:
-        #     raise ValueError("file_name must be provided when using 'made-query'")
+        file_path = QUERY_DIR / file_name
+        if not file_path.is_file():
+            raise FileNotFoundError(f"Query file not found: {file_path}")
+        with open(file_path, "r", encoding="utf-8") as f:
+            queries = [line.strip() for line in f if line.strip()]
 
-        # file_path = QUERY_DIR / file_name
-        # if not file_path.is_file():
-        #     raise FileNotFoundError(f"Query file not found: {file_path}")
-        # with open(file_path, "r", encoding="utf-8") as f:
-        #     queries = [line.strip() for line in f if line.strip()]
+        if not queries:
+            raise ValueError("No queries extracted for execution.")
 
-        # if not queries:
-        #     raise ValueError("No queries extracted for execution.")
-
-        # results = await self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id])
-        # query_ids = list(results.get(self.flow_id, {}).keys())
-        # await self._broadcast_rag_result(query_ids)
-        pass
+        results = await self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id])
+        query_ids = list(results.get(self.flow_id, {}).keys())
+        await self._broadcast_rag_result(query_ids)
 
     # test query: 단일 질의를 즉시 실행해 결과 송신
     async def _on_test_query(self, msg: dict, ws):
@@ -157,8 +159,7 @@ class Runner:
 
     # rag continer가 하나의 query에 대해 실행이 완료될 때마다 해당 query_id 송신 -> 프로그래스 바에 사용
     async def _generated_query_files(self, query_num: int):
-        from pathlib import Path
-        base_dir = Path("data/generated_query")
+        base_dir = Path(os.getcwd()) / 'datas/queries/generated'
         file_list = []
         try:
             if base_dir.exists() and base_dir.is_dir():
