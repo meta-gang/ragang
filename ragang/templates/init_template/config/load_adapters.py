@@ -1,3 +1,5 @@
+import os
+
 from ragang.adapters.milvus_adapter import MilvusAdapter
 from ragang.adapters.embedding_adapter import GeminiEmbeddingAdapter, BaseEmbeddingAdapter
 from ragang.adapters.llm_adapter import GeminiAdapter, BaseLLMAdapter
@@ -39,8 +41,13 @@ def load(api_key: str) -> dict:
     emb = __init_embedding(api_key)
     llm = __init_llm(api_key)
 
-    with open('./datas/docs/sudden_shower.txt', 'r', encoding='utf-8') as f:
-        doc = f.read()
+    doc = ''
+    docs_dir = './datas/docs'
+    for fname in os.listdir(docs_dir):
+        if fname.endswith('.txt'):
+            print(f"Adding document {fname} into vector db...")
+            with open(os.path.join(docs_dir, fname), 'r', encoding='utf-8') as f:
+                doc += f.read() + '\n'
     chunk = __split_to_chunk(doc, 500)
 
     if len((emb_vectors := emb.create_embeddings(chunk))) > 0:
