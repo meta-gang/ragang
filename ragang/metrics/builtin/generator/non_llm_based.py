@@ -95,8 +95,8 @@ class MutualInformation_KSG(BaseBuiltinMetric):
     :vartype k: int
     """
 
-    def __init__(self, embedding_adapter: BaseEmbeddingAdapter = None, llm_adapter: BaseLLMAdapter = None, k=3):
-        super().__init__(llm_adapter, embedding_adapter)
+    def __init__(self, param_src: list[str], embedding_adapter: BaseEmbeddingAdapter = None, llm_adapter: BaseLLMAdapter = None, k=3):
+        super().__init__(param_src, llm_adapter, embedding_adapter)
         self.k = k
 
     def evaluate(self, ret_docs: list[str], generation: str) -> Performance:

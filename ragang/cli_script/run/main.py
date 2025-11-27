@@ -41,6 +41,7 @@ def run(args: Namespace):
         else:
             raise NotAllowedQueryFileException(query_path)
 
+    print(ANSIStyler.style(f"Running {len(queries)} queries", fore_color='cyan'))
     res = engine.invoke_batch(queries)
     engine.print_eval()
 

@@ -1,0 +1,10 @@
+{
+  "vectordb": {
+    "provider": "vectorDB",
+    "config": {
+      "collection_name": "test",
+      "api_url": "localhost:19530",
+      "db_dimension": "768"
+    }
+  }
+}

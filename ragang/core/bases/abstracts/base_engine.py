@@ -256,7 +256,7 @@ class FlowEngine:
             self.__run_query(query, flow_id)
             for query in queries
         ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=False)
         merged = {}
         for res in results:
             if isinstance(res, Exception):
@@ -281,7 +281,7 @@ class FlowEngine:
             if self.ws_sender:
                 await self.ws_sender.send_rag_preparation_sig(n_query=1)  # send rag preparation signal
 
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            results = await asyncio.gather(*tasks, return_exceptions=False)
 
             merged = {}
             for res in results:
@@ -315,7 +315,7 @@ class FlowEngine:
             if self.ws_sender:
                 await self.ws_sender.send_rag_preparation_sig(len(queries))  # send rag preparation signal
 
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            results = await asyncio.gather(*tasks, return_exceptions=False)
 
             merged = {}
             for res in results:
