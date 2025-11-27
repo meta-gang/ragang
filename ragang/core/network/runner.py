@@ -1,10 +1,12 @@
 import datetime as dt
+import json
 import os
 import traceback
 from typing import Dict, Tuple, List
 from pathlib import Path
 
 from ragang.core.utils.cli import get_history
+from ragang.exceptions.user.cli import NotAllowedQueryFileException
 
 
 def _ts_str() -> str:
@@ -33,6 +35,8 @@ class Runner:
             "run-rag-llm-query": self._on_run_rag_llm_query,
             "test-query": self._on_test_query,
             "start!": self._start_react,
+            "generated-query-files": self._generated_query_files,
+            "custom-query-files": self._custom_query_files
         }
 
     # 모듈 상태(start, end) 브로드캐스트 -> 엔진/모듈 실행 지점에서 호출
@@ -88,23 +92,30 @@ class Runner:
     # query 파일 (txt)에서 줄바꿈 기준으로 질의들을 뽑아 배치 실행
     async def _on_run_rag_file_query(self, msg: dict, ws):
         # user_workspace/datas/queries/custom/을 base로 이 위체에서의 query file 상대경로를 받아야 함
-        base_path = Path(os.getcwd()) / 'datas/queries/custom'
-        files = msg.get("files") or []
-        files = [base_path / f for f in files]  # concatenate
-        if not isinstance(files, list):
-            files = []
+        QUERY_DIR = Path(os.getcwd()) / 'datas/queries/custom'  # custom query base file path
 
-        queries: List[str] = []
-        for file_path in files:
-            with open(file_path, "r", encoding="utf-8") as f:
-                queries.extend([line.strip() for line in f if line.strip()])
+        settings = msg.get("settings") or {}
+
+        file_name = settings.get("file_name")
+        if not file_name:
+            raise ValueError("file_name must be provided when using 'made-query'")
+
+        file_path = QUERY_DIR / file_name
+        if not file_path.is_file():
+            raise FileNotFoundError(f"Query file not found: {file_path}")
+
+        # check file suffix
+        if file_name.suffix != '.txt':
+            raise NotAllowedQueryFileException(file_name)
+
+        queries = []
+        with open(file_path, "r", encoding="utf-8") as f:
+            queries = [line.strip() for line in f if line.strip()]
 
         if not queries:
-            raise ValueError("No queries extracted from files.")
+            raise ValueError("No queries extracted for execution.")
 
-        # 선택한 flow_id 컨테이너만 실행
         results = await self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id])
-        # 반환 포맷: { flow_id: { qid1:{...}, qid2:{...}, ... } }
         query_ids = list(results.get(self.flow_id, {}).keys())
         await self._broadcast_rag_result(query_ids)
 
@@ -122,8 +133,19 @@ class Runner:
         file_path = QUERY_DIR / file_name
         if not file_path.is_file():
             raise FileNotFoundError(f"Query file not found: {file_path}")
+
+        # check file suffix
+        if file_name.suffix != '.json':
+            raise NotAllowedQueryFileException(file_name)
+
+        queries = []
         with open(file_path, "r", encoding="utf-8") as f:
-            queries = [line.strip() for line in f if line.strip()]
+            # load queries
+            data = json.load(f)
+            query = data['query']
+            for q in query:
+                queries.append(q['query'])
+            # queries = [line.strip() for line in f if line.strip()]
 
         if not queries:
             raise ValueError("No queries extracted for execution.")
@@ -158,8 +180,24 @@ class Runner:
         })
 
     # rag continer가 하나의 query에 대해 실행이 완료될 때마다 해당 query_id 송신 -> 프로그래스 바에 사용
-    async def _generated_query_files(self, query_num: int):
+    async def _generated_query_files(self):
         base_dir = Path(os.getcwd()) / 'datas/queries/generated'
+        file_list = []
+        try:
+            if base_dir.exists() and base_dir.is_dir():
+                for p in sorted(base_dir.rglob("*.json")):
+                    file_list.append(str(p.as_posix()))
+        except Exception:
+            file_list = []
+
+        await self.handler.broadcast("generated-query-files", {
+            "ts": _ts_str(),
+            "files": file_list
+        })
+
+    async def _custom_query_files(self):
+        # send custom query file list in user_workspace/datas/queries/
+        base_dir = Path(os.getcwd()) / 'datas/queries/custom'
         file_list = []
         try:
             if base_dir.exists() and base_dir.is_dir():
@@ -167,8 +205,7 @@ class Runner:
                     file_list.append(str(p.as_posix()))
         except Exception:
             file_list = []
-
-        await self.handler.broadcast("generated-query-files", {
+        await self.handler.broadcast("custom-query-files", {
             "ts": _ts_str(),
             "files": file_list
         })
