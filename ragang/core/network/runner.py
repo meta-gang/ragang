@@ -36,7 +36,8 @@ class Runner:
             "test-query": self._on_test_query,
             "start!": self._start_react,
             "generated-query-files": self._generated_query_files,
-            "custom-query-files": self._custom_query_files
+            "custom-query-files": self._custom_query_files,
+            "get-module-pairs": self._on_get_module_pairs
         }
 
     # 모듈 상태(start, end) 브로드캐스트 -> 엔진/모듈 실행 지점에서 호출
@@ -211,10 +212,12 @@ class Runner:
         })
 
     async def _start_react(self, msg: dict, ws):
-        flow_id = msg.get("flow_id")
-        history = get_history(flow_id)
+        history = get_history(self.flow_id)
 
         await self.handler.broadcast("history", {
             "ts": _ts_str(),
             "history": history
         })
+
+    async def _on_get_module_pairs(self, msg, ws):
+        await self._broadcast_container_topology()
