@@ -2,7 +2,7 @@ import datetime as dt
 import traceback
 from typing import Dict, Tuple, List
 
-from utils.cli import get_history
+from ragang.core.utils.cli import get_history
 
 
 def _ts_str() -> str:
