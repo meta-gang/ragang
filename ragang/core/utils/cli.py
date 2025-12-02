@@ -10,6 +10,11 @@ from ragang.exceptions.user.cli import NoConfigFileException
 
 def update_history(flow_id: str, ts: float, results: list[State]):
     history_path = Path(os.getcwd()) / 'history' / f"{flow_id}.json"
+
+    history_dir = os.path.dirname(history_path)
+    if history_dir and not os.path.exists(history_dir):
+        os.makedirs(history_dir)
+
     history: dict = dict()
     if history_path.exists():
         with open(history_path, 'r', encoding='utf-8') as f:
