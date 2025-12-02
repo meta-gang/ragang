@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ragang"
-version = "v0.0.3-beta"
+version = "v0.0.4-beta"
 description = "Retrieval Augmented Generation Assessing tool with No Gold"
 requires-python = ">=3.13"
 dependencies = [
@@ -30,7 +30,7 @@ keywords = ["rag", "llm"]
 ragang = 'ragang.cli_script.entry:main'
 
 [tool.setuptools]
-packages = ['ragang']
+packages = {find={}}
 
 [tool.setuptools.package-data]
 ragang = ['templates/**/*', 'web/**/*']
