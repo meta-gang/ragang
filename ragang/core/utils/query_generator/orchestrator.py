@@ -145,9 +145,9 @@ class Orchestrator:
         파일 상단에 메타데이터를 포함합니다.
         """
         # # 디렉토리가 없으면 생성
-        # output_dir = os.path.dirname(output_path)
-        # if output_dir and not os.path.exists(output_dir):
-        #     os.makedirs(output_dir)
+        output_dir = os.path.dirname(output_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
 
         with open(output_path, "w", encoding="utf-8") as f:
             output: dict = {}
