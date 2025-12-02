@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "RAGANG"
+name = "ragang"
 version = "v0.0.1-beta"
 description = "Retrieval Augmented Generation Assessing tool with No Gold"
 requires-python = ">=3.13"
