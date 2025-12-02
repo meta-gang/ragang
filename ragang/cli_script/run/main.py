@@ -20,7 +20,7 @@ def run(args: Namespace):
     engine = create_engine(user_root, flow_id)
     queries = []
 
-    with open(query_path, "r") as f:
+    with open(query_path, "r", encoding='utf-8') as f:
         q_source = args.query_path.split('/')[0]
         if q_source == 'custom':
             # custom query files: .txt

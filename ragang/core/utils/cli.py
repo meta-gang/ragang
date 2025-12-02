@@ -2,6 +2,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+from datetime import datetime
 
 from ragang.core.bases.datas.state import State
 from ragang.exceptions.user.cli import NoConfigFileException
@@ -14,10 +15,12 @@ def update_history(flow_id: str, ts: float, results: list[State]):
         with open(history_path, 'r', encoding='utf-8') as f:
             history = json.load(f)
 
-    history.setdefault(str(ts), dict())
+    ts_str = datetime.fromtimestamp(ts).strftime("%y%m%d%H%M%S")
+
+    history.setdefault(ts_str, dict())
 
     for res in results:
-        history[str(ts)][res.q_id] = res.serialize()
+        history[ts_str][res.q_id] = res.serialize()
 
     with open(history_path, 'w', encoding='utf-8') as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
