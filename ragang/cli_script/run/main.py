@@ -45,7 +45,7 @@ def run(args: Namespace):
     res = engine.invoke_batch(queries)
     engine.print_eval()
 
-    if args.x_save:  # without saving results into history
+    if not args.save:  # without saving results into history
         return
 
     # add result to history

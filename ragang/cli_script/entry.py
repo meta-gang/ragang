@@ -25,7 +25,7 @@ def main():
     parser_run = subparsers.add_parser("run", help="Run RAGANG project at cli ")
     parser_run.add_argument('-F', '--flow', action='store', type=str, help="flow id to run", dest='flow_id')
     parser_run.add_argument('-Q', '--query', action='store', type=str, help="query file path from datas/queries/ to run", dest='query_path', required=True)
-    parser_run.add_argument('--no-save', action='store_false', help="don't save the results", dest='x_save', default=False)
+    parser_run.add_argument('--no-save', action='store_false', help="don't save the results", dest='save', default=True)
     parser_run.set_defaults(func=run_run)
 
     # $ ragang query-gen

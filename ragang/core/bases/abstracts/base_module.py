@@ -25,7 +25,7 @@ class BaseModule(metaclass=ABCMeta):  # observer
             "module_id": self.module_id,
             "direction": self.direction.directions,
             "dependency": self.dependency.dependencies,
-            "metrics": [m.__class__.__name__ for m in self.metrics],
+            "metrics": [m.__class__.__name__ for m in (self.metrics or [])],
             "is_starter": self.is_starter,
         }
 

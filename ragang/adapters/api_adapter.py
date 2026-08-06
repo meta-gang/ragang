@@ -1,6 +1,6 @@
 import json
 import os
-from .llm_adapter import BaseLLMAdapter, LocalLLMAdapter, OpenAIAdapter, GeminiAdapter
+from .llm_adapter import BaseLLMAdapter, OllamaLocalLLMAdapter, OpenAIAdapter, GeminiAdapter
 from .embedding_adapter import BaseEmbeddingAdapter, LocalEmbeddingAdapter, OpenAIEmbeddingAdapter, \
     GeminiEmbeddingAdapter
 
@@ -45,7 +45,7 @@ class api_adapter:
         elif provider == "Gemini":
             return GeminiAdapter(**config_params)
         elif provider == "Local":
-            return LocalLLMAdapter(**config_params)
+            return OllamaLocalLLMAdapter(**config_params)
         else:
             raise ValueError(f"Unknown LLM provider: {provider}")
 

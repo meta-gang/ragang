@@ -270,9 +270,12 @@ class PrecisionMetric(BaseBuiltinMetric):
     :vartype embedding_adapter: BaseEmbeddingAdapter, optional
     """
 
-    def __init__(self, mode: str = 'token', threshold: float = 0.5, llm_adapter: BaseLLMAdapter = None,
+    def __init__(self, param_src: list[str], mode: str = 'token', threshold: float = 0.5,
+                 llm_adapter: BaseLLMAdapter = None,
                  embedding_adapter: BaseEmbeddingAdapter = None):
         """
+        :param param_src: 평가 파라미터의 출처. 'module_id.key' 형식의 리스트.
+        :type param_src: list[str]
         :param mode: 'token' 또는 'embedding' 중 평가 모드를 선택합니다. 기본값은 'token'입니다.
         :type mode: str
         :param threshold: 유사도가 이 값 이상일 때 정답으로 간주합니다. 기본값은 0.5입니다.
@@ -281,7 +284,7 @@ class PrecisionMetric(BaseBuiltinMetric):
         :type embedding_adapter: BaseEmbeddingAdapter, optional
         :raises ValueError: 'embedding' 모드인데 embedding_adapter가 제공되지 않은 경우
         """
-        super().__init__(llm_adapter, embedding_adapter)
+        super().__init__(param_src, llm_adapter, embedding_adapter)
         if mode not in ['token', 'embedding']:
             raise ValueError("mode는 'token' 또는 'embedding'만 지원합니다.")
         if mode == 'embedding' and not embedding_adapter:

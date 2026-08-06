@@ -539,9 +539,10 @@ class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
     :type claims_batch_size: int
     """
 
-    def __init__(self, llm_adapter: BaseLLMAdapter = None, embedding_adapter: BaseEmbeddingAdapter = None,
+    def __init__(self, param_src: list[str], llm_adapter: BaseLLMAdapter = None,
+                 embedding_adapter: BaseEmbeddingAdapter = None,
                  claims_batch_size: int = 10):
-        super().__init__(llm_adapter, embedding_adapter)
+        super().__init__(param_src, llm_adapter, embedding_adapter)
         self.claims_batch_size = claims_batch_size
 
     def _extract_claims(self, ret_docs: list[str] = None, gen: str = None) -> list[str]:

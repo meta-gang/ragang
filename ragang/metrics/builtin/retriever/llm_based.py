@@ -68,9 +68,12 @@ class RandomDocumentInjectionEffect(BaseBuiltinMetric):
     :vartype llm_adapter: BaseLLMAdapter
     """
 
-    def __init__(self, precision_metric: PrecisionMetric, llm_adapter: BaseLLMAdapter = None,
+    def __init__(self, param_src: list[str], precision_metric: PrecisionMetric,
+                 llm_adapter: BaseLLMAdapter = None,
                  embedding_adapter: BaseEmbeddingAdapter = None):
         """
+        :param param_src: 평가 파라미터의 출처. 'module_id.key' 형식의 리스트.
+        :type param_src: list[str]
         :param precision_metric: 정밀도 계산에 사용할 PrecisionMetric 객체 (mode, threshold가 설정된 상태)
         :type precision_metric: PrecisionMetric
         :param llm_adapter: 노이즈 문서 생성에 사용할 LLM 어댑터
@@ -80,7 +83,7 @@ class RandomDocumentInjectionEffect(BaseBuiltinMetric):
         :raises ValueError: 'embedding' 모드인데 embedding_adapter가 제공되지 않은 경우
         """
         self.precision_calculator = precision_metric
-        super().__init__(llm_adapter, embedding_adapter)
+        super().__init__(param_src, llm_adapter, embedding_adapter)
         if self.precision_calculator.mode == 'embedding' and not self.embedding_adapter:
             raise ValueError("'embedding' 모드에서는 embedding_adapter가 반드시 필요합니다.")
 

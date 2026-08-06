@@ -8,15 +8,17 @@ class Linker:
         self.module_id: str = module_id
         self.dependency_ids: list[str] = []
         self.is_or: bool = False
+        self.is_and: bool = False
 
     def __and__(self, other: 'Linker') -> 'Linker':
-        Linker.__or__ = Linker.__prevent_cross_operator_usage
+        self.__prevent_cross_operator_usage(other, is_or=False)
+        self.is_and = True
         self.__add_dependency(other)
         return self
 
     def __or__(self, other: 'Linker') -> 'Linker':
+        self.__prevent_cross_operator_usage(other, is_or=True)
         self.is_or = True
-        Linker.__and__ = Linker.__prevent_cross_operator_usage
         self.__add_dependency(other)
         return self
 
@@ -24,8 +26,12 @@ class Linker:
         self.dependency_ids.append(other.module_id)
         self.dependency_ids.extend(other.dependency_ids)
 
-    def __prevent_cross_operator_usage(self, other):
-        raise DependencyConnectionException("Dependency links must be formed exclusively '&' or '|'")
+    def __prevent_cross_operator_usage(self, other: 'Linker', is_or: bool) -> None:
+        # check both operands; python evaluates '&' before '|', so a mixed expression
+        # such as 'a | (b & c)' is only detectable from the right operand's state
+        for side in (self, other):
+            if (side.is_or and not is_or) or (side.is_and and is_or):
+                raise DependencyConnectionException("Dependency links must be formed exclusively '&' or '|'")
 
     def build(self, dest_mid: str) -> 'Direction':
         dep_mids = [self.module_id, *self.dependency_ids]
