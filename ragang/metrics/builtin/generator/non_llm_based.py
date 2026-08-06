@@ -34,8 +34,11 @@ class AnswerContextSimilarity(BaseBuiltinMetric):
         :returns: mean of cosine similarities between gen and each retrieval chunks
         :rtype: Performance
         """
-        ans_vec = self.embedding_adapter.create_embeddings([gen])[0]
+        ans_vecs = self.embedding_adapter.create_embeddings([gen])
         chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
+        if ans_vecs.size == 0 or chunk_vecs.size == 0:  # embedding api failed
+            return Performance(_eval=False)
+        ans_vec = ans_vecs[0]
 
         similarity = []
         for chunk_vec in chunk_vecs:
@@ -68,8 +71,11 @@ class AnswerCentricSimilarityVariance(BaseBuiltinMetric):
         :returns: Veriance of angles beteween gen_vec and each chunk_vecs
         :rtype: Performance
         """
-        ans_vec = self.embedding_adapter.create_embeddings([gen])[0]
+        ans_vecs = self.embedding_adapter.create_embeddings([gen])
         chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
+        if ans_vecs.size == 0 or chunk_vecs.size == 0:  # embedding api failed
+            return Performance(_eval=False)
+        ans_vec = ans_vecs[0]
         angles = []
         for chunk_vec in chunk_vecs:
             cos_sim = CosineSimilarity.compute(chunk_vec, ans_vec)
@@ -111,11 +117,17 @@ class MutualInformation_KSG(BaseBuiltinMetric):
         :rtype: Performance
         """
         context_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
-        gen_embedding = self.embedding_adapter.create_embeddings([generation])[0]
+        gen_embeddings = self.embedding_adapter.create_embeddings([generation])
+        if context_embeddings.size == 0 or gen_embeddings.size == 0:  # embedding api failed
+            return Performance(_eval=False)
+        gen_embedding = gen_embeddings[0]
 
         N = len(context_embeddings)
-        if N == 0:
-            return Performance(score=0.0, unit="", metric="MI_GC_KSG")
+        # each point has N-1 neighbours, so k cannot exceed that. shrink k to fit
+        # the retrieved set instead of failing (top_k=3 with k=3 is the template default)
+        k_eff = min(self.k, N - 1)
+        if k_eff < 1:  # a single chunk has no neighbour to measure against
+            return Performance(_eval=False)
 
         joint_vectors = []
         for ctx_vec in context_embeddings:
@@ -131,7 +143,7 @@ class MutualInformation_KSG(BaseBuiltinMetric):
                 dist = np.max(np.abs(joint_vectors[i] - joint_vectors[j]))
                 distances.append(dist)
             distances.sort()
-            epsilons.append(distances[self.k - 1])
+            epsilons.append(distances[k_eff - 1])
 
         n_x = []
         n_y = []
@@ -151,7 +163,7 @@ class MutualInformation_KSG(BaseBuiltinMetric):
             n_x.append(count_x)
             n_y.append(count_y)
 
-        log_k = np.log(self.k)
+        log_k = np.log(k_eff)
         log_N = np.log(N)
         avg_term = np.mean(np.log(np.array(n_x) + 1) + np.log(np.array(n_y) + 1))
         mi = log_k + log_N - avg_term
@@ -181,7 +193,10 @@ class RetrievalDeviationfromAnswer(BaseBuiltinMetric):
         :rtype: Performance
         """
         chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
-        ans_vec = self.embedding_adapter.create_embeddings([gen])[0]
+        ans_vecs = self.embedding_adapter.create_embeddings([gen])
+        if chunk_vecs.size == 0 or ans_vecs.size == 0:  # embedding api failed
+            return Performance(_eval=False)
+        ans_vec = ans_vecs[0]
 
         chunk_vecs = chunk_vecs / np.linalg.norm(chunk_vecs, axis=1, keepdims=True)
         ans_vec = ans_vec / np.linalg.norm(ans_vec)
@@ -220,8 +235,14 @@ class RetrievaltopkMeanAnswerSimilarity(BaseBuiltinMetric):
         :rtype: Performance
         """
         chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
-        gen_vec = self.embedding_adapter.create_embeddings([gen])[0]
-        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        gen_vecs = self.embedding_adapter.create_embeddings([gen])
+        query_vecs = self.embedding_adapter.create_embeddings([query])
+        if chunk_vecs.size == 0 or gen_vecs.size == 0 or query_vecs.size == 0:  # embedding api failed
+            return Performance(_eval=False)
+        if len(chunk_vecs) < 2:  # top-k split needs at least two chunks to compare
+            return Performance(_eval=False)
+        gen_vec = gen_vecs[0]
+        query_vec = query_vecs[0]
 
         similarities = [CosineSimilarity.compute(query_vec, vec) for vec in chunk_vecs]
 

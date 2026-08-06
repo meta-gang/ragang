@@ -256,13 +256,20 @@ class FlowEngine:
             self.__run_query(query, flow_id)
             for query in queries
         ]
-        results = await asyncio.gather(*tasks, return_exceptions=False)
+        # isolate failures: one failing query must not discard the results already produced
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         merged = {}
+        errors: list[BaseException] = []
         for res in results:
-            if isinstance(res, Exception):
+            if isinstance(res, BaseException):
+                errors.append(res)
+                warnings.warn(f"Skipped a failed execution: {type(res).__name__}: {res}", RuntimeWarning)
                 continue  # error
             for k, v in res.items():  # merge into {flow_id: {q_id1: {...}, q_id2: {...}, ...}
                 merged.setdefault(k, {}).update(v)
+        if errors and not merged:
+            # nothing survived. a config error fails every query, so report it instead of an empty result
+            raise errors[0]
         return merged
 
     async def async_invoke(self, query: str, flow_ids: list[str] = None):
@@ -281,14 +288,22 @@ class FlowEngine:
             if self.ws_sender:
                 await self.ws_sender.send_rag_preparation_sig(n_query=1)  # send rag preparation signal
 
-            results = await asyncio.gather(*tasks, return_exceptions=False)
+            # isolate failures: one failing query must not discard the results already produced
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
             merged = {}
+            errors: list[BaseException] = []
             for res in results:
-                if isinstance(res, Exception):
+                if isinstance(res, BaseException):
+                    errors.append(res)
+                    warnings.warn(f"Skipped a failed execution: {type(res).__name__}: {res}", RuntimeWarning)
                     continue  # error
                 for k, v in res.items():
                     merged.setdefault(k, {}).update(v)
+
+            if errors and not merged:
+                # nothing survived. a config error fails every query, so report it instead of an empty result
+                raise errors[0]
 
             return merged
 
@@ -315,14 +330,22 @@ class FlowEngine:
             if self.ws_sender:
                 await self.ws_sender.send_rag_preparation_sig(len(queries))  # send rag preparation signal
 
-            results = await asyncio.gather(*tasks, return_exceptions=False)
+            # isolate failures: one failing query must not discard the results already produced
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
             merged = {}
+            errors: list[BaseException] = []
             for res in results:
-                if isinstance(res, Exception):
+                if isinstance(res, BaseException):
+                    errors.append(res)
+                    warnings.warn(f"Skipped a failed execution: {type(res).__name__}: {res}", RuntimeWarning)
                     continue  # error
                 for k, v in res.items():
                     merged.setdefault(k, {}).update(v)
+
+            if errors and not merged:
+                # nothing survived. a config error fails every query, so report it instead of an empty result
+                raise errors[0]
 
             return merged
 

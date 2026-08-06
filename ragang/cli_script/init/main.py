@@ -15,8 +15,7 @@ def run(args: Namespace):
                            fore_color='light-cyan',
                            font_style='bold'))
 
-    if not target_path.exists():
-        os.mkdir(target_path)
+    target_path.mkdir(parents=True, exist_ok=True)  # create intermediate dirs too
 
     if not template_path.exists():
         raise TemplateNotFoundException()

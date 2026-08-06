@@ -20,7 +20,12 @@ class MyRetrievalModule(RetrievalModule):
 
     async def execute(self, query: str):
         query_vector = self.embedding_adapter.create_embeddings([query])
+        if query_vector.size == 0:
+            raise RuntimeError("Embedding request failed. Check API_KEY in settings.py and the network.")
         retrieval_raw = self.milvus_adapter.retrieve('test', query_vector, top_k=3)
+        if retrieval_raw is None:
+            raise RuntimeError("Vector DB retrieval failed. Check that Milvus is running "
+                               "(config/docker-compose.yml) and the collection exists.")
         retrieval = [ret for sublist in retrieval_raw for ret in sublist]
 
         return {
@@ -70,7 +75,9 @@ class MyGenerationModule(GenerationModule):
             "---\n" \
             "answer: "
         )
-        answer = self.llm_adapter.request(prompt=prompt, query=input_query)['text']
+        response = self.llm_adapter.request(prompt=prompt, query=input_query)
+        if 'error' in response:
+            raise RuntimeError(f"LLM request failed: {response['error']}")
         return {
-            'gen': answer,
+            'gen': response['text'],
         }

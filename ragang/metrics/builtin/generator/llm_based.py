@@ -73,6 +73,8 @@ class A2RYNFaithfulnessMetric(BaseBuiltinMetric):
         )
         user_query = f"Text:\n{gen}\n\nOutput:\n"
         response = self.llm_adapter.request(prompt_claim_generation, user_query)
+        if "error" in response or not response.get("text"):  # llm api failed
+            return Performance(_eval=False)
         claim_list = [
             line.strip()
             for line in response["text"].split('\n')
@@ -122,6 +124,8 @@ class A2RYNFaithfulnessMetric(BaseBuiltinMetric):
             print(f"Claim: {claim}")
             user_query = f"Claim:\n{claim}\n\nRetrieved Documents:\n{ret_docs}\n\nJustification:\n"
             response = self.llm_adapter.request(prompt_claim_judgement, user_query)
+            if "error" in response or not response.get("text"):  # llm api failed
+                return Performance(_eval=False)
             try:
                 for line in reversed(response["text"].strip().splitlines()):
                     line = line.strip()
@@ -134,6 +138,8 @@ class A2RYNFaithfulnessMetric(BaseBuiltinMetric):
                             print("Not Grounded")
             except ValueError:
                 score = 0.0  # Default to 0 if the response is not a valid form
+        if not claim_list:  # llm did not answer in the expected numbered format
+            return Performance(_eval=False)
         return Performance(score=score / len(claim_list), unit="", metric="Yes/No Relevancy")
 
 
@@ -190,6 +196,8 @@ class A2RSimpleScoringFaithfulnessMetric(BaseBuiltinMetric):
         )
         user_query = f"Text:\n{gen}\n\nOutput:\n"
         response = self.llm_adapter.request(prompt_claim_generation, user_query)
+        if "error" in response or not response.get("text"):  # llm api failed
+            return Performance(_eval=False)
         claim_list = [
             line.strip()
             for line in response["text"].split('\n')
@@ -239,6 +247,8 @@ class A2RSimpleScoringFaithfulnessMetric(BaseBuiltinMetric):
         for i, claim in enumerate(claim_list):
             user_query = f"Claim:\n{claim}\n\nRetrieved Documents:\n{ret_docs}\n\nJustification:\n"
             response = self.llm_adapter.request(prompt_claim_scoring, user_query)
+            if "error" in response or not response.get("text"):  # llm api failed
+                return Performance(_eval=False)
             score = 0
             try:
                 for line in reversed(response["text"].strip().splitlines()):
@@ -296,6 +306,8 @@ class A2RHallucinationFaithfulnessMetric(BaseBuiltinMetric):
             Is the answer above factual or hallucinated based on the query and reference text?"""
 
         response = self.llm_adapter.request(prompt, "")
+        if "error" in response or not response.get("text"):  # llm api failed
+            return Performance(_eval=False)
         result = response["text"].strip().lower()
 
         score = 1 if result == "factual" else 0
@@ -357,6 +369,8 @@ class A2RTruthfulFaithfulnessMetric(BaseBuiltinMetric):
         )
         user_query = f"Text:\n{gen}\n\nOutput:\n"
         response = self.llm_adapter.request(prompt_claim_generation, user_query)
+        if "error" in response or not response.get("text"):  # llm api failed
+            return Performance(_eval=False)
         claim_list = [
             line.strip()
             for line in response["text"].split('\n')
@@ -408,6 +422,8 @@ class A2RTruthfulFaithfulnessMetric(BaseBuiltinMetric):
             print(f"Claim: {claim}")
             user_query = f"Claim:\n{claim}\n\nRetrieved Documents:\n{ret_docs}\n\nJustification:\n"
             response = self.llm_adapter.request(prompt_claim_judgement, user_query)
+            if "error" in response or not response.get("text"):  # llm api failed
+                return Performance(_eval=False)
             try:
                 for line in reversed(response["text"].strip().splitlines()):
                     line = line.strip()
@@ -420,6 +436,8 @@ class A2RTruthfulFaithfulnessMetric(BaseBuiltinMetric):
                             print("Not Truthful")
             except ValueError:
                 score = 0.0  # Default to 0 if the response is not a valid form
+        if not claim_list:  # llm did not answer in the expected numbered format
+            return Performance(_eval=False)
         return Performance(score=score / len(claim_list), unit="", metric="Yes/No Relevancy")
 
 
@@ -495,8 +513,12 @@ class A2RYNFaithfulnessMetricSingleCall(BaseBuiltinMetric):
         formatted_docs = "\n".join([f"{i + 1}. {doc}" for i, doc in enumerate(truncated_docs)])
         user_query = f"<Generated Answer>\n{truncated_gen}\n\n<Retrieved Documents>\n{formatted_docs}\n\n<Output>\n"
 
+        response_text = ""  # bound before use so the except blocks below can log safely
+        json_part = ""
         try:
             response = self.llm_adapter.request(prompt, user_query)
+            if "error" in response or not response.get("text"):  # llm api failed
+                return Performance(_eval=False)
             response_text = response["text"].strip()
 
             match = re.search(r"```json\s*(\[.*?\])\s*```|(\[.*?\])", response_text, re.DOTALL)

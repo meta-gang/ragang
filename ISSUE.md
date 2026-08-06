@@ -4,7 +4,7 @@
 
 코어 엔진(`base_engine.py`, `base_container.py`)은 정상 동작하며 linear/merge 그래프의 종단 실행을 확인했다. 확인된 결함 41건 중 상당수가 `metrics/builtin/`에 집중되어 있으며, 저장소 전체에 테스트 파일이 없다.
 
-**진행 상황:** 1.1 기능 동작 불가 5건 해결 완료. 나머지 36건 미착수.
+**진행 상황:** 1.1 전체 5건, 1.2 중 2건, 1.3 중 5건, 1.5 중 2건 해결 완료(총 14건). 성능 관련 항목(1.3-5, 1.3-6)과 값 오류 항목은 미착수.
 
 상세 근거와 재현 절차는 저장소의 `REVIEW.md`에 기록했다. 아래 표의 위치는 `ragang/` 패키지 기준 상대 경로다.
 
@@ -30,30 +30,32 @@
 
 ## 1.2 잘못된 평가 결과
 
-예외 없이 부정확한 값이 산출된다. 정상적으로 점수가 반환되므로 사용자가 오류를 인지하기 어렵다.
+예외 없이 부정확한 값이 산출된다. 정상적으로 점수가 반환되므로 사용자가 오류를 인지하기 어렵다. 이 중 실행 오류를 동반하는 2건을 처리했다.
 
-| # | 항목 | 위치 | 증상 |
-|---|---|---|---|
-| 1 | `MutualInformation_KSG` 산출식 오류 | `metrics/builtin/generator/non_llm_based.py:145` | `dist_x = np.max(np.abs(gen_embedding - gen_embedding))`이 항상 0이다. x-주변부 항이 상수로 고정되어 상호정보량을 추정하지 못한다. 표준 KSG는 digamma를 사용하나 `np.log`를 사용한다 |
-| 2 | e2e 메트릭 시그니처와 엔진 규약 불일치 | `metrics/builtin/e2e/non_llm_based.py:56`, `:98` | 엔진은 `evaluate(query, gen: str)`으로 호출하나 메트릭은 `gens: list[str]`을 기대한다. 문자열 길이가 개수로 계산되고 문자 조각이 임베딩된다 |
-| 3 | claim 판정 중복 가산 및 누적 점수 초기화 | `metrics/builtin/generator/llm_based.py:121-137`, `:406-423` | 판정 라인 발견 후 `break`가 없어 응답에 판정이 2회 등장하면 1개 claim이 2점을 받는다. 파싱 실패 시 `score = 0.0`이 이전 claim 결과 전체를 폐기한다 |
-| 4 | 인덱싱 대상과 쿼리 생성 대상 불일치 | `templates/init_template/config/load_adapters.py:46-51`, `core/utils/query_generator/document_loader.py:141` | 인덱싱은 `.txt`를 500자 단위로, 쿼리 생성은 `.pdf`를 5문장 단위로 처리한다. 평가 대상 문서와 질문 생성 문서가 일치하지 않는다 |
-| 5 | 실행마다 인덱스 재구축으로 비교 불가 | `templates/init_template/config/load_adapters.py:12-20` | `containers()`가 `create_engine()` 호출마다 실행되어 컬렉션을 drop 후 전량 재임베딩한다. 실행 시점마다 인덱스가 달라지며 임베딩 비용이 실행 횟수에 비례한다 |
-| 6 | 루프 그래프 중복 파라미터 처리 무효 | `core/bases/abstracts/base_engine.py:174-179` | 좌변과 우변이 동일 객체의 동일 키인 자기 대입이다. 루프 복귀 시 최신값 반영 로직이 동작하지 않는다 |
-| 7 | `MilvusAdapter`가 설정 파일의 host/port 폐기 | `adapters/milvus_adapter.py:55-60` | `super().__init__(host, port, alias)`가 설정에서 읽은 값을 생성자 기본값으로 덮어쓴다. 원격 Milvus 지정이 무시된다 |
+| # | 항목 | 위치 | 증상 | 해결 |
+|---|---|---|---|---|
+| 1 | `MutualInformation_KSG` 산출식 오류 | `metrics/builtin/generator/non_llm_based.py:145` | `dist_x = np.max(np.abs(gen_embedding - gen_embedding))`이 항상 0이다. x-주변부 항이 상수로 고정되어 상호정보량을 추정하지 못한다. 표준 KSG는 digamma를 사용하나 `np.log`를 사용한다. 추가로 `distances[k-1]` 인덱싱이 **템플릿 기본값(top_k=3, k=3)에서 100% IndexError** | **부분 해결(크래시만).** 이웃 수는 최대 N-1이므로 `k_eff = min(k, N-1)`로 k를 검색 결과 수에 맞춰 축소, 문서 1건 이하는 미평가. `log_k`도 `k_eff` 기준. **`dist_x` 산출식 오류는 남아 있어 산출값은 여전히 유효한 상호정보량이 아니다** |
+| 2 | e2e 메트릭 시그니처와 엔진 규약 불일치 | `metrics/builtin/e2e/non_llm_based.py:56`, `:98` | 엔진은 `evaluate(query, gen: str)`으로 호출하나 메트릭은 `gens: list[str]`을 기대한다. 문자열 길이가 개수로 계산되고 문자 조각이 임베딩된다 | **해결.** str 입력을 `[str]`로 정규화하고, 답변 2건 미만이면 `Performance(_eval=False)`. 날조된 점수(0.757 등) 대신 "Not evaluated!"로 표기된다. 기존의 `len(gens)<2 → 1.0` 분기도 상수 1.0이 실제 점수로 읽히므로 동일 처리. 반복 실행 기능이 생기면 그대로 동작 |
+| 3 | claim 판정 중복 가산 및 누적 점수 초기화 | `metrics/builtin/generator/llm_based.py:121-137`, `:406-423` | 판정 라인 발견 후 `break`가 없어 응답에 판정이 2회 등장하면 1개 claim이 2점을 받는다. 파싱 실패 시 `score = 0.0`이 이전 claim 결과 전체를 폐기한다 | — |
+| 4 | 인덱싱 대상과 쿼리 생성 대상 불일치 | `templates/init_template/config/load_adapters.py:46-51`, `core/utils/query_generator/document_loader.py:141` | 인덱싱은 `.txt`를 500자 단위로, 쿼리 생성은 `.pdf`를 5문장 단위로 처리한다. 평가 대상 문서와 질문 생성 문서가 일치하지 않는다 | — |
+| 5 | 실행마다 인덱스 재구축으로 비교 불가 | `templates/init_template/config/load_adapters.py:12-20` | `containers()`가 `create_engine()` 호출마다 실행되어 컬렉션을 drop 후 전량 재임베딩한다. 실행 시점마다 인덱스가 달라지며 임베딩 비용이 실행 횟수에 비례한다 | — |
+| 6 | 루프 그래프 중복 파라미터 처리 무효 | `core/bases/abstracts/base_engine.py:174-179` | 좌변과 우변이 동일 객체의 동일 키인 자기 대입이다. 루프 복귀 시 최신값 반영 로직이 동작하지 않는다 | — |
+| 7 | `MilvusAdapter`가 설정 파일의 host/port 폐기 | `adapters/milvus_adapter.py:55-60` | `super().__init__(host, port, alias)`가 설정에서 읽은 값을 생성자 기본값으로 덮어쓴다. 원격 Milvus 지정이 무시된다 | — |
 
-## 1.3 실행 중단 및 성능 저하
+## 1.3 실행 중단 및 성능 저하 — 실행 중단 5건 해결
 
-평가 도중 예외가 발생해 결과를 얻지 못하거나 처리량이 저하된다.
+평가 도중 예외가 발생해 결과를 얻지 못하거나 처리량이 저하된다. 빌트인 메트릭 전 클래스를 6가지 경계 입력(정상/문서1건/문서0건/LLM오류응답/LLM형식이탈/임베딩실패)으로 180회 호출해 조사한 결과 **런타임 오류 25회**가 확인됐고, 수정 후 **0회**가 됐다. 성능 항목(5, 6)은 이번 범위에서 제외했다.
 
-| # | 항목 | 위치 | 증상 |
-|---|---|---|---|
-| 1 | 어댑터 오류 응답 시 KeyError | 메트릭 6개소, `templates/init_template/modules/impls.py:73` | 어댑터는 실패 시 `{"error": ...}`를 반환하나 `response["text"]`를 무조건 인덱싱한다. `gather(return_exceptions=False)`와 결합되어 400건 배치 중 1회의 rate-limit으로 전체가 중단되고 완료분도 저장되지 않는다 |
-| 2 | claim 0건 시 ZeroDivisionError | `metrics/builtin/generator/llm_based.py:137`, `:423` | LLM이 번호 형식으로 응답하지 않으면 claim 리스트가 비고 `score / len(claim_list)`에서 예외가 발생한다 |
-| 3 | top-k 메트릭이 문서 1건 입력에서 예외 | `metrics/builtin/generator/non_llm_based.py:231-233` | `max()` 인자가 빈 리스트가 되어 ValueError. `base_score` 산식이 비유계로 -10⁶ 규모 값이 가능하다 |
-| 4 | `Status` 그래프 순회에 사이클 보호 부재 | `core/bases/datas/status.py:13-17`, `:37-43` | 방문 집합 없이 재귀하여 루프 그래프에서 RecursionError 가능. `find_loop_before_mid`는 첫 outgoing edge만 따라가 분기 그래프에서 오탐한다 |
-| 5 | 동기 메트릭이 이벤트 루프를 점유 | `core/bases/abstracts/base_engine.py:151` | 8쿼리 기준 이론값 0.6초 대비 실측 2.70초. `Packet.x_time`에 타 코루틴의 대기 시간이 포함되어 성능 측정값이 오염된다 |
-| 6 | 동기 HTTP 호출에 timeout 미지정 | `adapters/` 6개소 | `requests` 기본 timeout은 무제한이다. 무응답 서버 1개가 배치 전체를 정지시킨다. 재시도·백오프도 없다 |
+| # | 항목 | 위치 | 증상 | 해결 |
+|---|---|---|---|---|
+| 1 | 어댑터 오류 응답 시 KeyError | 메트릭 6개소, `templates/init_template/modules/impls.py:73` | 어댑터는 실패 시 `{"error": ...}`를 반환하나 `response["text"]`를 무조건 인덱싱한다. `gather(return_exceptions=False)`와 결합되어 400건 배치 중 1회의 rate-limit으로 전체가 중단되고 완료분도 저장되지 않는다 | **해결.** ① LLM 5개 메트릭 6개 호출 지점에 `if "error" in response or not response.get("text"): return Performance(_eval=False)` 추가(`retriever/llm_based.py:109`의 기존 패턴 적용). ② 임베딩 실패 시 `np.array([])`를 `[0]`으로 인덱싱해 IndexError를 내던 13개 메트릭에 `.size == 0` 가드 추가. `GECE`·`ECS`는 가드가 이미 있었으나 인덱싱이 먼저 실행돼 도달 못 했으므로 순서만 교정. ③ `SingleCall`은 `response_text`를 try 진입 전에 초기화해 except 블록의 UnboundLocalError 제거 |
+| 2 | claim 0건 시 ZeroDivisionError | `metrics/builtin/generator/llm_based.py:137`, `:423` | LLM이 번호 형식으로 응답하지 않으면 claim 리스트가 비고 `score / len(claim_list)`에서 예외가 발생한다 | **해결.** 나눗셈 전 `if not claim_list: return Performance(_eval=False)` |
+| 3 | top-k 메트릭이 문서 1건 입력에서 예외 | `metrics/builtin/generator/non_llm_based.py:231-233` | `max()` 인자가 빈 리스트가 되어 ValueError. `base_score` 산식이 비유계로 -10⁶ 규모 값이 가능하다 | **해결.** top-k 분할에 최소 2건이 필요하므로 문서 2건 미만이면 미평가. `PairwiseCosineSimilarityVariance`의 NaN 산출도 동일 처리 |
+| 4 | `Status` 그래프 순회에 사이클 보호 부재 | `core/bases/datas/status.py:13-17`, `:37-43` | 방문 집합 없이 재귀하여 루프 그래프에서 RecursionError 가능. `find_loop_before_mid`는 첫 outgoing edge만 따라가 분기 그래프에서 오탐한다 | — (usage 예제로는 재현되지 않는 잠재 결함이라 범위 제외) |
+| 5 | 동기 메트릭이 이벤트 루프를 점유 | `core/bases/abstracts/base_engine.py:151` | 8쿼리 기준 이론값 0.6초 대비 실측 2.70초. `Packet.x_time`에 타 코루틴의 대기 시간이 포함되어 성능 측정값이 오염된다 | — (성능, 범위 제외) |
+| 6 | 동기 HTTP 호출에 timeout 미지정 | `adapters/` 6개소 | `requests` 기본 timeout은 무제한이다. 무응답 서버 1개가 배치 전체를 정지시킨다. 재시도·백오프도 없다 | — (범위 제외) |
+| 7 | 배치 중 1건 실패가 전체를 중단 | `core/bases/abstracts/base_engine.py:260`, `:287`, `:323` | 쿼리 5건 중 1건이 실패하면 `invoke_batch`가 예외를 전파해 `run/main.py`가 `print_eval()`·`update_history()`에 도달하지 못한다. 완료된 4건이 메모리에 있는데도 출력되지 않고 히스토리에도 남지 않는다 | **해결.** `gather` 3개소를 `return_exceptions=True`로 변경. 직후의 `if isinstance(res, Exception): continue`는 이미 작성돼 있었으나 도달 불가였으므로, 플래그만 바꿔 작성자가 의도한 동작을 살렸다. 실패가 묻히지 않도록 `warnings.warn` 추가. **단, 살아남은 결과가 하나도 없으면 첫 예외를 다시 던진다** — 설정 오류는 모든 쿼리에서 실패하므로 격리 대상이 아니며, 빈 결과 대신 원인을 보고해야 한다 |
+| 8 | 설정 오류 시 진단 메시지 부재 | `core/bases/abstracts/base_container.py:50`, `:62-67`, `templates/init_template/modules/impls.py` | starter 모듈 미지정 시 `AttributeError: 'NoneType' object has no attribute 'lazy_state'`. 중복 module id 메시지가 항상 `set()`. 템플릿 모듈은 벡터DB 실패 시 `TypeError: 'NoneType' object is not iterable`, LLM 실패 시 `KeyError: 'text'` | **해결.** ① starter가 0개면 `RagangStructureException`으로 안내(기존에 "여러 개"만 검증하던 비대칭 해소). ② 중복 id를 `ids.count(i) > 1`로 실제 산출. ③ 템플릿 모듈이 어댑터 실패를 감지해 원인과 조치를 담은 `RuntimeError`를 던지도록 변경 |
 
 ## 1.4 보안 및 정보 노출
 
@@ -66,17 +68,17 @@ WebSocket 서버에 인증이 없는 상태에서 파일 접근과 외부 노출
 | 3 | 예외 traceback을 전체 구독자에게 브로드캐스트 | `core/network/runner.py:64-68` | 절대 경로, 사용자명, 내부 구조가 노출된다 |
 | 4 | API 키 평문 저장 | `templates/init_template/settings.py:10` | 환경변수 대체 경로가 없고 `ragang init`이 `.gitignore`를 생성하지 않아 키가 커밋될 가능성이 높다 |
 
-## 1.5 데이터 형식 및 운영
+## 1.5 데이터 형식 및 운영 — 2건 해결
 
 저장 포맷과 오류 처리 방식이 외부 도구 및 사용자 환경과 맞지 않는다.
 
-| # | 항목 | 위치 | 증상 |
-|---|---|---|---|
-| 1 | NaN 점수와 이름 맹글링 키가 히스토리에 기록 | `core/bases/datas/performance.py:7-10`, `core/utils/cli.py:31` | `{"_Performance__score": NaN}` 형태로 저장된다. 표준 JSON 파서로 읽을 수 없고 스키마가 Python 이름 맹글링 규칙에 종속된다 |
-| 2 | 어댑터 실패의 조용한 전파 | `adapters/embedding_adapter.py`, `adapters/milvus_adapter.py` | 실패 시 `np.array([])`, `None`을 반환하고 `connect()`는 예외를 삼킨다. 호출 지점과 다른 곳에서 예외가 표면화된다 |
-| 3 | `'gen'` 키가 예약어이나 미문서화 | `core/bases/datas/packet.py:16` | 중간 모듈이 `gen` 키를 반환하면 플로우가 경고 없이 종료된다. 예약어 검증 코드가 주석 처리되어 있다 |
-| 4 | `load_user_containers`의 예외 통합 및 `sys.path` 미복원 | `core/utils/modules.py:11-27` | 프레임워크가 던진 안내 메시지가 일반 메시지로 대체된다. `sys.path` 미복원과 모듈 캐시로 한 프로세스에서 다중 프로젝트 로드가 불가능하다 |
-| 5 | `ragang init a/b/c` 실패 | `cli_script/init/main.py:19` | `os.mkdir`가 중간 디렉터리를 생성하지 않아 FileNotFoundError |
+| # | 항목 | 위치 | 증상 | 해결 |
+|---|---|---|---|---|
+| 1 | NaN 점수와 이름 맹글링 키가 히스토리에 기록 | `core/bases/datas/performance.py:7-10`, `core/utils/cli.py:31` | `{"_Performance__score": NaN}` 형태로 저장된다. 표준 JSON 파서로 읽을 수 없고 스키마가 Python 이름 맹글링 규칙에 종속된다 | **NaN 부분 해결.** `core/decorators/serializable.py`의 `__serialize`에 비유한 float를 `None`으로 바꾸는 분기 추가. 이 한 곳이 히스토리와 WebSocket 브로드캐스트 공통 경로이므로 양쪽이 함께 해결된다. `GECE`가 반환하던 `inf`도 동일 처리. **키 맹글링은 프론트엔드 계약이라 그대로 둠** |
+| 2 | 어댑터 실패의 조용한 전파 | `adapters/embedding_adapter.py`, `adapters/milvus_adapter.py` | 실패 시 `np.array([])`, `None`을 반환하고 `connect()`는 예외를 삼킨다. 호출 지점과 다른 곳에서 예외가 표면화된다 | **부분 해결.** 어댑터 반환 계약은 그대로 두고, 빌트인 메트릭 호출부 전체에 가드를 넣어 크래시를 제거했다(1.3-1). 어댑터가 실패를 조용히 삼키는 것 자체와 템플릿 모듈의 `retrieve() → None` TypeError는 남아 있다 |
+| 3 | `'gen'` 키가 예약어이나 미문서화 | `core/bases/datas/packet.py:16` | 중간 모듈이 `gen` 키를 반환하면 플로우가 경고 없이 종료된다. 예약어 검증 코드가 주석 처리되어 있다 | — |
+| 4 | `load_user_containers`의 예외 통합 및 `sys.path` 미복원 | `core/utils/modules.py:11-27` | 프레임워크가 던진 안내 메시지가 일반 메시지로 대체된다. `sys.path` 미복원과 모듈 캐시로 한 프로세스에서 다중 프로젝트 로드가 불가능하다 | — |
+| 5 | `ragang init a/b/c` 실패 | `cli_script/init/main.py:19` | `os.mkdir`가 중간 디렉터리를 생성하지 않아 FileNotFoundError | **해결.** `target_path.mkdir(parents=True, exist_ok=True)`로 교체 |
 
 ## 1.6 코드 품질 및 유지보수
 
@@ -211,8 +213,10 @@ LLM-as-judge는 동일 입력에 대해 상이한 점수를 산출하나 현재�
 v0.0.8b0이 PyPI에 배포된 상태이므로 우선순위가 높다.
 
 - [x] 1.1 전체 5건 — 완료 (8개 파일, 검증 13/13 통과)
-- [ ] 실행 중단 항목: 1.3-1, 1.3-2, 1.3-3
-- [ ] 산출식 오류: 1.2-1 대체 또는 배포 제외, 1.2-3
+- [x] 실행 중단 항목: 1.3-1, 1.3-2, 1.3-3, 1.3-7, 1.3-8 — 완료 (10개 파일, 런타임 오류 25 → 0)
+- [x] 1.2-2 e2e 시그니처, 1.5-1 NaN JSON, 1.5-5 init 경로 — 완료
+- [~] 1.2-1 KSG — 크래시만 제거. 산출식 오류는 남아 있어 대체 또는 배포 제외 필요
+- [ ] 1.2-3 claim 중복 가산
 - [ ] 보안 항목: 1.4-1, 1.4-2
 - [ ] 테스트 하네스 도입. Fake 어댑터 기반 usage 4종 골든 테스트, 빌트인 메트릭 전수 스모크 테스트(문서 0/1/N건, 오류 응답, 빈 응답)
 - [ ] 루트 README 재작성 (1.6-12)

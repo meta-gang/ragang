@@ -9,6 +9,7 @@ from ragang.core.bases.datas.state import State
 from ragang.core.decorators.use_lock import use_async_lock
 from ragang.exceptions.user.module import DuplicateModuleIdException, \
     MultipleStarterModuleException, InvalidModuleIdException
+from ragang.exceptions.user.structure import RagangStructureException
 from ragang.core.utils.ansi_styler import ANSIStyler
 
 
@@ -48,7 +49,7 @@ class BaseContainer(metaclass=ABCMeta):
         u_ids: set[str] = set(ids)
 
         if len(ids) != len(u_ids):  # check dup
-            duplicate_ids: set[str] = u_ids.difference(set(ids))
+            duplicate_ids: set[str] = {i for i in u_ids if ids.count(i) > 1}
             raise DuplicateModuleIdException(duplicate_ids)
         return modules
 
@@ -65,6 +66,10 @@ class BaseContainer(metaclass=ABCMeta):
                 if self.starter is not None:
                     raise MultipleStarterModuleException(self.starter.module_id, module.module_id)
                 self.starter = module
+        if self.starter is None:
+            raise RagangStructureException(
+                f"Container '{self.flow_id}' has no starter module. "
+                f"Set 'is_starter=True' on exactly one module to define where the flow begins.")
 
     def __set_directions(self) -> None:
         for _, module in self.modules.items():

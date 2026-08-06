@@ -1,3 +1,6 @@
+import math
+
+
 def serializable(cls):
     def __serialize(obj):
         from ragang.core.bases.abstracts.base_module import BaseModule
@@ -10,6 +13,9 @@ def serializable(cls):
             return {k: __serialize(v) for k, v in obj.items()}
         elif isinstance(obj, (list, tuple)):
             return [__serialize(v) for v in obj]
+        elif isinstance(obj, float) and not math.isfinite(obj):
+            # NaN / inf are not valid JSON; they break the dashboard and any strict parser
+            return None
         else:
             return obj
 

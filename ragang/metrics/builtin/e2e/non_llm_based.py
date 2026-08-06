@@ -36,6 +36,8 @@ class AnswerQuerySimilarity(BaseBuiltinMetric):
         :rtype: Performance
         """
         embeddings = self.embedding_adapter.create_embeddings([query, gen])
+        if len(embeddings) < 2:  # embedding api failed
+            return Performance(_eval=False)
         query_vec, ans_vec = embeddings[0], embeddings[1]
 
         aqs_score = CosineSimilarity.compute(query_vec, ans_vec)
@@ -62,11 +64,16 @@ class e2eCosineConsistencyMetric(BaseBuiltinMetric):
         :returns: Performance object with the mean cosine similarity score
         :rtype: Performance
         """
-        if len(gens) < 2:
-            return Performance(score=1.0, unit="", metric="E2E Consistency")
+        # the engine passes a single generated answer (str); consistency needs several
+        if isinstance(gens, str):
+            gens = [gens]
+        if not gens or len(gens) < 2:
+            return Performance(_eval=False)
 
         try:
             gen_vectors = self.embedding_adapter.create_embeddings(gens)
+            if len(gen_vectors) < 2:  # embedding api failed
+                return Performance(_eval=False)
             similarity_matrix = cosine_similarity(gen_vectors)
 
             num_gens = len(gens)
@@ -106,12 +113,17 @@ class e2eCovarianceConsistencyMetric(BaseBuiltinMetric):
         :returns: Performance object with the variance of cosine similarities
         :rtype: Performance
         """
-        if not gens:
-            return Performance(score=0.0, unit="", metric="E2E Query-Answer Consistency Variance")
+        # the engine passes a single generated answer (str); variance needs several
+        if isinstance(gens, str):
+            gens = [gens]
+        if not gens or len(gens) < 2:
+            return Performance(_eval=False)
 
         try:
             all_texts = [query] + gens
             embeddings = self.embedding_adapter.create_embeddings(all_texts)
+            if len(embeddings) != len(all_texts):  # embedding api failed
+                return Performance(_eval=False)
 
             query_vector = embeddings[0:1]
             gen_vectors = embeddings[1:]

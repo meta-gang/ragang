@@ -152,8 +152,11 @@ class CosineSimilarityMetric(BaseBuiltinMetric):
         if not ret_docs:
             return Performance(score=0.0, unit='-1 to 1', metric='Cosine Similarity Metric')
 
-        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        query_vecs = self.embedding_adapter.create_embeddings([query])
         doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
+        if query_vecs.size == 0 or doc_vecs.size == 0:  # embedding api failed
+            return Performance(_eval=False)
+        query_vec = query_vecs[0]
 
         similarity_scores = cosine_similarity([query_vec], doc_vecs)[0]
 
@@ -185,8 +188,11 @@ class EuclideanDistanceMetric(BaseBuiltinMetric):
         if not ret_docs:
             return Performance(score=0.0, unit='distance', metric='Euclidean Distance Metric')
 
-        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        query_vecs = self.embedding_adapter.create_embeddings([query])
         doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
+        if query_vecs.size == 0 or doc_vecs.size == 0:  # embedding api failed
+            return Performance(_eval=False)
+        query_vec = query_vecs[0]
 
         distances = [np.linalg.norm(query_vec - doc_vec) for doc_vec in doc_vecs]
         avg_distance = np.mean(distances) if distances else 0.0
@@ -216,8 +222,11 @@ class ManhattanDistanceMetric(BaseBuiltinMetric):
         if not ret_docs:
             return Performance(score=0.0, unit='distance', metric='Manhattan Distance Metric')
 
-        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        query_vecs = self.embedding_adapter.create_embeddings([query])
         doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
+        if query_vecs.size == 0 or doc_vecs.size == 0:  # embedding api failed
+            return Performance(_eval=False)
+        query_vec = query_vecs[0]
 
         distances = [np.sum(np.abs(query_vec - doc_vec)) for doc_vec in doc_vecs]
         avg_distance = np.mean(distances) if distances else 0.0
@@ -246,8 +255,11 @@ class NegativeRejectionRateMetric(BaseBuiltinMetric):
         if not ret_docs:
             return Performance(score=0.0, unit='%', metric='Negative Rejection Rate Metric')
 
-        query_vec = self.embedding_adapter.create_embeddings([query])[0]
+        query_vecs = self.embedding_adapter.create_embeddings([query])
         doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
+        if query_vecs.size == 0 or doc_vecs.size == 0:  # embedding api failed
+            return Performance(_eval=False)
+        query_vec = query_vecs[0]
 
         similarities = cosine_similarity([query_vec], doc_vecs)[0]
         irrelevant_count = np.sum(similarities <= 0)
@@ -414,11 +426,12 @@ class GeneralizedEmbeddingCoverageError(BaseBuiltinMetric):
         if not ret_docs:
             return Performance(score=float('inf'), unit='distance', metric='GECE')
 
-        query_embedding = self.embedding_adapter.create_embeddings([query])[0]
+        query_embeddings = self.embedding_adapter.create_embeddings([query])
         doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
 
-        if query_embedding.size == 0 or doc_embeddings.size == 0:
-            return Performance(score=float('inf'), unit='distance', metric='GECE')
+        if query_embeddings.size == 0 or doc_embeddings.size == 0:  # guard before indexing
+            return Performance(_eval=False)
+        query_embedding = query_embeddings[0]
 
         distances = [np.linalg.norm(query_embedding - doc_emb) for doc_emb in doc_embeddings]
         coverage_error = np.mean(distances) if distances else 0.0
@@ -446,11 +459,12 @@ class EmbeddingCosineSimilarityEvaluation(BaseBuiltinMetric):
         if not ret_docs:
             return Performance(score=0.0, unit='-1 to 1', metric='Embedding Cosine Similarity')
 
-        query_embedding = self.embedding_adapter.create_embeddings([query])[0]
+        query_embeddings = self.embedding_adapter.create_embeddings([query])
         doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
 
-        if query_embedding.size == 0 or doc_embeddings.size == 0:
-            return Performance(score=0.0, unit='-1 to 1', metric='Embedding Cosine Similarity')
+        if query_embeddings.size == 0 or doc_embeddings.size == 0:  # guard before indexing
+            return Performance(_eval=False)
+        query_embedding = query_embeddings[0]
 
         sims = cosine_similarity([query_embedding], doc_embeddings)[0]
         local_score = np.max(sims)
@@ -479,6 +493,8 @@ class PairwiseCosineSimilarityVariance(BaseBuiltinMetric):
         :rtype: Performance
         """
         embeddings = self.embedding_adapter.create_embeddings(ret_docs)
+        if len(embeddings) < 2:  # embedding api failed, or not enough chunks to pair
+            return Performance(_eval=False)
         similarity = []
         for i in range(len(embeddings)):
             for j in range(i + 1, len(embeddings)):
