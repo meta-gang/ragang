@@ -9,11 +9,10 @@ from ragang.exceptions.user.structure import RagangStructureException
 
 
 def load_user_containers(proj_root: str):
+    root = Path(proj_root).resolve()
+    sys.path.insert(0, str(root))
     try:
-        root = Path(proj_root).resolve()
-        sys.path.insert(0, str(root))
-
-        entry_path = Path(proj_root) / 'manager.py'
+        entry_path = root / 'manager.py'
         if not entry_path.exists():
             raise NoEntryPointException()
 
@@ -23,6 +22,8 @@ def load_user_containers(proj_root: str):
             raise RagangStructureException(f"manager.py must define a 'containers()' function")
 
         return module.containers
+    except (NoEntryPointException, RagangStructureException):
+        raise  # these already say what the user has to do; do not bury them
     except Exception as e:
         raise RagangLoadError(f"Failed to load containers() from {proj_root}/manager.py") from e
 

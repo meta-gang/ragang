@@ -14,7 +14,7 @@ from ragang.exceptions.frameworks.cli import HTMLNotFoundException
 stop_event = threading.Event()
 
 
-def run_web_cli(port: int):
+def run_web_cli(host: str, port: int):
     # serve react build file
     web_path: Path = Path(__file__).parent.parent.parent / 'web'
     if not web_path.exists():
@@ -28,7 +28,9 @@ def run_web_cli(port: int):
         def log_message(self, format, *args):
             pass
 
-    server = HTTPServer(('0.0.0.0', port), Handler)
+    # bind to the advertised host only; the dashboard serves local evaluation results
+    # and must not be reachable from the rest of the network
+    server = HTTPServer((host, port), Handler)
     server.serve_forever()
 
 
@@ -44,7 +46,7 @@ def run(args: Namespace):
     ws_thread.start()
 
     # run front
-    web_thread = threading.Thread(target=run_web_cli, args=(web_port,), daemon=True)
+    web_thread = threading.Thread(target=run_web_cli, args=(host, web_port), daemon=True)
     web_thread.start()
 
     webbrowser.open(f"http://{host}:{web_port}")  # open web browser

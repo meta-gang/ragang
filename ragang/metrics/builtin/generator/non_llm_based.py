@@ -5,6 +5,49 @@ from ragang.core.utils.tools import CosineSimilarity
 from ragang.adapters.llm_adapter import BaseLLMAdapter
 from ragang.adapters.embedding_adapter import BaseEmbeddingAdapter
 
+_EULER_MASCHERONI = 0.5772156649015329
+
+
+def _digamma_int(n: int) -> float:
+    """Digamma psi(n) for a positive integer n.
+
+    The KSG estimator only ever evaluates psi at positive integers, where it has the
+    closed form psi(n) = -gamma + sum_{m=1}^{n-1} 1/m. Computing it directly keeps the
+    estimator free of any special-function library.
+    """
+    value = -_EULER_MASCHERONI
+    for m in range(1, n):
+        value += 1.0 / m
+    return value
+
+
+def _ksg_mutual_information(xs: list[float], ys: list[float], k: int) -> float:
+    """KSG (Kraskov-Stoegbauer-Grassberger) estimator of I(X;Y) for paired 1-D samples.
+
+        I(X;Y) = psi(k) + psi(N) - <psi(n_x + 1) + psi(n_y + 1)>
+
+    For each sample i, eps_i is the distance to its k-th nearest neighbour in the joint
+    space under the max-norm; n_x and n_y count the neighbours strictly inside eps_i
+    along each marginal. Both lists must be the same length and paired by index.
+    """
+    n = len(xs)
+    total = 0.0
+    for i in range(n):
+        dx = [abs(xs[i] - xs[j]) for j in range(n) if j != i]
+        dy = [abs(ys[i] - ys[j]) for j in range(n) if j != i]
+        eps = sorted(max(a, b) for a, b in zip(dx, dy))[k - 1]
+        if eps == 0:
+            # the k-th neighbour coincides with the sample (duplicate chunks). counting
+            # nothing here would make such degenerate input score as maximal dependency,
+            # so count the coincident points instead
+            n_x = sum(1 for d in dx if d == 0)
+            n_y = sum(1 for d in dy if d == 0)
+        else:
+            n_x = sum(1 for d in dx if d < eps)
+            n_y = sum(1 for d in dy if d < eps)
+        total += _digamma_int(n_x + 1) + _digamma_int(n_y + 1)
+    return _digamma_int(k) + _digamma_int(n) - total / n
+
 
 class BaseBuiltinMetric(BaseMetric):
     def __init__(self, param_src: list[str], llm_adapter: BaseLLMAdapter = None, embedding_adapter: BaseEmbeddingAdapter = None):
@@ -89,11 +132,24 @@ class AnswerCentricSimilarityVariance(BaseBuiltinMetric):
 
 class MutualInformation_KSG(BaseBuiltinMetric):
     """
-    Estimates mutual information between the generated answer and context using KSG estimator.
+    Estimates the mutual information between how much the answer reflects each retrieved
+    chunk and how relevant that chunk is to the query, using the KSG estimator.
+
+    One paired sample is taken per retrieved chunk:
+
+    - ``x_i = cos(generation, chunk_i)`` -- how much the answer reflects that chunk
+    - ``y_i = cos(query, chunk_i)``      -- how relevant that chunk is to the query
+
+    A high score means the generator drew on chunks in proportion to their relevance to
+    the query. A low score means the answer's content is unrelated to which chunks were
+    actually relevant, which is a hallucination signal.
+
+    .. note:: The sample size equals the number of retrieved chunks, so the estimate is
+        high-variance at small ``top_k``. Raise ``top_k`` for a more stable reading.
 
     :param embedding_adapter: The embedding model to use
     :type embedding_adapter: BaseEmbeddingAdapter
-    :param k: Number of nearest neighbors
+    :param k: Number of nearest neighbors. Shrunk automatically when fewer chunks are retrieved.
     :type k: int
     :ivar embedding_adapter: Stores the embedding model
     :vartype embedding_adapter: BaseEmbeddingAdapter
@@ -105,70 +161,42 @@ class MutualInformation_KSG(BaseBuiltinMetric):
         super().__init__(param_src, llm_adapter, embedding_adapter)
         self.k = k
 
-    def evaluate(self, ret_docs: list[str], generation: str) -> Performance:
+    def evaluate(self, ret_docs: list[str], generation: str, query: str) -> Performance:
         """
-        Estimate how much mutual information exists between the generated answer and the retrieval context by measuring statistical dependency using the KSG(Kraskov Stögbauer Grassberger) method, which approximates mutual information based on neighbor distances in joint and marginal embedding spaces.
+        Estimate the statistical dependency between the answer's use of each retrieved chunk
+        and that chunk's relevance to the query, using the KSG(Kraskov Stoegbauer Grassberger)
+        method over one paired sample per chunk.
 
         :param ret_docs: Retrieval chunks
         :type ret_docs: list[str]
         :param generation: Generated answer
         :type generation: str
+        :param query: User query
+        :type query: str
         :returns: Estimated mutual information score
         :rtype: Performance
         """
-        context_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
-        gen_embeddings = self.embedding_adapter.create_embeddings([generation])
-        if context_embeddings.size == 0 or gen_embeddings.size == 0:  # embedding api failed
+        chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
+        gen_vecs = self.embedding_adapter.create_embeddings([generation])
+        query_vecs = self.embedding_adapter.create_embeddings([query])
+        if chunk_vecs.size == 0 or gen_vecs.size == 0 or query_vecs.size == 0:  # embedding api failed
             return Performance(_eval=False)
-        gen_embedding = gen_embeddings[0]
 
-        N = len(context_embeddings)
-        # each point has N-1 neighbours, so k cannot exceed that. shrink k to fit
-        # the retrieved set instead of failing (top_k=3 with k=3 is the template default)
-        k_eff = min(self.k, N - 1)
+        n = len(chunk_vecs)
+        # each point has n-1 neighbours, so k cannot exceed that. shrink k to whatever the
+        # retrieved set allows rather than refusing to evaluate
+        k_eff = min(self.k, n - 1)
         if k_eff < 1:  # a single chunk has no neighbour to measure against
             return Performance(_eval=False)
 
-        joint_vectors = []
-        for ctx_vec in context_embeddings:
-            joint = np.concatenate([gen_embedding, ctx_vec])
-            joint_vectors.append(joint)
+        gen_vec, query_vec = gen_vecs[0], query_vecs[0]
+        # one paired sample per chunk: (how much the answer reflects it, how relevant it is)
+        xs = [CosineSimilarity.compute(gen_vec, vec) for vec in chunk_vecs]
+        ys = [CosineSimilarity.compute(query_vec, vec) for vec in chunk_vecs]
 
-        epsilons = []
-        for i in range(N):
-            distances = []
-            for j in range(N):
-                if i == j:
-                    continue
-                dist = np.max(np.abs(joint_vectors[i] - joint_vectors[j]))
-                distances.append(dist)
-            distances.sort()
-            epsilons.append(distances[k_eff - 1])
-
-        n_x = []
-        n_y = []
-        for i in range(N):
-            eps = epsilons[i]
-            count_x = 0
-            count_y = 0
-            for j in range(N):
-                if i == j:
-                    continue
-                dist_x = np.max(np.abs(gen_embedding - gen_embedding))
-                dist_y = np.max(np.abs(context_embeddings[i] - context_embeddings[j]))
-                if dist_x < eps:
-                    count_x += 1
-                if dist_y < eps:
-                    count_y += 1
-            n_x.append(count_x)
-            n_y.append(count_y)
-
-        log_k = np.log(k_eff)
-        log_N = np.log(N)
-        avg_term = np.mean(np.log(np.array(n_x) + 1) + np.log(np.array(n_y) + 1))
-        mi = log_k + log_N - avg_term
-
-        return Performance(score=float(mi), unit="", metric="MI_GC_KSG")
+        mi = _ksg_mutual_information(xs, ys, k_eff)
+        # mutual information is non-negative; the estimator can dip below zero on small samples
+        return Performance(score=max(float(mi), 0.0), unit="", metric="MI_GC_KSG")
 
 
 class RetrievalDeviationfromAnswer(BaseBuiltinMetric):

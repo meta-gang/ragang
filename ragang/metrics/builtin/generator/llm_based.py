@@ -126,18 +126,18 @@ class A2RYNFaithfulnessMetric(BaseBuiltinMetric):
             response = self.llm_adapter.request(prompt_claim_judgement, user_query)
             if "error" in response or not response.get("text"):  # llm api failed
                 return Performance(_eval=False)
-            try:
-                for line in reversed(response["text"].strip().splitlines()):
-                    line = line.strip()
-                    if line.startswith("Groundedness:"):
-                        value = line.split(":", 1)[1].strip()
-                        if value == "Grounded":
-                            print("Grounded")
-                            score += 1
-                        else:
-                            print("Not Grounded")
-            except ValueError:
-                score = 0.0  # Default to 0 if the response is not a valid form
+            # read the last verdict only; few-shot examples echoed back by smaller models
+            # would otherwise be counted again and push a single claim above 1 point
+            for line in reversed(response["text"].strip().splitlines()):
+                line = line.strip()
+                if line.startswith("Groundedness:"):
+                    value = line.split(":", 1)[1].strip()
+                    if value == "Grounded":
+                        print("Grounded")
+                        score += 1
+                    else:
+                        print("Not Grounded")
+                    break
         if not claim_list:  # llm did not answer in the expected numbered format
             return Performance(_eval=False)
         return Performance(score=score / len(claim_list), unit="", metric="Yes/No Relevancy")
@@ -424,18 +424,18 @@ class A2RTruthfulFaithfulnessMetric(BaseBuiltinMetric):
             response = self.llm_adapter.request(prompt_claim_judgement, user_query)
             if "error" in response or not response.get("text"):  # llm api failed
                 return Performance(_eval=False)
-            try:
-                for line in reversed(response["text"].strip().splitlines()):
-                    line = line.strip()
-                    if line.startswith("Faithfulness:"):
-                        value = line.split(":", 1)[1].strip()
-                        if value == "Truthful":
-                            print("Truthful")
-                            score += 1
-                        else:
-                            print("Not Truthful")
-            except ValueError:
-                score = 0.0  # Default to 0 if the response is not a valid form
+            # read the last verdict only; few-shot examples echoed back by smaller models
+            # would otherwise be counted again and push a single claim above 1 point
+            for line in reversed(response["text"].strip().splitlines()):
+                line = line.strip()
+                if line.startswith("Faithfulness:"):
+                    value = line.split(":", 1)[1].strip()
+                    if value == "Truthful":
+                        print("Truthful")
+                        score += 1
+                    else:
+                        print("Not Truthful")
+                    break
         if not claim_list:  # llm did not answer in the expected numbered format
             return Performance(_eval=False)
         return Performance(score=score / len(claim_list), unit="", metric="Yes/No Relevancy")

@@ -4,8 +4,6 @@
 
 코어 엔진(`base_engine.py`, `base_container.py`)은 정상 동작하며 linear/merge 그래프의 종단 실행을 확인했다. 확인된 결함 41건 중 상당수가 `metrics/builtin/`에 집중되어 있으며, 저장소 전체에 테스트 파일이 없다.
 
-**진행 상황:** 1.1 전체 5건, 1.2 중 2건, 1.3 중 5건, 1.5 중 2건 해결 완료(총 14건). 성능 관련 항목(1.3-5, 1.3-6)과 값 오류 항목은 미착수.
-
 상세 근거와 재현 절차는 저장소의 `REVIEW.md`에 기록했다. 아래 표의 위치는 `ragang/` 패키지 기준 상대 경로다.
 
 ---
@@ -28,19 +26,19 @@
 
 **검증 결과** — 항목별 확인 13건이 수정 전 2/13에서 수정 후 13/13으로 전환됐다. 통과한 2건은 기존 정상 동작(연산자 혼용 차단, 의존관계 산출)의 회귀 확인용이다. 회귀 검사로 `usage/` 예제 4종 동시 import, linear·merge·conditional·loop 그래프 종단 실행, 빌트인 메트릭 6개 모듈 전수 import, `compileall`을 모두 통과했다.
 
-## 1.2 잘못된 평가 결과
+## 1.2 잘못된 평가 결과 — 4건 해결
 
-예외 없이 부정확한 값이 산출된다. 정상적으로 점수가 반환되므로 사용자가 오류를 인지하기 어렵다. 이 중 실행 오류를 동반하는 2건을 처리했다.
+예외 없이 부정확한 값이 산출된다. 정상적으로 점수가 반환되므로 사용자가 오류를 인지하기 어렵다. 남은 3건은 문서 로더 통일(2.3.1)이 선행되어야 하거나 재현 조건이 좁다.
 
 | # | 항목 | 위치 | 증상 | 해결 |
 |---|---|---|---|---|
-| 1 | `MutualInformation_KSG` 산출식 오류 | `metrics/builtin/generator/non_llm_based.py:145` | `dist_x = np.max(np.abs(gen_embedding - gen_embedding))`이 항상 0이다. x-주변부 항이 상수로 고정되어 상호정보량을 추정하지 못한다. 표준 KSG는 digamma를 사용하나 `np.log`를 사용한다. 추가로 `distances[k-1]` 인덱싱이 **템플릿 기본값(top_k=3, k=3)에서 100% IndexError** | **부분 해결(크래시만).** 이웃 수는 최대 N-1이므로 `k_eff = min(k, N-1)`로 k를 검색 결과 수에 맞춰 축소, 문서 1건 이하는 미평가. `log_k`도 `k_eff` 기준. **`dist_x` 산출식 오류는 남아 있어 산출값은 여전히 유효한 상호정보량이 아니다** |
+| 1 | `MutualInformation_KSG` 정식화 오류 | `metrics/builtin/generator/non_llm_based.py` | 표본을 `concat(gen, ctx_i)`로 만드는데 `gen`이 모든 표본에서 동일하다. 상수 확률변수의 상호정보량은 정의상 0이므로 `n_x`가 항상 `N-1`, `n_y`가 항상 `k-1`로 고정되어 `log k + log N − (log N + log k) = 0`으로 상쇄된다. **입력과 무관하게 항상 정확히 0을 반환하는 상수 함수**(실제 템플릿 문서 33청크·1.6만자로 재현, 225회 호출 전부 0). 추가로 `distances[k-1]`이 템플릿 기본값(top_k=3, k=3)에서 IndexError | **해결(재정식화).** 표본을 청크 단위로 재정의: `x_i = cos(gen, chunk_i)`(답변이 그 청크를 반영한 정도), `y_i = cos(query, chunk_i)`(청크의 질의 관련성). 표준 KSG `I = psi(k) + psi(N) − ⟨psi(n_x+1) + psi(n_y+1)⟩`를 직접 구현했고, digamma는 양의 정수에서의 닫힌 형태(`−γ + H_{n−1}`)로 계산해 **외부 라이브러리를 쓰지 않는다.** `k_eff = min(k, N−1)`로 표본이 적어도 있는 만큼 평가하며, 중복 청크(`eps=0`)는 동점 처리로 0이 되게 했다(미처리 시 정보 없는 입력이 5.05점을 받음). `evaluate`에 `query`가 추가되어 `param_src`가 3개 필요하다(같은 파일 `RetrievaltopkMeanAnswerSimilarity`와 동일 패턴).|
 | 2 | e2e 메트릭 시그니처와 엔진 규약 불일치 | `metrics/builtin/e2e/non_llm_based.py:56`, `:98` | 엔진은 `evaluate(query, gen: str)`으로 호출하나 메트릭은 `gens: list[str]`을 기대한다. 문자열 길이가 개수로 계산되고 문자 조각이 임베딩된다 | **해결.** str 입력을 `[str]`로 정규화하고, 답변 2건 미만이면 `Performance(_eval=False)`. 날조된 점수(0.757 등) 대신 "Not evaluated!"로 표기된다. 기존의 `len(gens)<2 → 1.0` 분기도 상수 1.0이 실제 점수로 읽히므로 동일 처리. 반복 실행 기능이 생기면 그대로 동작 |
-| 3 | claim 판정 중복 가산 및 누적 점수 초기화 | `metrics/builtin/generator/llm_based.py:121-137`, `:406-423` | 판정 라인 발견 후 `break`가 없어 응답에 판정이 2회 등장하면 1개 claim이 2점을 받는다. 파싱 실패 시 `score = 0.0`이 이전 claim 결과 전체를 폐기한다 | — |
-| 4 | 인덱싱 대상과 쿼리 생성 대상 불일치 | `templates/init_template/config/load_adapters.py:46-51`, `core/utils/query_generator/document_loader.py:141` | 인덱싱은 `.txt`를 500자 단위로, 쿼리 생성은 `.pdf`를 5문장 단위로 처리한다. 평가 대상 문서와 질문 생성 문서가 일치하지 않는다 | — |
-| 5 | 실행마다 인덱스 재구축으로 비교 불가 | `templates/init_template/config/load_adapters.py:12-20` | `containers()`가 `create_engine()` 호출마다 실행되어 컬렉션을 drop 후 전량 재임베딩한다. 실행 시점마다 인덱스가 달라지며 임베딩 비용이 실행 횟수에 비례한다 | — |
-| 6 | 루프 그래프 중복 파라미터 처리 무효 | `core/bases/abstracts/base_engine.py:174-179` | 좌변과 우변이 동일 객체의 동일 키인 자기 대입이다. 루프 복귀 시 최신값 반영 로직이 동작하지 않는다 | — |
-| 7 | `MilvusAdapter`가 설정 파일의 host/port 폐기 | `adapters/milvus_adapter.py:55-60` | `super().__init__(host, port, alias)`가 설정에서 읽은 값을 생성자 기본값으로 덮어쓴다. 원격 Milvus 지정이 무시된다 | — |
+| 3 | claim 판정 중복 가산 및 누적 점수 초기화 | `metrics/builtin/generator/llm_based.py:121-137`, `:406-423` | 판정 라인 발견 후 `break`가 없어 응답에 판정이 2회 등장하면 1개 claim이 2점을 받는다. **0~1 척도인데 2.00이 나오는 것을 재현했다**(소형 모델이 few-shot 예시를 되뇌는 흔한 경우). 파싱 실패 시 `score = 0.0`이 이전 claim 결과 전체를 폐기한다 | **해결.** 판정 라인을 찾으면 `break`로 마지막 판정만 읽는다. 잡히지도 않던 `except ValueError`(실제 발생 예외는 `KeyError`였고 그마저 1.3-1에서 선제 차단됨)와 누적값을 날리던 `score = 0.0`을 함께 제거 |
+| 4 | 인덱싱 대상과 쿼리 생성 대상 불일치 | `templates/init_template/config/load_adapters.py:46-51`, `core/utils/query_generator/document_loader.py:141` | 인덱싱은 `.txt`를 500자 단위로, 쿼리 생성은 `.pdf`를 5문장 단위로 처리한다. 사용자가 한 형식만 넣으면 한쪽이 빈 결과를 낸다 | — (문서 로더 통일이 필요해 2.3.1 `ragang index` 작업과 함께 처리) |
+| 5 | 실행마다 인덱스 재구축 | `templates/init_template/config/load_adapters.py:12-20` | `containers()`가 `create_engine()` 호출마다 실행되어 컬렉션을 drop 후 전량 재임베딩한다. 임베딩 시간과 API 비용이 실행 횟수에 비례한다 | — (같은 문서를 같은 모델로 재임베딩하면 벡터가 동일하므로 결과 비교 자체는 성립한다. 비용·시간 문제이므로 2.3.1 `ragang index` 분리로 처리) |
+| 6 | 루프 그래프 중복 파라미터 처리 무효 | `core/bases/abstracts/base_engine.py:174-179` | 좌변과 우변이 동일 객체의 동일 키인 자기 대입이다. 루프 복귀 시 최신값 반영 로직이 동작하지 않는다 | — (루프 그래프 + 중복 파라미터명이라는 좁은 조건이며 usage 예제로는 재현되지 않는다) |
+| 7 | `MilvusAdapter`가 설정 파일의 host/port 폐기 | `adapters/milvus_adapter.py:55-60` | `super().__init__(host, port, alias)`가 설정에서 읽은 값을 생성자 기본값으로 덮어쓴다. 원격 Milvus 지정이 무시된다 | **해결.** `super().__init__()`을 먼저 호출한 뒤 설정값을 적용하도록 순서를 바꿨다 |
 
 ## 1.3 실행 중단 및 성능 저하 — 실행 중단 5건 해결
 
@@ -57,18 +55,18 @@
 | 7 | 배치 중 1건 실패가 전체를 중단 | `core/bases/abstracts/base_engine.py:260`, `:287`, `:323` | 쿼리 5건 중 1건이 실패하면 `invoke_batch`가 예외를 전파해 `run/main.py`가 `print_eval()`·`update_history()`에 도달하지 못한다. 완료된 4건이 메모리에 있는데도 출력되지 않고 히스토리에도 남지 않는다 | **해결.** `gather` 3개소를 `return_exceptions=True`로 변경. 직후의 `if isinstance(res, Exception): continue`는 이미 작성돼 있었으나 도달 불가였으므로, 플래그만 바꿔 작성자가 의도한 동작을 살렸다. 실패가 묻히지 않도록 `warnings.warn` 추가. **단, 살아남은 결과가 하나도 없으면 첫 예외를 다시 던진다** — 설정 오류는 모든 쿼리에서 실패하므로 격리 대상이 아니며, 빈 결과 대신 원인을 보고해야 한다 |
 | 8 | 설정 오류 시 진단 메시지 부재 | `core/bases/abstracts/base_container.py:50`, `:62-67`, `templates/init_template/modules/impls.py` | starter 모듈 미지정 시 `AttributeError: 'NoneType' object has no attribute 'lazy_state'`. 중복 module id 메시지가 항상 `set()`. 템플릿 모듈은 벡터DB 실패 시 `TypeError: 'NoneType' object is not iterable`, LLM 실패 시 `KeyError: 'text'` | **해결.** ① starter가 0개면 `RagangStructureException`으로 안내(기존에 "여러 개"만 검증하던 비대칭 해소). ② 중복 id를 `ids.count(i) > 1`로 실제 산출. ③ 템플릿 모듈이 어댑터 실패를 감지해 원인과 조치를 담은 `RuntimeError`를 던지도록 변경 |
 
-## 1.4 보안 및 정보 노출
+## 1.4 보안 및 정보 노출 — 해결 완료
 
-WebSocket 서버에 인증이 없는 상태에서 파일 접근과 외부 노출이 제어되지 않는다.
+WebSocket 서버에 인증이 없는 상태에서 파일 접근과 외부 노출이 제어되지 않는다. 4건 모두 처리했다.
 
-| # | 항목 | 위치 | 증상 |
-|---|---|---|---|
-| 1 | WebSocket `file_name` 경로 탈출 | `core/network/runner.py:126` | 확장자만 검증한다. `../../../etc/hosts.txt` 및 절대 경로가 통과하며, 읽은 내용은 쿼리로 LLM에 전송된다 |
-| 2 | 대시보드 HTTP 서버가 `0.0.0.0`에 바인딩 | `cli_script/show/main.py:31` | LAN 전체에 노출되나 안내 문구는 127.0.0.1이다. WS 서버는 정상적으로 로컬 바인딩된다 |
-| 3 | 예외 traceback을 전체 구독자에게 브로드캐스트 | `core/network/runner.py:64-68` | 절대 경로, 사용자명, 내부 구조가 노출된다 |
-| 4 | API 키 평문 저장 | `templates/init_template/settings.py:10` | 환경변수 대체 경로가 없고 `ragang init`이 `.gitignore`를 생성하지 않아 키가 커밋될 가능성이 높다 |
+| # | 항목 | 위치 | 증상 | 해결 |
+|---|---|---|---|---|
+| 1 | WebSocket `file_name` 경로 탈출 | `core/network/runner.py:126` | 확장자만 검증한다. `../../../etc/hosts.txt` 및 절대 경로가 통과하며, 읽은 내용은 쿼리로 LLM에 전송된다 | **해결.** 두 핸들러의 중복 검증을 `Runner._resolve_query_file()`로 모으고 `resolve()` 후 `is_relative_to(base)`로 경계를 강제한다. 상대 경로 탈출·절대 경로·확장자 불일치를 모두 차단하는 것을 확인 |
+| 2 | 대시보드 HTTP 서버가 `0.0.0.0`에 바인딩 | `cli_script/show/main.py:31` | LAN 전체에 노출되나 안내 문구는 127.0.0.1이다. WS 서버는 정상적으로 로컬 바인딩된다 | **해결.** `run_web_cli(host, port)`로 host를 받아 안내 문구와 동일한 주소에 바인딩한다 |
+| 3 | 예외 traceback을 전체 구독자에게 브로드캐스트 | `core/network/runner.py:64-68` | 절대 경로, 사용자명, 내부 구조가 노출된다. 1번과 결합하면 파일시스템 탐색의 피드백 채널이 된다 | **해결.** 구독자에게는 예외 메시지만 보내고 traceback은 서버 콘솔에만 출력한다 |
+| 4 | API 키 평문 저장 | `templates/init_template/settings.py:10` | 환경변수 대체 경로가 없고 `ragang init`이 `.gitignore`를 생성하지 않아 키가 커밋될 가능성이 높다 | **해결.** `API_KEY = os.environ.get("RAGANG_API_KEY", "")`로 환경변수를 우선 사용하고, `ragang init`이 `settings.py`·`history/`·생성 쿼리를 제외하는 `.gitignore`를 만든다 |
 
-## 1.5 데이터 형식 및 운영 — 2건 해결
+## 1.5 데이터 형식 및 운영 — 3건 해결
 
 저장 포맷과 오류 처리 방식이 외부 도구 및 사용자 환경과 맞지 않는다.
 
@@ -76,8 +74,8 @@ WebSocket 서버에 인증이 없는 상태에서 파일 접근과 외부 노출
 |---|---|---|---|---|
 | 1 | NaN 점수와 이름 맹글링 키가 히스토리에 기록 | `core/bases/datas/performance.py:7-10`, `core/utils/cli.py:31` | `{"_Performance__score": NaN}` 형태로 저장된다. 표준 JSON 파서로 읽을 수 없고 스키마가 Python 이름 맹글링 규칙에 종속된다 | **NaN 부분 해결.** `core/decorators/serializable.py`의 `__serialize`에 비유한 float를 `None`으로 바꾸는 분기 추가. 이 한 곳이 히스토리와 WebSocket 브로드캐스트 공통 경로이므로 양쪽이 함께 해결된다. `GECE`가 반환하던 `inf`도 동일 처리. **키 맹글링은 프론트엔드 계약이라 그대로 둠** |
 | 2 | 어댑터 실패의 조용한 전파 | `adapters/embedding_adapter.py`, `adapters/milvus_adapter.py` | 실패 시 `np.array([])`, `None`을 반환하고 `connect()`는 예외를 삼킨다. 호출 지점과 다른 곳에서 예외가 표면화된다 | **부분 해결.** 어댑터 반환 계약은 그대로 두고, 빌트인 메트릭 호출부 전체에 가드를 넣어 크래시를 제거했다(1.3-1). 어댑터가 실패를 조용히 삼키는 것 자체와 템플릿 모듈의 `retrieve() → None` TypeError는 남아 있다 |
-| 3 | `'gen'` 키가 예약어이나 미문서화 | `core/bases/datas/packet.py:16` | 중간 모듈이 `gen` 키를 반환하면 플로우가 경고 없이 종료된다. 예약어 검증 코드가 주석 처리되어 있다 | — |
-| 4 | `load_user_containers`의 예외 통합 및 `sys.path` 미복원 | `core/utils/modules.py:11-27` | 프레임워크가 던진 안내 메시지가 일반 메시지로 대체된다. `sys.path` 미복원과 모듈 캐시로 한 프로세스에서 다중 프로젝트 로드가 불가능하다 | — |
+| 3 | `'gen'` 키가 예약어이나 미문서화 | `core/bases/datas/packet.py:16` | 중간 모듈이 `gen` 키를 반환하면 플로우가 경고 없이 종료된다. 예약어 검증 코드가 주석 처리되어 있다 | — (후속 모듈이 남아 있을 때 경고하는 방식을 시도했으나, "확신이 서면 바로 답하고 아니면 재검색"하는 적응형 RAG 설계에서 오탐하는 것을 확인해 되돌렸다. `is_output` 플래그 도입이 선행되어야 한다) |
+| 4 | `load_user_containers`의 예외 통합 | `core/utils/modules.py:11-27` | 프레임워크가 던진 안내 메시지가 일반 메시지로 대체된다 | **해결.** `NoEntryPointException`·`RagangStructureException`은 재전파해 "`ragang init`을 실행하라"는 안내가 그대로 보이게 한다. **`sys.path` 복구는 넣었다가 되돌렸다** — `containers()` 안에서 지연 import 하는 프로젝트가 깨지고, 모듈 캐시 때문에 다중 프로젝트 로드가 되지도 않아 이득이 없었다 |
 | 5 | `ragang init a/b/c` 실패 | `cli_script/init/main.py:19` | `os.mkdir`가 중간 디렉터리를 생성하지 않아 FileNotFoundError | **해결.** `target_path.mkdir(parents=True, exist_ok=True)`로 교체 |
 
 ## 1.6 코드 품질 및 유지보수
@@ -214,10 +212,9 @@ v0.0.8b0이 PyPI에 배포된 상태이므로 우선순위가 높다.
 
 - [x] 1.1 전체 5건 — 완료 (8개 파일, 검증 13/13 통과)
 - [x] 실행 중단 항목: 1.3-1, 1.3-2, 1.3-3, 1.3-7, 1.3-8 — 완료 (10개 파일, 런타임 오류 25 → 0)
-- [x] 1.2-2 e2e 시그니처, 1.5-1 NaN JSON, 1.5-5 init 경로 — 완료
-- [~] 1.2-1 KSG — 크래시만 제거. 산출식 오류는 남아 있어 대체 또는 배포 제외 필요
-- [ ] 1.2-3 claim 중복 가산
-- [ ] 보안 항목: 1.4-1, 1.4-2
+- [x] 1.2-1 KSG 재정식화, 1.2-2 e2e 시그니처, 1.2-3 claim 중복 가산, 1.2-7 Milvus 엔드포인트 — 완료
+- [x] 보안 1.4 전체 4건 — 완료 (경로 탈출, 바인딩 주소, traceback 노출, API 키)
+- [x] 1.5-1 NaN JSON, 1.5-4 진단 메시지, 1.5-5 init 경로 — 완료
 - [ ] 테스트 하네스 도입. Fake 어댑터 기반 usage 4종 골든 테스트, 빌트인 메트릭 전수 스모크 테스트(문서 0/1/N건, 오류 응답, 빈 응답)
 - [ ] 루트 README 재작성 (1.6-12)
 

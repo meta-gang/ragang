@@ -51,13 +51,16 @@ class MilvusAdapter(BaseMilvusAdapter):
         settings = config.get("vectordb")
         if not settings:
             raise ValueError("Configuration file must contain its necessary contents.")
-        else:
-            self.host = settings["config"]["api_url"].split(":")[0]
-            self.port = settings["config"]["api_url"].split(":")[1]
-            self.collection_name = settings["config"]["collection_name"]
-            self.db_dimension = int(settings["config"]["db_dimension"])
 
         super().__init__(host, port, alias)
+
+        # apply the configured endpoint after super(), otherwise the constructor defaults
+        # overwrite it and every connection silently falls back to localhost
+        self.host = settings["config"]["api_url"].split(":")[0]
+        self.port = settings["config"]["api_url"].split(":")[1]
+        self.collection_name = settings["config"]["collection_name"]
+        self.db_dimension = int(settings["config"]["db_dimension"])
+
         self.connect()
 
     def reset_collection(self):

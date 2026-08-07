@@ -60,16 +60,38 @@ class Runner:
         try:
             await fn(msg, ws)
         except Exception as e:
+            # the traceback stays on the server console; broadcasting it would leak
+            # absolute paths and internal structure to every subscriber
             print(f"[Runner] Dispatch Error: {e}")
+            traceback.print_exc()
             await self.handler.broadcast("error", {
                 "module": "runner",
                 "message": str(e),
-                "traceback": traceback.format_exc()
             })
 
     # ------------------------------------------------------------------
     # [Helper Methods]
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _resolve_query_file(base_dir: Path, file_name: str, suffix: str) -> Path:
+        """Resolve a client supplied file name inside base_dir.
+
+        The name arrives over an unauthenticated socket, so it must stay within the
+        query directory. '../' escapes and absolute paths are both rejected.
+        """
+        if not file_name:
+            raise ValueError("file_name must be provided")
+        if Path(file_name).suffix != suffix:
+            raise NotAllowedQueryFileException(file_name)
+
+        base = base_dir.resolve()
+        target = (base / file_name).resolve()
+        if not target.is_relative_to(base):
+            raise NotAllowedQueryFileException(file_name)
+        if not target.is_file():
+            raise FileNotFoundError(f"Query file not found: {target}")
+        return target
 
     async def _broadcast_rag_result(self, query_ids: List[str]):
         cont = self.engine.containers[self.flow_id]
@@ -118,18 +140,7 @@ class Runner:
     async def _on_run_rag_file_query(self, msg: dict, ws):
         QUERY_DIR = Path(os.getcwd()) / 'datas/queries/custom'
         settings = msg.get("settings") or {}
-        file_name = settings.get("file_name")
-
-        if not file_name:
-            raise ValueError("file_name must be provided")
-
-        file_path = QUERY_DIR / file_name
-
-        if not file_path.is_file():
-            raise FileNotFoundError(f"Query file not found: {file_path}")
-
-        if Path(file_name).suffix != '.txt':
-            raise NotAllowedQueryFileException(file_name)
+        file_path = self._resolve_query_file(QUERY_DIR, settings.get("file_name"), '.txt')
 
         queries = []
         with open(file_path, "r", encoding="utf-8") as f:
@@ -147,17 +158,7 @@ class Runner:
     async def _on_run_rag_llm_query(self, msg: dict, ws):
         QUERY_DIR = Path(os.getcwd()) / 'datas/queries/generated'
         settings = msg.get("settings") or {}
-        file_name = settings.get("file_name")
-
-        if not file_name:
-            raise ValueError("file_name must be provided")
-
-        file_path = QUERY_DIR / file_name
-        if not file_path.is_file():
-            raise FileNotFoundError(f"Query file not found: {file_path}")
-
-        if Path(file_name).suffix != '.json':
-            raise NotAllowedQueryFileException(file_name)
+        file_path = self._resolve_query_file(QUERY_DIR, settings.get("file_name"), '.json')
 
         queries = []
         with open(file_path, "r", encoding="utf-8") as f:

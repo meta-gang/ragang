@@ -26,3 +26,9 @@ def run(args: Namespace):
         shutil.copytree(template_path, target_path, dirs_exist_ok=True)
     except Exception as e:
         raise RagangInitError(e)
+
+    # keep derived output out of git. the API key comes from RAGANG_API_KEY, so
+    # settings.py itself stays tracked
+    gitignore = target_path / '.gitignore'
+    if not gitignore.exists():
+        gitignore.write_text("__pycache__/\nhistory/\n", encoding='utf-8')
