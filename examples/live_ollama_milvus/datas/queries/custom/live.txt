@@ -1,0 +1,1 @@
+What does RAGANG preserve when an evaluator cannot produce a valid result?

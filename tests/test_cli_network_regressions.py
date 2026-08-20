@@ -90,7 +90,7 @@ class CliNetworkRegressionTests(unittest.TestCase):
                 self.events.append((topic, payload))
 
         storage = SimpleNamespace(flow_graph=[])
-        container = SimpleNamespace(storage=storage)
+        container = SimpleNamespace(storage=storage, flow_id="flow")
         engine = SimpleNamespace(containers={"flow": container})
         handler = Handler()
         runner = Runner(handler, engine, "flow")
@@ -128,6 +128,30 @@ class CliNetworkRegressionTests(unittest.TestCase):
 
         message = output.getvalue()
         self.assertIn("token=[REDACTED]", message)
+        self.assertIn("[PATH]", message)
+        self.assertNotIn("do-not-leak", message)
+        self.assertNotIn("/Users/example", message)
+
+    def test_history_save_error_is_redacted_without_secondary_failure(self):
+        class Handler:
+            async def broadcast(self, topic, payload):
+                return None
+
+        state = SimpleNamespace(serialize=lambda: {"query": "safe"})
+        storage = SimpleNamespace(flow_graph=[], results={"query-id": state})
+        container = SimpleNamespace(storage=storage, flow_id="flow")
+        engine = SimpleNamespace(containers={"flow": container})
+        runner = Runner(Handler(), engine, "flow")
+        output = io.StringIO()
+
+        with patch(
+            "ragang.core.network.runner.update_history",
+            side_effect=RuntimeError("api_key=do-not-leak at /Users/example/private/history.json"),
+        ), redirect_stdout(output):
+            asyncio.run(runner._broadcast_rag_result(["query-id"]))
+
+        message = output.getvalue()
+        self.assertIn("api_key=[REDACTED]", message)
         self.assertIn("[PATH]", message)
         self.assertNotIn("do-not-leak", message)
         self.assertNotIn("/Users/example", message)

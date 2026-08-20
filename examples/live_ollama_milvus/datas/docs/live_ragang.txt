@@ -1,0 +1,5 @@
+RAGANG evaluates retrieval-augmented generation without requiring a traditional
+gold answer dataset. It records evaluator provenance and health, preserves
+not-evaluated results instead of turning failures into zero, separates observed
+evidence from possible-cause inferences, and compares baseline and candidate
+runs while warning when their configurations differ.

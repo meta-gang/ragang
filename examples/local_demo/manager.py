@@ -81,8 +81,20 @@ class QueryAnswerAlignment(CustomMetric):
         return Performance(score=score, metric="Query-answer alignment")
 
 
+class UnavailableEvaluatorProbe(CustomMetric):
+    """Acceptance-only probe for verifying honest not-evaluated rendering."""
+
+    def evaluate(self, answer: str) -> Performance:
+        return Performance(metric="Unavailable evaluator probe", _eval=False)
+
+
 def containers():
     mode = os.getenv("RAGANG_DEMO_MODE", "focused")
+    generation_metrics = [
+        AnswerEvidenceOverlap(["retrieval.ret_docs", "generation.gen"]),
+    ]
+    if os.getenv("RAGANG_DEMO_INCLUDE_NOT_EVALUATED", "0") == "1":
+        generation_metrics.append(UnavailableEvaluatorProbe(["generation.gen"]))
     return [
         RAGContainer(
             flow_id="local_demo",
@@ -97,7 +109,7 @@ def containers():
                 EvidenceBoundAnswer(
                     "generation",
                     linker=Linker("retrieval"),
-                    metrics=[AnswerEvidenceOverlap(["retrieval.ret_docs", "generation.gen"])],
+                    metrics=generation_metrics,
                 ),
             ],
             e2e_metrics=[QueryAnswerAlignment(["starter.query", "generation.gen"])],

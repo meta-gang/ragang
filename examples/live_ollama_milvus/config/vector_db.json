@@ -1,0 +1,10 @@
+{
+  "vectordb": {
+    "provider": "vectorDB",
+    "config": {
+      "collection_name": "ragang_live_demo",
+      "api_url": "localhost:19530",
+      "db_dimension": "64"
+    }
+  }
+}

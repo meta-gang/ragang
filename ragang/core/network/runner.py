@@ -117,8 +117,8 @@ class Runner:
             update_history(self.flow_id, current_ts, results)
             print(f"[Runner] History updated: {len(results)} results saved.")
         except Exception as e:
-            print(f"[Runner] Error updating history: {e}")
-            traceback.print_exc()
+            failure = safe_failure(e)
+            print(f"[Runner] Error updating history: {failure['type']}: {failure['message']}")
 
     async def _broadcast_container_topology(self):
         try:
