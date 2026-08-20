@@ -157,3 +157,95 @@ def compare_runs(baseline_states: dict[str, dict], candidate_states: dict[str, d
         "metrics": metrics,
         "warnings": warnings,
     }
+
+
+def summarize_multi_runs(runs: list[dict[str, dict]] | tuple[dict[str, dict], ...]) -> dict:
+    """Aggregate repeated evaluation runs to assess multi-trial variance and stability."""
+    if not runs:
+        raise ValueError("At least one run must be provided for multi-run analysis")
+
+    summaries = [summarize_run(states) for states in runs]
+    all_fingerprints = sorted({fp for s in summaries for fp in s["config_fingerprints"]})
+    config_consistent = len(all_fingerprints) == 1 and all(
+        s["config_fingerprints"] == all_fingerprints for s in summaries
+    )
+
+    total_queries = sum(s["query_count"] for s in summaries)
+    total_evaluated = sum(s["evaluator_health"]["evaluated"] for s in summaries)
+    total_not_evaluated = sum(s["evaluator_health"]["not_evaluated"] for s in summaries)
+    total_attempts = total_evaluated + total_not_evaluated
+
+    combined_failures = defaultdict(int)
+    for s in summaries:
+        for f_type, count in s["evaluator_health"].get("failure_types", {}).items():
+            combined_failures[f_type] += count
+
+    trial_latency_means = [s["latency_mean"] for s in summaries if s["latency_mean"] is not None]
+    grand_latency_mean = fmean(trial_latency_means) if trial_latency_means else None
+    latency_stddev = pstdev(trial_latency_means) if len(trial_latency_means) >= 2 else None
+
+    all_metric_keys = sorted({key for s in summaries for key in s["metrics"]})
+    aggregated_metrics = []
+
+    for key in all_metric_keys:
+        stage, module, metric, unit = key
+        trial_means = [
+            s["metrics"][key]["mean"]
+            for s in summaries
+            if key in s["metrics"] and s["metrics"][key]["mean"] is not None
+        ]
+        trial_eval_counts = [
+            s["metrics"][key]["evaluated"]
+            for s in summaries
+            if key in s["metrics"]
+        ]
+        trial_not_eval_counts = [
+            s["metrics"][key]["not_evaluated"]
+            for s in summaries
+            if key in s["metrics"]
+        ]
+        m_eval_total = sum(trial_eval_counts)
+        m_not_eval_total = sum(trial_not_eval_counts)
+        m_attempts = m_eval_total + m_not_eval_total
+
+        aggregated_metrics.append({
+            "stage": stage,
+            "module": module,
+            "metric": metric,
+            "unit": unit,
+            "trial_means": trial_means,
+            "mean": fmean(trial_means) if trial_means else None,
+            "between_run_stddev": pstdev(trial_means) if len(trial_means) >= 2 else None,
+            "min_trial_mean": min(trial_means) if trial_means else None,
+            "max_trial_mean": max(trial_means) if trial_means else None,
+            "evaluated": m_eval_total,
+            "not_evaluated": m_not_eval_total,
+            "coverage": m_eval_total / m_attempts if m_attempts else None,
+        })
+
+    warnings = []
+    if not config_consistent:
+        warnings.append(
+            "실행 configuration fingerprint가 일치하지 않는 실행이 포함되어 있습니다. 실행 간 차이를 무작위 변동으로만 해석하지 마세요."
+        )
+
+    return {
+        "trial_count": len(runs),
+        "total_queries": total_queries,
+        "configuration": {
+            "consistent": config_consistent,
+            "fingerprints": all_fingerprints,
+        },
+        "evaluator_health": {
+            "evaluated": total_evaluated,
+            "not_evaluated": total_not_evaluated,
+            "coverage": total_evaluated / total_attempts if total_attempts else None,
+            "failure_types": dict(sorted(combined_failures.items())),
+        },
+        "latency_seconds": {
+            "mean": grand_latency_mean,
+            "between_run_stddev": latency_stddev,
+        },
+        "metrics": aggregated_metrics,
+        "warnings": warnings,
+    }

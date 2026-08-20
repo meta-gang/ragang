@@ -6,8 +6,8 @@
 - Frontend source repository: `RAG-APP-UI` React/TypeScript source
 - `ragang/web/`: frontend source가 아니라 검증된 production build의 배포 사본
 
-구조 설명은 [architecture overview](docs/architecture/overview.md), 평가 의미론은
-[EVALUATION.md](EVALUATION.md)를 먼저 읽습니다.
+구조 설명은 [architecture overview](../architecture/overview.md), 평가 의미론은
+[EVALUATION.md](../evaluation/EVALUATION.md)를 먼저 읽습니다.
 
 ## 환경
 

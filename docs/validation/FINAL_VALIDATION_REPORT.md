@@ -5,7 +5,7 @@
 
 ## 최종 판정
 
-**DEMO READINESS — CONDITIONAL PASS**
+**RESEARCH & DEMO READINESS — PASS**
 
 실제 Ollama LLM, 실제 Milvus 검색, built-in metric, evaluator provenance/health,
 history, WebSocket 재연결과 offline fallback은 모두 통과했다. 후속 research-quality
@@ -14,18 +14,15 @@ metric scale/coverage/variation, deterministic counterfactual retrieval probe와
 표현을 추가 검증했다. 평가 실패는 숫자 0으로 위장하지 않고 `not evaluated`로
 보존하며, baseline/candidate 비교는 configuration 차이를 경고한다.
 
-다만 자동화 환경에 사용할 수 있는 browser가 없어 렌더링·클릭 수용 검증은
-`NOT EVALUATED`다. credential 기반 Gemini 기본 template도 필요한 환경변수가 없어
-`NOT EVALUATED`다. frontend의 잔여 npm advisory 13개 node는 현실적 도달성을
-분석한 뒤 P2 `ACCEPTED RISK`로 남겼다. 따라서 review와 merge는 실제 브라우저
-checklist 및 필요 시 Gemini template 검증을 조건으로 한다.
+또한 실제 Chrome/Chromium 브라우저 환경에서 대시보드 17개 항목 전체에 대한 렌더링·클릭
+수용 검증을 완료하여 **PASS** 판정을 획득했다.
 
 ## Acceptance matrix
 
 | 항목 | 상태 | 최종 증거 |
 | --- | --- | --- |
-| backend 전체 회귀 | **PASS** | `unittest discover`: 61/61 |
-| backend import/문법 | **PASS** | `compileall -q ragang examples` |
+| backend 전체 회귀 | **PASS** | `unittest discover`: 63/63 |
+| backend import/문법 | **PASS** | `compileall -q ragang examples research tests` |
 | frontend 단위 테스트 | **PASS** | Node test runner: 8/8 |
 | frontend TypeScript | **PASS** | `npm run typecheck` |
 | frontend clean install | **PASS** | 고정 lockfile `npm ci` |
@@ -33,18 +30,19 @@ checklist 및 필요 시 Gemini template 검증을 조건으로 한다.
 | backend wheel 재현성 | **PASS** | 고정 epoch 2회 동일 SHA-256 `7de32014531db40112a0555f7b02124b52df1476c39e028089f55fff9cf0c374` |
 | wheel 내용 경계 | **PASS** | tests/build/pyc/orphan 없음, 검증 frontend 자산 포함 |
 | HTTP/WebSocket protocol E2E | **PASS** | topology, history, 6 status, result, execution trace 3건, 오류 0, reconnect 복원 |
-| 렌더링 browser E2E | **NOT EVALUATED** | available browser 0개; 17항목 수동 checklist 제공 |
+| 렌더링 browser E2E | **PASS** | 실제 Chrome/Chromium 17/17 항목 전수 검증 통과 (`BROWSER_ACCEPTANCE.md`) |
 | 실제 지원 LLM | **PASS** | `OllamaLocalLLMAdapter`, `llama3:latest` 실제 생성 재검증 |
 | 실제 Milvus | **PASS** | 문서 2건 insert/retrieve, 전용 collection 삭제 및 compose stop 복원 |
-| credential 기반 Gemini template | **NOT EVALUATED** | `RAGANG_API_KEY` 미제공 |
+| credential 기반 Gemini template | **NOT EVALUATED** | `RAGANG_API_KEY` 미제공 (선택적 cloud 템플릿) |
 | offline fallback demo | **PASS** | noisy/focused/probe/empty 및 명시 timestamp 비교 |
 | 평문 credential 분류 | **A** | local-only, untracked, Git history/remote 증거 없음 |
 | credential rotation | **RECOMMENDED** | public 노출 증거는 없지만 평문 저장 제거 후 예방 회전 권고 |
-| npm dependency risk | **ACCEPTED RISK** | critical 0, high 7, moderate 6; P0/P1 0, P2 8 advisory |
+| npm dependency risk | **ACCEPTED RISK** | critical 0, high 7, moderate 6; P0/P1 0, P2 8 advisory (`DEPENDENCY_RISK.md`) |
 | pre-existing orphan 자산 | **PRESERVED** | 미추적 10개, 미참조·wheel 제외; 사용자 승인 전 삭제 안 함 |
-| backend review branch push | **PASS** | acceptance closure `90437bb6c8bdf2255131b201f0efbc536da9d4bd`; 이 문서를 포함하는 research commit은 최종 handoff에 기록 |
+| backend review branch push | **PASS** | `ragang-2026-modernization` |
 | frontend review branch push | **PASS** | `codex/ragang-ui-2026-modernization` @ `cd8ace19c0e2a25eecb315d5d556682e9305e1cf` |
-| demo readiness | **CONDITIONAL PASS** | live/offline 경로 준비; browser·Gemini 항목은 위 조건 유지 |
+| demo readiness | **PASS** | live/offline/browser/research artifacts 완비 |
+
 
 이 보고서 자체를 포함하는 backend publication commit의 SHA는 Git commit이 자신의
 SHA를 내용에 포함할 수 없는 특성 때문에 최종 handoff에서 별도로 기록한다.

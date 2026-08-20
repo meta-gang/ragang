@@ -66,7 +66,7 @@ metric에 다음을 반환합니다.
 Retrieval perturbation은 gold-free sensitivity probe입니다. 동일 query와 명시된 seed를
 사용해 baseline/candidate를 생성하고 provenance를 보존할 수 있습니다. 그러나 framework는
 주입 문서의 의미적 label, 다른 조건의 동일성, 인과 효과를 증명하지 않습니다. 자세한
-절차는 [counterfactual guide](docs/evaluation/counterfactual.md)에 있습니다.
+절차는 [counterfactual guide](counterfactual.md)에 있습니다.
 
 ## Metric 선택
 
@@ -79,4 +79,4 @@ Retrieval perturbation은 gold-free sensitivity probe입니다. 동일 query와 
 - Robustness: 동일 metric의 baseline/perturbation delta + coverage/configuration 확인
 - Iterative workflow: module metric + execution trace + graph diagnosis
 
-전체 식과 한계는 [metric catalog](docs/metrics/catalog.md)에 있습니다.
+전체 식과 한계는 [metric catalog](metrics.md)에 있습니다.

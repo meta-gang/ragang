@@ -242,6 +242,52 @@ class ReportingTests(unittest.TestCase):
         self.assertTrue(report["configuration"]["match"])
         self.assertIn('"candidate_run": "260103000000"', output.getvalue())
 
+    def test_summarize_multi_runs_aggregates_trials_and_computes_variance(self):
+        from ragang.comparison import summarize_multi_runs
+
+        run1 = {
+            "q1": _state(score=80.0, did_eval=True, latency=0.2, fingerprint="fp1"),
+            "q2": _state(score=90.0, did_eval=True, latency=0.4, fingerprint="fp1"),
+        }
+        run2 = {
+            "q1": _state(score=85.0, did_eval=True, latency=0.3, fingerprint="fp1"),
+            "q2": _state(score=95.0, did_eval=True, latency=0.3, fingerprint="fp1"),
+        }
+        run3 = {
+            "q1": _state(score=75.0, did_eval=True, latency=0.2, fingerprint="fp1"),
+            "q2": _state(score=85.0, did_eval=True, latency=0.4, fingerprint="fp1"),
+        }
+
+        report = summarize_multi_runs([run1, run2, run3])
+
+        self.assertEqual(report["trial_count"], 3)
+        self.assertEqual(report["total_queries"], 6)
+        self.assertTrue(report["configuration"]["consistent"])
+        self.assertEqual(report["configuration"]["fingerprints"], ["fp1"])
+        self.assertEqual(len(report["warnings"]), 0)
+
+        # Check aggregated metrics
+        context_m = next(m for m in report["metrics"] if m["metric"] == "Context quality")
+        self.assertEqual(context_m["evaluated"], 6)
+        self.assertEqual(context_m["not_evaluated"], 0)
+        self.assertEqual(context_m["coverage"], 1.0)
+        self.assertEqual(len(context_m["trial_means"]), 3)
+        self.assertAlmostEqual(context_m["mean"], 85.0)  # (85.0 + 90.0 + 80.0) / 3
+        self.assertIsNotNone(context_m["between_run_stddev"])
+        self.assertAlmostEqual(context_m["min_trial_mean"], 80.0)
+        self.assertAlmostEqual(context_m["max_trial_mean"], 90.0)
+
+    def test_summarize_multi_runs_flags_inconsistent_fingerprints(self):
+        from ragang.comparison import summarize_multi_runs
+
+        run1 = {"q1": _state(score=80.0, did_eval=True, latency=0.2, fingerprint="fp_a")}
+        run2 = {"q1": _state(score=85.0, did_eval=True, latency=0.3, fingerprint="fp_b")}
+
+        report = summarize_multi_runs([run1, run2])
+        self.assertFalse(report["configuration"]["consistent"])
+        self.assertEqual(report["configuration"]["fingerprints"], ["fp_a", "fp_b"])
+        self.assertTrue(len(report["warnings"]) > 0)
+
 
 if __name__ == "__main__":
     unittest.main()
