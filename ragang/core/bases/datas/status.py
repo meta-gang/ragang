@@ -10,14 +10,20 @@ class Status:
         # find target tuples to remove in flow graph
         target_links: list[tuple[str, str]] = []
 
-        def find_links(mid: str) -> None:
-            for link in self.x_status:
-                if link[0] == mid:
-                    target_links.append(link)
-                    find_links(link[1])
-
         for _, n_mid in cur_x:
-            find_links(n_mid)
+            pending = [n_mid]
+            visited: set[str] = set()
+            while pending:
+                current = pending.pop()
+                if current in visited:
+                    continue
+                visited.add(current)
+                for link in self.x_status:
+                    if link[0] != current:
+                        continue
+                    target_links.append(link)
+                    if link[1] not in visited:
+                        pending.append(link[1])
 
         self.x_status = list(set(self.x_status) - set(target_links))
         # add current execution status

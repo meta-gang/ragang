@@ -181,8 +181,9 @@ RAGANG_DEMO_MODE=noisy RAGANG_DEMO_INCLUDE_NOT_EVALUATED=1 \
   ../../.venv/bin/ragang run -F local_demo -Q custom/demo.txt
 ```
 
-`Unavailable evaluator probe`는 `Not evaluated`로 보여야 하고, 평균·분포·추세와
-Overall Score에는 들어가면 안 된다. 이 probe는 default demo에는 포함되지 않는다.
+`Unavailable evaluator probe`는 `Not evaluated`로 보여야 하고, metric별 분포·추세의
+유효 score에는 들어가면 안 된다. Evaluator coverage에는 미평가 1건으로 반영되어야 한다.
+이 probe는 default demo에는 포함되지 않는다.
 
 ## 5. empty retrieval 진단
 

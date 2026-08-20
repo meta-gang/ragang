@@ -15,8 +15,8 @@ from ragang.core.bases.datas.status import Status
 from ragang.core.network.socket_sender import SocketSender
 from ragang.core.utils.ansi_styler import ANSIStyler
 from ragang.diagnostics import diagnose_state
-from ragang.evaluator import attach_evaluator_context, build_run_metadata
-from ragang.exceptions.frameworks.engine import FlowIdNotFoundException
+from ragang.evaluator import attach_evaluator_context, build_run_metadata, safe_failure
+from ragang.exceptions.frameworks.engine import FlowExecutionLimitException, FlowIdNotFoundException
 
 from ragang.exceptions.user.module import FlowOutputException, InvalidModuleIdException
 from ragang.exceptions.user.module import UnlinkedModuleException, ModuleOutputException
@@ -154,13 +154,14 @@ class FlowEngine:
         module.lazy_state = state
 
         # run module
-        start_t = time.time()
-        # may be bounded network io
-        output: dict[str, Any] = await module.execute(**params)
-        duration = time.time() - start_t
-
-        # rm state obj from executed module for integrity(idk I just thought it is the right sequence)
-        module.lazy_state = None
+        start_t = time.perf_counter()
+        try:
+            # may be bounded network io
+            output: dict[str, Any] = await module.execute(**params)
+        finally:
+            # do not retain a state reference on the copied module, including failure paths
+            module.lazy_state = None
+        duration = time.perf_counter() - start_t
 
         # validate output
         formed_output: dict[str, dict[str, Any]] = self.__validate_output(cont, module, output)
@@ -176,19 +177,22 @@ class FlowEngine:
                       x_time=duration)
 
     def __schedule_next_module(self, c_packet: Packet, cont: BaseContainer, status: Status, state: State) -> list[
-        tuple[BaseModule, dict[str, Any]]]:
-        scheduled: list[tuple[BaseModule, dict[str, Any]]] = []
+        tuple[BaseModule, dict[str, Any], list[str]]]:
+        scheduled: list[tuple[BaseModule, dict[str, Any], list[str]]] = []
         for n_mid, _ in c_packet.formed_output.items():
             n_module: BaseModule = cont.get_module_by_id(n_mid)
             if status.check_dependencies(n_module.dependency):  # satisfy
                 dep_modules: list[str] = n_module.dependency.get_dependencies()
                 formed_params: dict[str, Any] = {}
+                parent_execution_ids: list[str] = []
 
                 # concatenate formed outputs from dep modules' snapshots for next module's param
                 for dep in dep_modules:
                     # ensured not none formed_output due to dependency checking
                     if n_module.dependency.is_or and not status.executed(dep):  # pass conditionally not executed mid
                         continue
+                    if parent_execution_id := state.latest_execution_id(dep):
+                        parent_execution_ids.append(parent_execution_id)
                     formed_output: dict[str, Any] = state.get_latest_packet(dep).formed_output[n_mid]
                     if duplicated := set(formed_output.keys()).intersection(formed_params.keys()):
                         loop_end_mid: str = status.find_loop_before_mid(n_mid, dep_modules)
@@ -213,31 +217,76 @@ class FlowEngine:
                         )
 
                 # add run queue
-                scheduled.append((n_module, formed_params))
+                scheduled.append((n_module, formed_params, list(dict.fromkeys(parent_execution_ids))))
         return scheduled
 
     async def __execute_flow(self, cont: BaseContainer, q_id: str, query: str) -> str:
         status: Status = Status(cont.storage.flow_graph)
         state: State = State(q_id, query)
         state.run_metadata = copy.deepcopy(self.run_metadata[cont.flow_id])
-        mod_queue: list[tuple[BaseModule, dict[str, Any]]] = [(cont.starter, {'query': query})]
+        mod_queue: list[tuple[BaseModule, dict[str, Any], list[str]]] = [
+            (cont.starter, {'query': query}, [])
+        ]
         while len(mod_queue) != 0:
-            c_module, param = mod_queue.pop(0)
+            if len(state.execution_trace) >= cont.max_steps:
+                error = FlowExecutionLimitException(
+                    f"Flow '{cont.flow_id}' reached max_steps={cont.max_steps} before producing an answer"
+                )
+                state.finalize_execution("max_steps", success=False)
+                state.diagnosis = diagnose_state(state)
+                await cont.save_state(q_id, state)
+                raise error
+
+            c_module, param, parent_execution_ids = mod_queue.pop(0)
+            execution_id, execution_index = state.next_execution_identity(c_module.module_id)
+            dependency_modules = c_module.dependency.get_dependencies()
+            execution_started = time.perf_counter()
 
             # send start module execution signal
             if self.ws_sender:
                 await self.ws_sender.send_module_status(c_module.module_id, True)
 
-            out: Packet = await self.__run_module(cont, state, c_module, param)
+            try:
+                out: Packet = await self.__run_module(cont, state, c_module, param)
+            except Exception as exc:
+                state.record_execution(
+                    execution_id=execution_id,
+                    module_id=c_module.module_id,
+                    execution_index=execution_index,
+                    parent_execution_ids=parent_execution_ids,
+                    dependency_modules=dependency_modules,
+                    status="failed",
+                    latency_seconds=time.perf_counter() - execution_started,
+                    input_keys=list(param),
+                    output_keys=[],
+                    next_modules=[],
+                    failure=safe_failure(exc),
+                )
+                state.finalize_execution("module_error", success=False)
+                state.diagnosis = diagnose_state(state)
+                await cont.save_state(q_id, state)
+                raise
+            finally:
+                # signal completion even when module execution or output validation fails
+                if self.ws_sender:
+                    await self.ws_sender.send_module_status(c_module.module_id, False)
 
             state.save_snapshots(out)
+            state.record_execution(
+                execution_id=execution_id,
+                module_id=c_module.module_id,
+                execution_index=execution_index,
+                parent_execution_ids=parent_execution_ids,
+                dependency_modules=dependency_modules,
+                status="completed",
+                latency_seconds=out.x_time,
+                input_keys=list(param),
+                output_keys=list(out.data),
+                next_modules=list(out.formed_output),
+            )
 
             # optimize / refresh module execution status (manages each module's dependency)
             status.optimize_n_add_xs([(c_module.module_id, dst) for dst in c_module.direction.get_directions()])
-
-            # send end module execution signal
-            if self.ws_sender:
-                await self.ws_sender.send_module_status(c_module.module_id, False)
 
             # exit if it is output
             if out.is_answer:
@@ -247,6 +296,9 @@ class FlowEngine:
             mod_queue.extend(self.__schedule_next_module(out, cont, status, state))
 
         if (gen := state.gen) is None:
+            state.finalize_execution("missing_output", success=False)
+            state.diagnosis = diagnose_state(state)
+            await cont.save_state(q_id, state)
             raise FlowOutputException()
 
         # eval e2e metrics
@@ -271,6 +323,7 @@ class FlowEngine:
                     ))
 
         state.performances = performances
+        state.finalize_execution("answer", success=True)
         state.diagnosis = diagnose_state(state)
 
         await self.containers[cont.flow_id].save_state(q_id, state)  # save result (using lock)

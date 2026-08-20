@@ -17,6 +17,10 @@
 5. [RAGVUE](https://aclanthology.org/2026.eacl-demo.35/)는 reference-free 평가에서도 retrieval, relevance/completeness, claim faithfulness, judge calibration을 분리하고 구조화된 설명을 제공하는 방향을 제시한다.
 6. [CUB](https://aclanthology.org/2026.acl-long.1151/)과 [Ragability](http://www.lrec-conf.org/proceedings/lrec2026/pdf/2026.lrec2026-1.182.pdf)는 관련·무관·상충 문맥을 함께 시험해야 하며, 한 조건에서 좋은 기법이 다른 조건에서는 악화될 수 있음을 보인다.
 7. [FRANQ](https://aclanthology.org/2026.findings-acl.338/)는 사실성(factuality)과 검색 근거에 대한 충실성(faithfulness)을 동일 개념으로 취급하면 안 된다는 근거를 제공한다.
+8. [AgenticRAGTracer](https://aclanthology.org/2026.findings-acl.66/)는 최종 답변만이 아니라 hop/intermediate step을 검증해야 agentic RAG의 실패 위치를 찾을 수 있음을 보인다.
+9. [Dissecting GraphRAG](https://aclanthology.org/2026.tacl-1.29/)은 GraphRAG를 triple extraction, clustering, report generation으로 분해하고 graph construction coverage를 bottleneck으로 분석한다.
+10. [Redefining Retrieval Evaluation for RAG](https://aclanthology.org/2026.eacl-long.391/)은 순차적 human consumption을 가정한 전통 IR metric이 machine utility와 distraction을 충분히 반영하지 못한다고 지적한다.
+11. [LLM Judges Can Be Too Generous in RAG Evaluation Without a Reference Answer](https://arxiv.org/abs/2607.12885)는 reference-free judge의 과대평가 가능성과 calibration/sensitivity 검증 필요성을 보고한다.
 
 ## 우선순위 결정
 
@@ -45,9 +49,17 @@
    - 미평가 개수 변화, latency 변화, score delta를 함께 보여준다.
    - 비교 조건/config fingerprint가 다르면 경고하고, score 개선만으로 승리를 선언하지 않는다.
 
+4. **Graph/Cycle 실행 진단**
+   - 실제 반복 실행마다 parent, 실행 번호, 실제 다음 node, latency, failure를 기록한다.
+   - 비수렴 cycle은 `max_steps`로 제한하고 failed State를 보존한다.
+
+5. **Gold-free counterfactual probe**
+   - 사용자 제공 distractor/conflict/noisy document injection과 retrieval dropout/shuffle을 seed 기반으로 재현한다.
+   - 의미 label과 인과 효과를 framework가 검증했다는 주장은 하지 않는다.
+
 ### P2 — 후속 개선
 
-- query typo/paraphrase와 distractor/conflicting-context perturbation suite
+- query typo/paraphrase perturbation
 - citation이 실제 출력에 존재할 때의 claim-level citation support
 - answerability/abstention 전용 metric과 상충 문맥 구분
 - 반복 judge 평가의 분산, 다중 judge agreement, bootstrap 신뢰구간
@@ -73,3 +85,5 @@
 - 실패 이유는 직렬화 가능하고 안전한 요약이어야 하며 traceback과 비밀을 포함하지 않는다.
 - 진단은 관측과 추론을 구분하고, 사용자가 다음 실험을 선택할 수 있게 한다.
 - 비교는 동일 조건 여부와 평가 커버리지를 score delta보다 먼저 보여준다.
+- 서로 다른 unit/range/direction의 metric을 단일 overall score로 합치지 않는다.
+- GraphRAG는 pipeline module 계측 범위와 knowledge-graph 내부 품질 보증 범위를 구분한다.

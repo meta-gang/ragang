@@ -45,5 +45,6 @@ class Performance:
     def __str__(self):
         # light blue colored score text
         if self.__did_eval:
-            return f'{self.__metric}: {self.__score:.2f}{self.__unit}'
-        return f"Not evaluated!"
+            unit_separator = "" if self.__unit == "%" else " "
+            return f'{self.__metric}: {self.__score:.2f}{unit_separator}{self.__unit}'
+        return f"{self.__metric}: not evaluated"

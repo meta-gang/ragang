@@ -7,7 +7,7 @@ from contextlib import redirect_stdout
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from ragang.comparison import compare_runs
+from ragang.comparison import compare_runs, summarize_run
 from ragang.container import RAGContainer
 from ragang.core.bases.abstracts.base_engine import FlowEngine
 from ragang.core.bases.abstracts.base_metric import BaseMetric
@@ -81,6 +81,26 @@ def _state(*, score: float | None, did_eval: bool, latency: float, fingerprint: 
 
 
 class ReportingTests(unittest.TestCase):
+    def test_metric_summary_reports_coverage_range_and_variation(self):
+        states = {
+            "q1": _state(score=20, did_eval=True, latency=0.1, fingerprint="same"),
+            "q2": _state(score=40, did_eval=True, latency=0.1, fingerprint="same"),
+            "q3": _state(score=None, did_eval=False, latency=0.1, fingerprint="same"),
+        }
+
+        summary = summarize_run(states)
+        context = next(
+            value for key, value in summary["metrics"].items()
+            if key[2] == "Context quality"
+        )
+
+        self.assertEqual(context["evaluated"], 2)
+        self.assertEqual(context["not_evaluated"], 1)
+        self.assertAlmostEqual(context["coverage"], 2 / 3)
+        self.assertEqual(context["minimum"], 20)
+        self.assertEqual(context["maximum"], 40)
+        self.assertEqual(context["population_stddev"], 10)
+
     def test_engine_attaches_safe_evaluator_provenance_and_failure(self):
         metric = ExplodingJudgeMetric(["output.gen"])
         container = RAGContainer(

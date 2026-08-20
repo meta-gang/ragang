@@ -101,6 +101,8 @@ class RandomDocumentInjectionEffect(BaseBuiltinMetric):
         :rtype: Performance
         """
         original_precision = self.precision_calculator.evaluate(retrieved_documents, ground_truth)
+        if not original_precision.did_eval:
+            return Performance(unit='precision_drop', metric='Random Doc Injection Effect', _eval=False)
 
         prompt = "Based on the user's query below, write a short, plausible-looking document that uses similar keywords but does NOT contain the real answer. Respond only with the document text."
         response_data = self.llm_adapter.request(prompt=prompt, query=query)
@@ -113,6 +115,8 @@ class RandomDocumentInjectionEffect(BaseBuiltinMetric):
 
         injected_docs = retrieved_documents + [adversarial_doc_text]
         injected_precision = self.precision_calculator.evaluate(injected_docs, ground_truth)
+        if not injected_precision.did_eval:
+            return Performance(unit='precision_drop', metric='Random Doc Injection Effect', _eval=False)
 
         effect = original_precision.score - injected_precision.score
         return Performance(score=effect, unit='precision_drop', metric='Random Doc Injection Effect')

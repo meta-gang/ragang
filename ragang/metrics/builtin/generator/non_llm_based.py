@@ -80,7 +80,7 @@ class AnswerContextSimilarity(BaseBuiltinMetric):
         ans_vecs = self.embedding_adapter.create_embeddings([gen])
         chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
         if ans_vecs.size == 0 or chunk_vecs.size == 0:  # embedding api failed
-            return Performance(_eval=False)
+            return Performance(unit="0 to 1", metric="ACS", _eval=False)
         ans_vec = ans_vecs[0]
 
         similarity = []
@@ -90,7 +90,7 @@ class AnswerContextSimilarity(BaseBuiltinMetric):
 
         acs_score = float(np.mean(similarity))
 
-        return Performance(score=acs_score, unit="", metric="ACS")
+        return Performance(score=acs_score, unit="0 to 1", metric="ACS")
 
 
 class AnswerCentricSimilarityVariance(BaseBuiltinMetric):
@@ -117,7 +117,7 @@ class AnswerCentricSimilarityVariance(BaseBuiltinMetric):
         ans_vecs = self.embedding_adapter.create_embeddings([gen])
         chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
         if ans_vecs.size == 0 or chunk_vecs.size == 0:  # embedding api failed
-            return Performance(_eval=False)
+            return Performance(unit="1 - angle variance", metric="ACSV", _eval=False)
         ans_vec = ans_vecs[0]
         angles = []
         for chunk_vec in chunk_vecs:
@@ -127,7 +127,7 @@ class AnswerCentricSimilarityVariance(BaseBuiltinMetric):
         mean_angle = np.mean(angles)
         angle_variance = np.mean((np.array(angles) - mean_angle) ** 2)
         acsv_score = 1 - angle_variance
-        return Performance(score=acsv_score, unit="", metric="ACSV")
+        return Performance(score=acsv_score, unit="1 - angle variance", metric="ACSV")
 
 
 class MutualInformation_KSG(BaseBuiltinMetric):
@@ -180,14 +180,14 @@ class MutualInformation_KSG(BaseBuiltinMetric):
         gen_vecs = self.embedding_adapter.create_embeddings([generation])
         query_vecs = self.embedding_adapter.create_embeddings([query])
         if chunk_vecs.size == 0 or gen_vecs.size == 0 or query_vecs.size == 0:  # embedding api failed
-            return Performance(_eval=False)
+            return Performance(unit="nats", metric="MI_GC_KSG", _eval=False)
 
         n = len(chunk_vecs)
         # each point has n-1 neighbours, so k cannot exceed that. shrink k to whatever the
         # retrieved set allows rather than refusing to evaluate
         k_eff = min(self.k, n - 1)
         if k_eff < 1:  # a single chunk has no neighbour to measure against
-            return Performance(_eval=False)
+            return Performance(unit="nats", metric="MI_GC_KSG", _eval=False)
 
         gen_vec, query_vec = gen_vecs[0], query_vecs[0]
         # one paired sample per chunk: (how much the answer reflects it, how relevant it is)
@@ -196,7 +196,7 @@ class MutualInformation_KSG(BaseBuiltinMetric):
 
         mi = _ksg_mutual_information(xs, ys, k_eff)
         # mutual information is non-negative; the estimator can dip below zero on small samples
-        return Performance(score=max(float(mi), 0.0), unit="", metric="MI_GC_KSG")
+        return Performance(score=max(float(mi), 0.0), unit="nats", metric="MI_GC_KSG")
 
 
 class RetrievalDeviationfromAnswer(BaseBuiltinMetric):
@@ -223,7 +223,7 @@ class RetrievalDeviationfromAnswer(BaseBuiltinMetric):
         chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
         ans_vecs = self.embedding_adapter.create_embeddings([gen])
         if chunk_vecs.size == 0 or ans_vecs.size == 0:  # embedding api failed
-            return Performance(_eval=False)
+            return Performance(unit="0 to 1", metric="RDA", _eval=False)
         ans_vec = ans_vecs[0]
 
         chunk_vecs = chunk_vecs / np.linalg.norm(chunk_vecs, axis=1, keepdims=True)
@@ -236,7 +236,7 @@ class RetrievalDeviationfromAnswer(BaseBuiltinMetric):
         dispersion = np.mean(np.linalg.norm(diff_vecs - mean_diff, axis=1) ** 2)
         acd_score = 1 / (1 + dispersion)
 
-        return Performance(score=acd_score, unit="", metric="RDA")
+        return Performance(score=acd_score, unit="0 to 1", metric="RDA")
 
 
 class RetrievaltopkMeanAnswerSimilarity(BaseBuiltinMetric):
@@ -266,9 +266,9 @@ class RetrievaltopkMeanAnswerSimilarity(BaseBuiltinMetric):
         gen_vecs = self.embedding_adapter.create_embeddings([gen])
         query_vecs = self.embedding_adapter.create_embeddings([query])
         if chunk_vecs.size == 0 or gen_vecs.size == 0 or query_vecs.size == 0:  # embedding api failed
-            return Performance(_eval=False)
+            return Performance(unit="heuristic score", metric="RMAS", _eval=False)
         if len(chunk_vecs) < 2:  # top-k split needs at least two chunks to compare
-            return Performance(_eval=False)
+            return Performance(unit="heuristic score", metric="RMAS", _eval=False)
         gen_vec = gen_vecs[0]
         query_vec = query_vecs[0]
 
@@ -297,4 +297,4 @@ class RetrievaltopkMeanAnswerSimilarity(BaseBuiltinMetric):
 
         final_score = base_score * adjustment_weight
 
-        return Performance(score=final_score, unit="", metric="RMAS")
+        return Performance(score=final_score, unit="heuristic score", metric="RMAS")

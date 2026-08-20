@@ -14,8 +14,12 @@ from ragang.core.utils.ansi_styler import ANSIStyler
 
 
 class BaseContainer(metaclass=ABCMeta):
-    def __init__(self, flow_id: str, modules: list[BaseModule], e2e_metrics: list[BaseMetric] = None):
+    def __init__(self, flow_id: str, modules: list[BaseModule], e2e_metrics: list[BaseMetric] = None,
+                 max_steps: int = 1000):
+        if isinstance(max_steps, bool) or not isinstance(max_steps, int) or max_steps <= 0:
+            raise ValueError("max_steps must be a positive integer")
         self.flow_id: str = flow_id
+        self.max_steps: int = max_steps
         self.modules: dict[str, BaseModule] = {m.module_id: m for m in self.__validate_module_id(modules)}
         self.starter: BaseModule | None = None
         self.metrics: list[BaseMetric] | None = e2e_metrics

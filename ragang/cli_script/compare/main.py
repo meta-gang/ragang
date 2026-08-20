@@ -43,7 +43,10 @@ def _print_report(report: dict):
         print(
             f"[{metric['module']}] {metric['metric']}: "
             f"{metric['baseline']['mean']} -> {metric['candidate']['mean']} "
-            f"(delta {metric['delta']:+g}{metric['unit']})"
+            f"(delta {metric['delta']:+g} {metric['unit']}; "
+            f"coverage {metric['baseline']['coverage']} -> {metric['candidate']['coverage']}; "
+            f"stddev {metric['baseline']['population_stddev']} -> "
+            f"{metric['candidate']['population_stddev']})"
         )
     for warning in report["warnings"]:
         print(f"Warning: {warning}")

@@ -37,12 +37,12 @@ class AnswerQuerySimilarity(BaseBuiltinMetric):
         """
         embeddings = self.embedding_adapter.create_embeddings([query, gen])
         if len(embeddings) < 2:  # embedding api failed
-            return Performance(_eval=False)
+            return Performance(unit="-1 to 1", metric="AQS", _eval=False)
         query_vec, ans_vec = embeddings[0], embeddings[1]
 
         aqs_score = CosineSimilarity.compute(query_vec, ans_vec)
 
-        return Performance(score=aqs_score, unit="", metric="AQS")
+        return Performance(score=aqs_score, unit="-1 to 1", metric="AQS")
 
 
 class e2eCosineConsistencyMetric(BaseBuiltinMetric):
@@ -68,12 +68,12 @@ class e2eCosineConsistencyMetric(BaseBuiltinMetric):
         if isinstance(gens, str):
             gens = [gens]
         if not gens or len(gens) < 2:
-            return Performance(_eval=False)
+            return Performance(unit="-1 to 1", metric="E2E Consistency", _eval=False)
 
         try:
             gen_vectors = self.embedding_adapter.create_embeddings(gens)
             if len(gen_vectors) < 2:  # embedding api failed
-                return Performance(_eval=False)
+                return Performance(unit="-1 to 1", metric="E2E Consistency", _eval=False)
             similarity_matrix = cosine_similarity(gen_vectors)
 
             num_gens = len(gens)
@@ -82,14 +82,21 @@ class e2eCosineConsistencyMetric(BaseBuiltinMetric):
             num_pairs = len(indices[0])
 
             if num_pairs == 0:
-                return Performance(score=1.0, unit="", metric="E2E Consistency")
+                return Performance(score=1.0, unit="-1 to 1", metric="E2E Consistency")
 
             score = total_cos / num_pairs
-        except Exception as e:
-            print(f"An error occurred during consistency calculation: {e}")
-            score = 0.0
+        except Exception as exc:
+            return Performance(
+                unit="-1 to 1",
+                metric="E2E Consistency",
+                _eval=False,
+                failure={
+                    "type": type(exc).__name__,
+                    "message": "Consistency calculation failed.",
+                },
+            )
 
-        return Performance(score=float(score), unit="", metric="E2E Consistency")
+        return Performance(score=float(score), unit="-1 to 1", metric="E2E Consistency")
 
 
 class e2eCovarianceConsistencyMetric(BaseBuiltinMetric):
@@ -117,24 +124,35 @@ class e2eCovarianceConsistencyMetric(BaseBuiltinMetric):
         if isinstance(gens, str):
             gens = [gens]
         if not gens or len(gens) < 2:
-            return Performance(_eval=False)
+            return Performance(unit="variance", metric="E2E Query-Answer Consistency Variance", _eval=False)
 
         try:
             all_texts = [query] + gens
             embeddings = self.embedding_adapter.create_embeddings(all_texts)
             if len(embeddings) != len(all_texts):  # embedding api failed
-                return Performance(_eval=False)
+                return Performance(unit="variance", metric="E2E Query-Answer Consistency Variance", _eval=False)
 
             query_vector = embeddings[0:1]
             gen_vectors = embeddings[1:]
 
             if gen_vectors.shape[0] == 0:
-                return Performance(score=0.0, unit="", metric="E2E Query-Answer Consistency Variance")
+                return Performance(
+                    unit="variance",
+                    metric="E2E Query-Answer Consistency Variance",
+                    _eval=False,
+                )
 
             cos_sims = cosine_similarity(query_vector, gen_vectors)[0]
             consistency_score = float(np.var(cos_sims))
-        except Exception as e:
-            print(f"An error occurred during consistency variance calculation: {e}")
-            consistency_score = 0.0
+        except Exception as exc:
+            return Performance(
+                unit="variance",
+                metric="E2E Query-Answer Consistency Variance",
+                _eval=False,
+                failure={
+                    "type": type(exc).__name__,
+                    "message": "Consistency variance calculation failed.",
+                },
+            )
 
-        return Performance(score=consistency_score, unit="", metric="E2E Query-Answer Consistency Variance")
+        return Performance(score=consistency_score, unit="variance", metric="E2E Query-Answer Consistency Variance")

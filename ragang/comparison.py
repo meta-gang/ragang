@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from statistics import fmean
+import math
+from statistics import fmean, pstdev
 from typing import Any
 
 
@@ -46,7 +47,12 @@ def summarize_run(states: dict[str, dict]) -> dict:
             key = (stage, module, metric, unit)
             did_eval = bool(_field(performance, "did_eval", "_Performance__did_eval", False))
             score = _field(performance, "score", "_Performance__score")
-            if did_eval and isinstance(score, (int, float)):
+            if (
+                did_eval
+                and not isinstance(score, bool)
+                and isinstance(score, (int, float))
+                and math.isfinite(float(score))
+            ):
                 evaluated += 1
                 metric_groups[key]["scores"].append(float(score))
             else:
@@ -58,10 +64,15 @@ def summarize_run(states: dict[str, dict]) -> dict:
     metrics = {}
     for key, values in metric_groups.items():
         scores = values["scores"]
+        attempted = len(scores) + values["not_evaluated"]
         metrics[key] = {
             "mean": fmean(scores) if scores else None,
             "evaluated": len(scores),
             "not_evaluated": values["not_evaluated"],
+            "coverage": len(scores) / attempted if attempted else None,
+            "minimum": min(scores) if scores else None,
+            "maximum": max(scores) if scores else None,
+            "population_stddev": pstdev(scores) if len(scores) >= 2 else None,
         }
     total = evaluated + not_evaluated
     return {
@@ -94,9 +105,18 @@ def compare_runs(baseline_states: dict[str, dict], candidate_states: dict[str, d
         )
 
     metrics = []
+    empty_metric = {
+        "mean": None,
+        "evaluated": 0,
+        "not_evaluated": 0,
+        "coverage": None,
+        "minimum": None,
+        "maximum": None,
+        "population_stddev": None,
+    }
     for key in sorted(set(baseline["metrics"]) | set(candidate["metrics"])):
-        baseline_metric = baseline["metrics"].get(key, {"mean": None, "evaluated": 0, "not_evaluated": 0})
-        candidate_metric = candidate["metrics"].get(key, {"mean": None, "evaluated": 0, "not_evaluated": 0})
+        baseline_metric = baseline["metrics"].get(key, dict(empty_metric))
+        candidate_metric = candidate["metrics"].get(key, dict(empty_metric))
         delta = None
         if baseline_metric["mean"] is not None and candidate_metric["mean"] is not None:
             delta = round(candidate_metric["mean"] - baseline_metric["mean"], 6)

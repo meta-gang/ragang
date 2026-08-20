@@ -3,6 +3,17 @@ import requests
 import asyncio
 import httpx
 
+
+def _safe_request_error(error: BaseException) -> dict:
+    """Return bounded failure metadata without URL query strings or response bodies."""
+    result = {"error": type(error).__name__}
+    response = getattr(error, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if isinstance(status_code, int):
+        result["status_code"] = status_code
+    return result
+
+
 class BaseLLMAdapter(ABC):
     """Abstract base class for LLM adapters."""
 
@@ -31,6 +42,8 @@ class BaseLLMAdapter(ABC):
         """
         if len(prompts) != len(queries):
             raise ValueError("Prompts and queries lists must have the same length.")
+        if isinstance(max_workers, bool) or not isinstance(max_workers, int) or max_workers <= 0:
+            raise ValueError("max_workers must be a positive integer")
 
         semaphore = asyncio.Semaphore(max_workers)
 
@@ -61,7 +74,7 @@ class OllamaLocalLLMAdapter(BaseLLMAdapter):
             "stream": False
         }
         try:
-            response = requests.post(self.api_url, json=payload)
+            response = requests.post(self.api_url, json=payload, timeout=30.0)
             response.raise_for_status()
             result = response.json()
             return {
@@ -69,8 +82,7 @@ class OllamaLocalLLMAdapter(BaseLLMAdapter):
                 "raw": result
             }
         except requests.exceptions.RequestException as e:
-            print(f"An error occurred while calling the local LLM API: {e}")
-            return {"error": str(e)}
+            return _safe_request_error(e)
 
     async def request_async(self, client: httpx.AsyncClient, prompt: str, query: str) -> dict:
         """Sends a request to Ollama local LLM API."""
@@ -87,12 +99,8 @@ class OllamaLocalLLMAdapter(BaseLLMAdapter):
                 "text": result.get("response", ""),
                 "raw": result
             }
-        except httpx.HTTPStatusError as e:
-            print(f"Ollama API error: {e.response.status_code} - {e.response.text}")
-            return {"error": str(e), "details": e.response.json()}
-        except httpx.RequestError as e:
-            print(f"An error occurred while calling the Ollama local LLM API: {e}")
-            return {"error": str(e)}
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            return _safe_request_error(e)
 
 
 class OpenAIAdapter(BaseLLMAdapter):
@@ -117,15 +125,14 @@ class OpenAIAdapter(BaseLLMAdapter):
             ]
         }
         try:
-            response = requests.post(self.api_url, headers=self.headers, json=payload)
+            response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=30.0)
             response.raise_for_status()
             data = response.json()
             # extracting text from the response in json format
             response_text = data["choices"][0]["message"]["content"]
             return {"text": response_text, "raw": data}
         except requests.exceptions.RequestException as e:
-            print(f"An error occurred while calling the OpenAI API: {e}")
-            return {"error": str(e)}
+            return _safe_request_error(e)
         
     async def request_async(self, client: httpx.AsyncClient, prompt: str, query: str) -> dict:
         """Sends a request to the OpenAI API."""
@@ -143,12 +150,8 @@ class OpenAIAdapter(BaseLLMAdapter):
             # extracting text from the response in json format
             response_text = data["choices"][0]["message"]["content"]
             return {"text": response_text, "raw": data}
-        except httpx.HTTPStatusError as e:
-            print(f"OpenAI API error: {e.response.status_code} - {e.response.text}")
-            return {"error": str(e), "details": e.response.json().get("error", {})}
-        except httpx.RequestError as e:
-            print(f"An error occurred while calling the OpenAI API: {e}")
-            return {"error": str(e)}
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            return _safe_request_error(e)
 
 
 class GeminiAdapter(BaseLLMAdapter):
@@ -178,16 +181,20 @@ class GeminiAdapter(BaseLLMAdapter):
         }
         params = {"key": self.api_key}
         try:
-            response = requests.post(self.api_url, headers=self.headers, params=params, json=payload)
+            response = requests.post(
+                self.api_url,
+                headers=self.headers,
+                params=params,
+                json=payload,
+                timeout=30.0,
+            )
             response.raise_for_status()
             data = response.json()
             # extracting text from the response in json format
             response_text = data["candidates"][0]["content"]["parts"][0]["text"]
             return {"text": response_text, "raw": data}
         except requests.exceptions.RequestException as e:
-            print(f"An error occurred while calling the Gemini API: {e}")
-            error_details = response.json() if response.content else {}
-            return {"error": str(e), "details": error_details.get("error", {})}
+            return _safe_request_error(e)
     
     async def request_async(self, client: httpx.AsyncClient, prompt: str, query: str) -> dict:
         """Sends an asynchronous request to the Gemini API."""
@@ -203,9 +210,5 @@ class GeminiAdapter(BaseLLMAdapter):
             data = response.json()
             response_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
             return {"text": response_text, "raw": data}
-        except httpx.HTTPStatusError as e:
-            print(f"Gemini API error: {e.response.status_code} - {e.response.text}")
-            return {"error": str(e), "details": e.response.json().get("error", {})}
-        except httpx.RequestError as e:
-            print(f"An error occurred while calling the Gemini API: {e}")
-            return {"error": str(e)}
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            return _safe_request_error(e)

@@ -55,7 +55,7 @@ class Runner:
         topic = msg.get("topic")
         fn = self.topic_map.get(topic)
         if not fn:
-            print(f"[Runner] Unknown topic received: {topic}")
+            print("[Runner] Unknown topic received.")
             return
         try:
             await fn(msg, ws)
@@ -126,7 +126,23 @@ class Runner:
             edges: List[Tuple[str, str]] = getattr(cont.storage, "flow_graph", [])
             await self.handler.broadcast("rag-container", {"rag-container": edges})
         except Exception as e:
-            print(f"[Runner] Error broadcasting topology: {e}")
+            failure = safe_failure(e)
+            print(f"[Runner] Error broadcasting topology: {failure['type']}: {failure['message']}")
+
+    async def _run_and_broadcast(self, operation):
+        """Broadcast every newly stored State, including executions that raise."""
+        container = self.engine.containers[self.flow_id]
+        previous_query_ids = set(container.storage.results)
+        try:
+            return await operation()
+        finally:
+            new_query_ids = [
+                query_id
+                for query_id in container.storage.results
+                if query_id not in previous_query_ids
+            ]
+            if new_query_ids:
+                await self._broadcast_rag_result(new_query_ids)
 
     async def _rag_on_run(self, query_num: int):
         await self.handler.broadcast("rag-on", {
@@ -151,10 +167,9 @@ class Runner:
             raise ValueError("No queries extracted for execution.")
 
         await self._rag_on_run(len(queries))
-        results = await self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id])
-
-        query_ids = list(results.get(self.flow_id, {}).keys())
-        await self._broadcast_rag_result(query_ids)
+        await self._run_and_broadcast(
+            lambda: self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id])
+        )
 
     async def _on_run_rag_llm_query(self, msg: dict, ws):
         QUERY_DIR = Path(os.getcwd()) / 'datas/queries/generated'
@@ -175,18 +190,18 @@ class Runner:
             raise ValueError("No queries extracted for execution.")
 
         await self._rag_on_run(len(queries))
-        results = await self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id])
-        query_ids = list(results.get(self.flow_id, {}).keys())
-        await self._broadcast_rag_result(query_ids)
+        await self._run_and_broadcast(
+            lambda: self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id])
+        )
 
     async def _on_test_query(self, msg: dict, ws):
         query = msg.get("query")
         if not isinstance(query, str) or not query.strip():
             raise ValueError("`query` must be a non-empty string.")
 
-        results = await self.engine.async_invoke(query, flow_ids=[self.flow_id])
-        query_ids = list(results.get(self.flow_id, {}).keys())
-        await self._broadcast_rag_result(query_ids)
+        await self._run_and_broadcast(
+            lambda: self.engine.async_invoke(query, flow_ids=[self.flow_id])
+        )
 
     async def _generated_query_files(self, msg, ws):
         base_dir = Path(os.getcwd()) / 'datas/queries/generated'

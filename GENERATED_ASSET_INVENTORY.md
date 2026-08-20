@@ -5,17 +5,22 @@
 ## 설치된 검증 자산
 
 `ragang/web/`의 현재 entry build는 frontend commit
-`2b325d510334f656a9f41a75ee24013d640c217f`에서 생성했다.
+`cd8ace19c0e2a25eecb315d5d556682e9305e1cf`에서 생성했다.
 
 - entry: `index.html`
-- vendor: `711.de815a03bc2919966fc9.js`
-- application: `main.16cb993c67e5dbc716f3.js`
+- vendor: `672.b1ce182a0d38187a8faa.js`
+- application: `main.999a67e469b0ae75a858.js`
 - style: `main.css`
 - service worker: `service-worker.js`, `workbox-86637ee2.js`
 - font와 source map: 같은 production build의 출력
 
 이 파일들은 Git-tracked, source-generated, 현재 task에서 설치, index/service worker
 또는 package manifest에서 참조되며 삭제하면 안 된다.
+
+이 build는 반복 module snapshot, graph/cycle execution trace, raw metric unit와
+evaluator coverage를 표시하고 이질 metric의 overall score를 제거한 research-quality
+presentation을 포함한다. 동일 source에서 연속 두 production build의 전체 file hash가
+일치했다.
 
 ## 보존된 pre-existing orphan
 
@@ -39,12 +44,13 @@
 
 ## Task-generated temporary files
 
-- live acceptance project와 wheel 확인 디렉터리는 `/tmp` 아래에만 만들었고,
-  검증 후 삭제 대신 운영체제 휴지통으로 이동했다.
-- live acceptance collection `ragang_acceptance_oynzwr`는 검증 후 삭제했다.
+- live acceptance project와 wheel 확인 디렉터리는 운영체제 임시 경로 아래에만
+  만들었다. repository 파일로 stage하지 않았으며 별도 삭제하지 않았다.
+- live acceptance collection `ragang_live_demo`는 검증 후 삭제했다.
 - 기존 Milvus containers는 삭제하지 않고 원래 stopped 상태로 되돌렸다.
 - backend의 ignored `build/`와 예제 `__pycache__/`는 검증 중 생길 수 있는 task
-  output이며 최종 검증 후 운영체제 휴지통으로 이동한다.
+  output이며 commit과 wheel에서 제외한다. 기존 파일과 구분하기 어려워 자동
+  삭제하지 않는다.
 - frontend `dist/`와 `node_modules/`는 ignored build/dependency output이며 commit하지
   않는다.
 

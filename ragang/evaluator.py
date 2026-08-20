@@ -6,6 +6,8 @@ from hashlib import sha256
 from importlib.metadata import PackageNotFoundError, version
 import inspect
 import json
+import math
+from numbers import Real
 import re
 from typing import Any
 
@@ -159,6 +161,14 @@ def safe_failure(error: BaseException | None = None) -> dict:
 def attach_evaluator_context(performance: Performance, metric: Any, error: BaseException | None = None) -> Performance:
     if not isinstance(performance, Performance):
         raise TypeError(f"Metric '{metric.__class__.__name__}' must return Performance")
+    if performance.did_eval and (
+        isinstance(performance.score, bool)
+        or not isinstance(performance.score, Real)
+        or not math.isfinite(float(performance.score))
+    ):
+        raise ValueError(
+            f"Metric '{metric.__class__.__name__}' marked a non-finite or non-numeric score as evaluated"
+        )
     failure = None
     if not performance.did_eval:
         failure = performance.failure or safe_failure(error)
@@ -179,6 +189,7 @@ def build_run_metadata(container: Any) -> dict:
     configuration = {
         "flow_id": container.flow_id,
         "flow_graph": [list(edge) for edge in container.storage.flow_graph],
+        "execution_policy": {"max_steps": container.max_steps},
         "modules": modules,
         "e2e_metrics": [evaluator_provenance(metric) for metric in (container.metrics or [])],
     }

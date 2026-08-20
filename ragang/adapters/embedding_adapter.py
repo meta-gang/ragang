@@ -44,12 +44,11 @@ class LocalEmbeddingAdapter(BaseEmbeddingAdapter):
                     "prompt": text
                 }
                 try:
-                    response = requests.post(self.api_url, json=payload)
+                    response = requests.post(self.api_url, json=payload, timeout=30.0)
                     response.raise_for_status()
                     result = response.json()
                     all_embeddings.append(result["embedding"])
-                except requests.exceptions.RequestException as e:
-                    print(f"An error occurred while calling the local embedding API: {e}")
+                except requests.exceptions.RequestException:
                     return np.array([])
 
         return np.array(all_embeddings)
@@ -78,12 +77,16 @@ class OpenAIEmbeddingAdapter(BaseEmbeddingAdapter):
                 "model": self.model_name
             }
             try:
-                response = requests.post(self.api_url, headers=self.headers, json=payload)
+                response = requests.post(
+                    self.api_url,
+                    headers=self.headers,
+                    json=payload,
+                    timeout=30.0,
+                )
                 response.raise_for_status()
                 embeddings = response.json()["data"]
                 all_embeddings.extend([embedding["embedding"] for embedding in embeddings])
-            except requests.exceptions.RequestException as e:
-                print(f"An error occurred while calling the OpenAI embedding API: {e}")
+            except requests.exceptions.RequestException:
                 return np.array([])
         return np.array(all_embeddings)
 
@@ -119,11 +122,16 @@ class GeminiEmbeddingAdapter(BaseEmbeddingAdapter):
             }
             params = {"key": self.api_key}
             try:
-                response = requests.post(self.api_url, headers=self.headers, params=params, json=payload)
+                response = requests.post(
+                    self.api_url,
+                    headers=self.headers,
+                    params=params,
+                    json=payload,
+                    timeout=30.0,
+                )
                 response.raise_for_status()
                 embeddings = response.json()["embeddings"]
                 all_embeddings.extend([embedding["values"] for embedding in embeddings])
-            except requests.exceptions.RequestException as e:
-                print(f"An error occurred while calling the Gemini embedding API: {e}")
+            except requests.exceptions.RequestException:
                 return np.array([])
         return np.array(all_embeddings)

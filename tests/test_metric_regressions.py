@@ -12,6 +12,7 @@ from ragang.metrics.builtin.e2e.llm_based import (
 from ragang.metrics.builtin.e2e.non_llm_based import (
     AnswerQuerySimilarity,
     e2eCosineConsistencyMetric,
+    e2eCovarianceConsistencyMetric,
 )
 from ragang.metrics.builtin.generator.llm_based import (
     A2RHallucinationFaithfulnessMetric,
@@ -30,6 +31,8 @@ from ragang.metrics.builtin.retriever.non_llm_based import (
     CosineSimilarityMetric,
     DiversityMetric,
     GeneralizedEmbeddingCoverageError,
+    EuclideanDistanceMetric,
+    RankingConsistencyKendallTau,
     PairwiseCosineSimilarityVariance,
     PrecisionMetric,
 )
@@ -42,6 +45,37 @@ from tests.fakes import (
 
 
 class MetricRegressionTests(unittest.TestCase):
+    def test_empty_retrieval_is_not_a_perfect_distance_score(self):
+        result = EuclideanDistanceMetric(
+            ["starter.query", "ret.docs"], embedding_adapter=MappingEmbeddingAdapter()
+        ).evaluate("query", [])
+
+        self.assertFalse(result.did_eval)
+
+    def test_invalid_ranking_is_not_fabricated_as_zero(self):
+        metric = RankingConsistencyKendallTau(["first.ranking", "second.ranking"])
+
+        self.assertFalse(metric.evaluate([1], [1]).did_eval)
+        self.assertFalse(metric.evaluate([1, 1], [1, 1]).did_eval)
+
+    def test_consistency_calculation_failure_is_not_fabricated_as_zero(self):
+        class RaisingEmbeddingAdapter:
+            def create_embeddings(self, texts, batch_size=32):
+                raise RuntimeError("embedding unavailable")
+
+        embedding = RaisingEmbeddingAdapter()
+        results = [
+            e2eCosineConsistencyMetric(
+                ["starter.query", "output.gen"], embedding_adapter=embedding
+            ).evaluate("query", ["first", "second"]),
+            e2eCovarianceConsistencyMetric(
+                ["starter.query", "output.gen"], embedding_adapter=embedding
+            ).evaluate("query", ["first", "second"]),
+        ]
+
+        self.assertTrue(all(not result.did_eval for result in results))
+        self.assertTrue(all(result.failure["type"] == "RuntimeError" for result in results))
+
     def test_metric_constructors_preserve_parameter_sources(self):
         precision = PrecisionMetric(["ret.docs", "gold.docs"])
         injection = RandomDocumentInjectionEffect(
@@ -73,6 +107,8 @@ class MetricRegressionTests(unittest.TestCase):
             ).evaluate("query", "answer"),
         ]
         self.assertTrue(all(not result.did_eval for result in results))
+        self.assertTrue(all(result.metric != "Accuracy" for result in results))
+        self.assertTrue(all(result.unit for result in results))
 
     def test_single_sample_metrics_are_not_evaluated(self):
         embedding = MappingEmbeddingAdapter()
@@ -92,6 +128,8 @@ class MetricRegressionTests(unittest.TestCase):
             ).evaluate("query", "answer"),
         ]
         self.assertTrue(all(not result.did_eval for result in results))
+        self.assertTrue(all(result.metric != "Accuracy" for result in results))
+        self.assertTrue(all(result.unit for result in results))
 
     def test_empty_gece_is_not_evaluated_instead_of_infinite(self):
         result = GeneralizedEmbeddingCoverageError(
@@ -153,6 +191,8 @@ class MetricRegressionTests(unittest.TestCase):
             ).evaluate(["doc"], "answer"),
         ]
         self.assertTrue(all(not result.did_eval for result in results))
+        self.assertTrue(all(result.metric != "Accuracy" for result in results))
+        self.assertTrue(all(result.unit for result in results))
 
     def test_random_document_injection_does_not_fabricate_on_llm_failure(self):
         precision = PrecisionMetric(["ret.docs", "gold.docs"])
@@ -162,6 +202,16 @@ class MetricRegressionTests(unittest.TestCase):
             llm_adapter=ConstantLLMAdapter({"error": "down"}),
         )
         self.assertFalse(metric.evaluate("query", ["answer"], ["answer"]).did_eval)
+
+    def test_random_document_injection_propagates_unsupported_precision(self):
+        precision = PrecisionMetric(["ret.docs", "gold.docs"])
+        metric = RandomDocumentInjectionEffect(
+            ["starter.query", "ret.docs", "gold.docs"],
+            precision,
+            llm_adapter=ConstantLLMAdapter({"text": "plausible distractor"}),
+        )
+
+        self.assertFalse(metric.evaluate("query", ["document"], []).did_eval)
 
     def test_mutual_information_is_finite_and_rejects_one_chunk(self):
         metric = MutualInformation_KSG(

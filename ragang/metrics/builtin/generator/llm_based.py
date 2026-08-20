@@ -74,7 +74,7 @@ class A2RYNFaithfulnessMetric(BaseBuiltinMetric):
         user_query = f"Text:\n{gen}\n\nOutput:\n"
         response = self.llm_adapter.request(prompt_claim_generation, user_query)
         if "error" in response or not response.get("text"):  # llm api failed
-            return Performance(_eval=False)
+            return Performance(unit="0 to 1", metric="Claim Groundedness", _eval=False)
         claim_list = [
             line.strip()
             for line in response["text"].split('\n')
@@ -121,11 +121,10 @@ class A2RYNFaithfulnessMetric(BaseBuiltinMetric):
         )
         score = 0
         for claim in claim_list:
-            print(f"Claim: {claim}")
             user_query = f"Claim:\n{claim}\n\nRetrieved Documents:\n{ret_docs}\n\nJustification:\n"
             response = self.llm_adapter.request(prompt_claim_judgement, user_query)
             if "error" in response or not response.get("text"):  # llm api failed
-                return Performance(_eval=False)
+                return Performance(unit="0 to 1", metric="Claim Groundedness", _eval=False)
             # read the last verdict only; few-shot examples echoed back by smaller models
             # would otherwise be counted again and push a single claim above 1 point
             found_verdict = False
@@ -135,16 +134,13 @@ class A2RYNFaithfulnessMetric(BaseBuiltinMetric):
                     found_verdict = True
                     value = line.split(":", 1)[1].strip()
                     if value == "Grounded":
-                        print("Grounded")
                         score += 1
-                    else:
-                        print("Not Grounded")
                     break
             if not found_verdict:
-                return Performance(unit="", metric="Yes/No Relevancy", _eval=False)
+                return Performance(unit="0 to 1", metric="Claim Groundedness", _eval=False)
         if not claim_list:  # llm did not answer in the expected numbered format
-            return Performance(_eval=False)
-        return Performance(score=score / len(claim_list), unit="", metric="Yes/No Relevancy")
+            return Performance(unit="0 to 1", metric="Claim Groundedness", _eval=False)
+        return Performance(score=score / len(claim_list), unit="0 to 1", metric="Claim Groundedness")
 
 
 class A2RSimpleScoringFaithfulnessMetric(BaseBuiltinMetric):
@@ -201,14 +197,14 @@ class A2RSimpleScoringFaithfulnessMetric(BaseBuiltinMetric):
         user_query = f"Text:\n{gen}\n\nOutput:\n"
         response = self.llm_adapter.request(prompt_claim_generation, user_query)
         if "error" in response or not response.get("text"):  # llm api failed
-            return Performance(_eval=False)
+            return Performance(unit="0 to 1", metric="Simple Scoring Faithfulness", _eval=False)
         claim_list = [
             line.strip()
             for line in response["text"].split('\n')
             if re.match(r"^\d+\.\s+", line.strip())
         ]
         if not claim_list:
-            return Performance(unit="score", metric="Simple Scoring Faithfulness", _eval=False)
+            return Performance(unit="0 to 1", metric="Simple Scoring Faithfulness", _eval=False)
 
         prompt_claim_scoring = (
             """
@@ -254,7 +250,7 @@ class A2RSimpleScoringFaithfulnessMetric(BaseBuiltinMetric):
             user_query = f"Claim:\n{claim}\n\nRetrieved Documents:\n{ret_docs}\n\nJustification:\n"
             response = self.llm_adapter.request(prompt_claim_scoring, user_query)
             if "error" in response or not response.get("text"):  # llm api failed
-                return Performance(_eval=False)
+                return Performance(unit="0 to 1", metric="Simple Scoring Faithfulness", _eval=False)
             score = 0
             found_score = False
             try:
@@ -264,19 +260,18 @@ class A2RSimpleScoringFaithfulnessMetric(BaseBuiltinMetric):
                         value = line.split(":", 1)[1].strip()
                         score = int(value)
                         if score not in {0, 2, 4}:
-                            return Performance(unit="score", metric="Simple Scoring Faithfulness", _eval=False)
+                            return Performance(unit="0 to 1", metric="Simple Scoring Faithfulness", _eval=False)
                         total_score += score
                         found_score = True
                         break
             except (ValueError, IndexError):
-                return Performance(unit="score", metric="Simple Scoring Faithfulness", _eval=False)
+                return Performance(unit="0 to 1", metric="Simple Scoring Faithfulness", _eval=False)
             if not found_score:
-                return Performance(unit="score", metric="Simple Scoring Faithfulness", _eval=False)
+                return Performance(unit="0 to 1", metric="Simple Scoring Faithfulness", _eval=False)
 
-            print(f"claim {i + 1}: {claim} score: {score}")
 
         final_score = total_score / (len(claim_list) * 4) if claim_list else 0
-        return Performance(score=final_score, unit="score", metric="Simple Scoring Faithfulness")
+        return Performance(score=final_score, unit="0 to 1", metric="Simple Scoring Faithfulness")
 
 
 class A2RHallucinationFaithfulnessMetric(BaseBuiltinMetric):
@@ -318,13 +313,13 @@ class A2RHallucinationFaithfulnessMetric(BaseBuiltinMetric):
 
         response = self.llm_adapter.request(prompt, "")
         if "error" in response or not response.get("text"):  # llm api failed
-            return Performance(_eval=False)
+            return Performance(unit="binary", metric="Hallucination (Factual/Hallucinated)", _eval=False)
         result = response["text"].strip().lower()
         if result not in {"factual", "hallucinated"}:
-            return Performance(unit="", metric="Hallucination Faithfulness", _eval=False)
+            return Performance(unit="binary", metric="Hallucination (Factual/Hallucinated)", _eval=False)
         score = 1 if result == "factual" else 0
 
-        return Performance(score=score, unit="", metric="Hallucination (Factual/Hallucinated)")
+        return Performance(score=score, unit="binary", metric="Hallucination (Factual/Hallucinated)")
 
 
 class A2RTruthfulFaithfulnessMetric(BaseBuiltinMetric):
@@ -382,7 +377,7 @@ class A2RTruthfulFaithfulnessMetric(BaseBuiltinMetric):
         user_query = f"Text:\n{gen}\n\nOutput:\n"
         response = self.llm_adapter.request(prompt_claim_generation, user_query)
         if "error" in response or not response.get("text"):  # llm api failed
-            return Performance(_eval=False)
+            return Performance(unit="0 to 1", metric="Claim Non-Contradiction", _eval=False)
         claim_list = [
             line.strip()
             for line in response["text"].split('\n')
@@ -431,11 +426,10 @@ class A2RTruthfulFaithfulnessMetric(BaseBuiltinMetric):
         )
         score = 0
         for claim in claim_list:
-            print(f"Claim: {claim}")
             user_query = f"Claim:\n{claim}\n\nRetrieved Documents:\n{ret_docs}\n\nJustification:\n"
             response = self.llm_adapter.request(prompt_claim_judgement, user_query)
             if "error" in response or not response.get("text"):  # llm api failed
-                return Performance(_eval=False)
+                return Performance(unit="0 to 1", metric="Claim Non-Contradiction", _eval=False)
             # read the last verdict only; few-shot examples echoed back by smaller models
             # would otherwise be counted again and push a single claim above 1 point
             found_verdict = False
@@ -445,16 +439,13 @@ class A2RTruthfulFaithfulnessMetric(BaseBuiltinMetric):
                     found_verdict = True
                     value = line.split(":", 1)[1].strip()
                     if value == "Truthful":
-                        print("Truthful")
                         score += 1
-                    else:
-                        print("Not Truthful")
                     break
             if not found_verdict:
-                return Performance(unit="", metric="Yes/No Relevancy", _eval=False)
+                return Performance(unit="0 to 1", metric="Claim Non-Contradiction", _eval=False)
         if not claim_list:  # llm did not answer in the expected numbered format
-            return Performance(_eval=False)
-        return Performance(score=score / len(claim_list), unit="", metric="Yes/No Relevancy")
+            return Performance(unit="0 to 1", metric="Claim Non-Contradiction", _eval=False)
+        return Performance(score=score / len(claim_list), unit="0 to 1", metric="Claim Non-Contradiction")
 
 
 class A2RYNFaithfulnessMetricSingleCall(BaseBuiltinMetric):
@@ -491,7 +482,7 @@ class A2RYNFaithfulnessMetricSingleCall(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not gen or not gen.strip():
-            return Performance(unit="", metric="Faithfulness (Single Call)", _eval=False)
+            return Performance(unit="0 to 1", metric="Faithfulness (Single Call)", _eval=False)
 
         # Truncate inputs to manage context window size
         truncated_gen = gen[:max_gen_chars]
@@ -534,35 +525,32 @@ class A2RYNFaithfulnessMetricSingleCall(BaseBuiltinMetric):
         try:
             response = self.llm_adapter.request(prompt, user_query)
             if "error" in response or not response.get("text"):  # llm api failed
-                return Performance(_eval=False)
+                return Performance(unit="0 to 1", metric="Faithfulness (Single Call)", _eval=False)
             response_text = response["text"].strip()
 
             match = re.search(r"```json\s*(\[.*?\])\s*```|(\[.*?\])", response_text, re.DOTALL)
 
             if not match:
                 logger.error("Failed to find a valid JSON array in the LLM response.")
-                logger.debug(f"Malformed response: {response_text}")
-                return Performance(unit="", metric="Faithfulness (Single Call)", _eval=False)
+                return Performance(unit="0 to 1", metric="Faithfulness (Single Call)", _eval=False)
 
             json_part = match.group(1) or match.group(2)
             evaluations = json.loads(json_part)
 
             if not evaluations:
-                return Performance(unit="", metric="Faithfulness (Single Call)", _eval=False)
+                return Performance(unit="0 to 1", metric="Faithfulness (Single Call)", _eval=False)
 
             grounded_count = sum(1 for e in evaluations if e.get("grounded") is True)
             score = grounded_count / len(evaluations)
 
         except json.JSONDecodeError as e:
             logger.error(f"JSON decoding failed for single-call faithfulness: {e}")
-            logger.debug(f"Invalid JSON content: {json_part}")
-            return Performance(unit="", metric="Faithfulness (Single Call)", _eval=False)
+            return Performance(unit="0 to 1", metric="Faithfulness (Single Call)", _eval=False)
         except (KeyError, AttributeError, IndexError) as e:
             logger.error(f"Failed to parse LLM response structure for single-call faithfulness: {e}")
-            logger.debug(f"Full response text: {response_text}")
-            return Performance(unit="", metric="Faithfulness (Single Call)", _eval=False)
+            return Performance(unit="0 to 1", metric="Faithfulness (Single Call)", _eval=False)
 
-        return Performance(score=score, unit="", metric="Faithfulness (Single Call)")
+        return Performance(score=score, unit="0 to 1", metric="Faithfulness (Single Call)")
 
 
 class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
@@ -618,7 +606,6 @@ class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
 
             if not match:
                 logger.error("Failed to find a valid JSON array in the claim extraction response.")
-                logger.debug(f"Malformed response: {response_text}")
                 return []
 
             json_part = match.group(1) or match.group(2)
@@ -626,7 +613,6 @@ class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
             return [str(c) for c in claims if isinstance(c, str)]
         except (json.JSONDecodeError, KeyError, AttributeError) as e:
             logger.error(f"Failed to extract claims: {e}")
-            logger.debug(f"Full response text: {response.get('text', '')}")
             return []
 
     def _judge_claims_batch(self, claims: list[str], ret_docs: list[str]) -> list[dict]:
@@ -688,7 +674,6 @@ class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
 
             if not match:
                 logger.error("Failed to find a valid JSON array in the judgment response.")
-                logger.debug(f"Malformed response: {response_text}")
                 return []
 
             json_part = match.group(1) or match.group(2)
@@ -700,11 +685,9 @@ class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
             return evaluations
         except json.JSONDecodeError as e:
             logger.error(f"Failed to judge claims batch: {e}")
-            logger.debug(f"Full response text for failed JSON parse: {response.get('text', '')}")
             return []
         except (KeyError, AttributeError) as e:
             logger.error(f"Failed to parse judgment response structure: {e}")
-            logger.debug(f"Full response text: {response.get('text', '')}")
             return []
 
     def evaluate(self, ret_docs: list[str] = None, gen: str = None, max_docs: int = 5) -> Performance:
@@ -721,12 +704,12 @@ class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not gen or not gen.strip():
-            return Performance(unit="", metric="Hybrid Faithfulness", _eval=False)
+            return Performance(unit="0 to 1", metric="Hybrid Faithfulness", _eval=False)
 
         claims = self._extract_claims(gen=gen)
         if not claims:
             logger.warning("No claims were extracted from the generated answer.")
-            return Performance(unit="", metric="Hybrid Faithfulness", _eval=False)
+            return Performance(unit="0 to 1", metric="Hybrid Faithfulness", _eval=False)
 
         all_evaluations = []
         truncated_docs = ret_docs[:max_docs]  # 상위 [max_docs]개만 포함
@@ -738,15 +721,15 @@ class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
                 all_evaluations.extend(evaluations)
             else:
                 logger.warning(f"A batch of {len(batch)} claims failed to be judged.")
-                return Performance(unit="", metric="Hybrid Faithfulness", _eval=False)
+                return Performance(unit="0 to 1", metric="Hybrid Faithfulness", _eval=False)
 
         if not all_evaluations:
             logger.error("All claim judgment batches failed.")
-            return Performance(unit="", metric="Hybrid Faithfulness", _eval=False)
+            return Performance(unit="0 to 1", metric="Hybrid Faithfulness", _eval=False)
 
         grounded_count = sum(1 for e in all_evaluations if isinstance(e, dict) and e.get("grounded") is True)
 
         total_claims = len(claims)
         score = grounded_count / total_claims
 
-        return Performance(score=score, unit="", metric="Hybrid Faithfulness")
+        return Performance(score=score, unit="0 to 1", metric="Hybrid Faithfulness")

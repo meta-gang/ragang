@@ -125,7 +125,7 @@ class QueryGenerator:
             json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
             if not json_match:
                 # 파싱 실패 시 로그를 남기고 빈 리스트 반환 -> 호출부에서 재시도 트리거됨
-                logger.warning(f"LLM 응답에서 JSON 리스트를 찾지 못했습니다. 응답: {response_text[:100]}...")
+                logger.warning("LLM 응답에서 JSON 리스트를 찾지 못했습니다. 응답 본문은 기록하지 않습니다.")
                 return []
 
             json_data = json.loads(json_match.group(0))
@@ -149,14 +149,14 @@ class QueryGenerator:
             return queries
 
         except json.JSONDecodeError as e:
-            logger.error(f"JSON 파싱 실패: {e}. 원본 응답: {response_text[:200]}")
+            logger.error(f"JSON 파싱 실패: {e}. 응답 본문은 기록하지 않습니다.")
             return []
         except Exception as e:
             logger.error(f"쿼리 파싱 중 알 수 없는 오류: {e}")
             return []
 
         except json.JSONDecodeError as e:
-            logger.error(f"JSON 파싱 실패: {e}. 원본 응답: {response_text}")
+            logger.error(f"JSON 파싱 실패: {e}. 응답 본문은 기록하지 않습니다.")
             return []
         except Exception as e:
             logger.error(f"쿼리 파싱 중 알 수 없는 오류: {e}")

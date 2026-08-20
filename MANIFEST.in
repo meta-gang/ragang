@@ -2,9 +2,9 @@ graft ragang/templates
 recursive-exclude ragang/templates __pycache__/* *.py[cod]
 recursive-exclude ragang/web *
 include ragang/web/12c5f3f90455943689153262702765ca.woff2
-include ragang/web/711.de815a03bc2919966fc9.js
-include ragang/web/711.de815a03bc2919966fc9.js.LICENSE.txt
-include ragang/web/711.de815a03bc2919966fc9.js.map
+include ragang/web/672.b1ce182a0d38187a8faa.js
+include ragang/web/672.b1ce182a0d38187a8faa.js.LICENSE.txt
+include ragang/web/672.b1ce182a0d38187a8faa.js.map
 include ragang/web/2ac864a194a4c2b8049b22eec5d89072.woff2
 include ragang/web/43b5c29006f365a91ccd1e8e9e0d04ee.woff2
 include ragang/web/9a72164420c5bea92570652a34fd378f.woff2
@@ -13,8 +13,8 @@ include ragang/web/d3283d226f8f74e7a8d573c221c95608.woff2
 include ragang/web/index.html
 include ragang/web/main.css
 include ragang/web/main.css.map
-include ragang/web/main.16cb993c67e5dbc716f3.js
-include ragang/web/main.16cb993c67e5dbc716f3.js.map
+include ragang/web/main.999a67e469b0ae75a858.js
+include ragang/web/main.999a67e469b0ae75a858.js.map
 include ragang/web/service-worker.js
 include ragang/web/workbox-86637ee2.js
 global-exclude .DS_Store

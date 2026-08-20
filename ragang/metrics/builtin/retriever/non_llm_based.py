@@ -75,7 +75,7 @@ class KeywordMatchingMetric(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not ret_docs:
-            return Performance(score=0.0, unit='%', metric='Keyword Matching Metric')
+            return Performance(unit='%', metric='Keyword Matching Metric', _eval=False)
 
         tokenized_query = set(query.split())
         scores = []
@@ -111,7 +111,7 @@ class JaccardSimilarityMetric(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not ret_docs:
-            return Performance(score=0.0, unit='%', metric='Jaccard Similarity Metric')
+            return Performance(unit='%', metric='Jaccard Similarity Metric', _eval=False)
 
         tokenized_query = set(query.split())
         scores = []
@@ -150,12 +150,12 @@ class CosineSimilarityMetric(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not ret_docs:
-            return Performance(score=0.0, unit='-1 to 1', metric='Cosine Similarity Metric')
+            return Performance(unit='-1 to 1', metric='Cosine Similarity Metric', _eval=False)
 
         query_vecs = self.embedding_adapter.create_embeddings([query])
         doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
         if query_vecs.size == 0 or doc_vecs.size == 0:  # embedding api failed
-            return Performance(_eval=False)
+            return Performance(unit='-1 to 1', metric='Cosine Similarity Metric', _eval=False)
         query_vec = query_vecs[0]
 
         similarity_scores = cosine_similarity([query_vec], doc_vecs)[0]
@@ -186,12 +186,12 @@ class EuclideanDistanceMetric(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not ret_docs:
-            return Performance(score=0.0, unit='distance', metric='Euclidean Distance Metric')
+            return Performance(unit='distance', metric='Euclidean Distance Metric', _eval=False)
 
         query_vecs = self.embedding_adapter.create_embeddings([query])
         doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
         if query_vecs.size == 0 or doc_vecs.size == 0:  # embedding api failed
-            return Performance(_eval=False)
+            return Performance(unit='distance', metric='Euclidean Distance Metric', _eval=False)
         query_vec = query_vecs[0]
 
         distances = [np.linalg.norm(query_vec - doc_vec) for doc_vec in doc_vecs]
@@ -220,12 +220,12 @@ class ManhattanDistanceMetric(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not ret_docs:
-            return Performance(score=0.0, unit='distance', metric='Manhattan Distance Metric')
+            return Performance(unit='distance', metric='Manhattan Distance Metric', _eval=False)
 
         query_vecs = self.embedding_adapter.create_embeddings([query])
         doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
         if query_vecs.size == 0 or doc_vecs.size == 0:  # embedding api failed
-            return Performance(_eval=False)
+            return Performance(unit='distance', metric='Manhattan Distance Metric', _eval=False)
         query_vec = query_vecs[0]
 
         distances = [np.sum(np.abs(query_vec - doc_vec)) for doc_vec in doc_vecs]
@@ -253,12 +253,12 @@ class NegativeRejectionRateMetric(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not ret_docs:
-            return Performance(score=0.0, unit='%', metric='Negative Rejection Rate Metric')
+            return Performance(unit='%', metric='Negative Rejection Rate Metric', _eval=False)
 
         query_vecs = self.embedding_adapter.create_embeddings([query])
         doc_vecs = self.embedding_adapter.create_embeddings(ret_docs)
         if query_vecs.size == 0 or doc_vecs.size == 0:  # embedding api failed
-            return Performance(_eval=False)
+            return Performance(unit='%', metric='Negative Rejection Rate Metric', _eval=False)
         query_vec = query_vecs[0]
 
         similarities = cosine_similarity([query_vec], doc_vecs)[0]
@@ -324,7 +324,7 @@ class PrecisionMetric(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not retrieved:
-            return Performance(score=0.0, unit='0 to 1', metric='Precision')
+            return Performance(unit='0 to 1', metric='Precision', _eval=False)
         if not ground_truth:
             return Performance(unit='0 to 1', metric='Precision', _eval=False)
 
@@ -371,8 +371,10 @@ class RankingConsistencyKendallTau(BaseBuiltinMetric):
         :rtype: Performance
         """
         if len(ranking1) < 2 or len(ranking2) < 2 or len(ranking1) != len(ranking2):
-            return Performance(score=0.0, unit='-1 to 1', metric="Kendall's Tau")
+            return Performance(unit='-1 to 1', metric="Kendall's Tau", _eval=False)
         tau, _ = kendalltau(ranking1, ranking2)
+        if not np.isfinite(tau):
+            return Performance(unit='-1 to 1', metric="Kendall's Tau", _eval=False)
         return Performance(score=tau, unit='-1 to 1', metric="Kendall's Tau")
 
 
@@ -393,18 +395,18 @@ class DiversityMetric(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not ret_docs or len(ret_docs) < 2:
-            return Performance(unit='0 to 1', metric='Diversity', _eval=False)
+            return Performance(unit='0 to 2', metric='Diversity', _eval=False)
 
         doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
 
         if len(doc_embeddings) < 2:
-            return Performance(unit='0 to 1', metric='Diversity', _eval=False)
+            return Performance(unit='0 to 2', metric='Diversity', _eval=False)
 
         similarity_matrix = cosine_similarity(doc_embeddings)
         indices = np.triu_indices(len(doc_embeddings), k=1)
         mean_similarity = np.mean(similarity_matrix[indices]) if indices[0].size > 0 else 0.0
         diversity_score = 1 - mean_similarity
-        return Performance(score=diversity_score, unit='0 to 1', metric='Diversity')
+        return Performance(score=diversity_score, unit='0 to 2', metric='Diversity')
 
 
 class GeneralizedEmbeddingCoverageError(BaseBuiltinMetric):
@@ -432,7 +434,7 @@ class GeneralizedEmbeddingCoverageError(BaseBuiltinMetric):
         doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
 
         if query_embeddings.size == 0 or doc_embeddings.size == 0:  # guard before indexing
-            return Performance(_eval=False)
+            return Performance(unit='distance', metric='GECE', _eval=False)
         query_embedding = query_embeddings[0]
 
         distances = [np.linalg.norm(query_embedding - doc_emb) for doc_emb in doc_embeddings]
@@ -459,13 +461,13 @@ class EmbeddingCosineSimilarityEvaluation(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not ret_docs:
-            return Performance(score=0.0, unit='-1 to 1', metric='Embedding Cosine Similarity')
+            return Performance(unit='-1 to 1', metric='Embedding Cosine Similarity', _eval=False)
 
         query_embeddings = self.embedding_adapter.create_embeddings([query])
         doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
 
         if query_embeddings.size == 0 or doc_embeddings.size == 0:  # guard before indexing
-            return Performance(_eval=False)
+            return Performance(unit='-1 to 1', metric='Embedding Cosine Similarity', _eval=False)
         query_embedding = query_embeddings[0]
 
         sims = cosine_similarity([query_embedding], doc_embeddings)[0]
@@ -496,7 +498,7 @@ class PairwiseCosineSimilarityVariance(BaseBuiltinMetric):
         """
         embeddings = self.embedding_adapter.create_embeddings(ret_docs)
         if len(embeddings) < 2:  # embedding api failed, or not enough chunks to pair
-            return Performance(_eval=False)
+            return Performance(unit="variance", metric="PCSV", _eval=False)
         similarity = []
         for i in range(len(embeddings)):
             for j in range(i + 1, len(embeddings)):
@@ -504,4 +506,4 @@ class PairwiseCosineSimilarityVariance(BaseBuiltinMetric):
                 similarity.append(sim)
         mean = np.mean(similarity)
         variance = np.mean((np.array(similarity) - mean) ** 2)
-        return Performance(score=variance, unit="", metric="PCSV")
+        return Performance(score=variance, unit="variance", metric="PCSV")

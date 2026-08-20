@@ -156,6 +156,31 @@ class CliNetworkRegressionTests(unittest.TestCase):
         self.assertNotIn("do-not-leak", message)
         self.assertNotIn("/Users/example", message)
 
+    def test_failed_execution_state_is_broadcast_before_error_propagates(self):
+        class Handler:
+            async def broadcast(self, topic, payload):
+                return None
+
+        storage = SimpleNamespace(flow_graph=[], results={})
+        container = SimpleNamespace(storage=storage, flow_id="flow")
+        engine = SimpleNamespace(containers={"flow": container})
+        runner = Runner(Handler(), engine, "flow")
+        broadcasted = []
+
+        async def fake_broadcast(query_ids):
+            broadcasted.extend(query_ids)
+
+        async def failing_operation():
+            storage.results["failed-query"] = SimpleNamespace(serialize=lambda: {"status": "failed"})
+            raise RuntimeError("module failed")
+
+        runner._broadcast_rag_result = fake_broadcast
+
+        with self.assertRaisesRegex(RuntimeError, "module failed"):
+            asyncio.run(runner._run_and_broadcast(failing_operation))
+
+        self.assertEqual(broadcasted, ["failed-query"])
+
 
 if __name__ == "__main__":
     unittest.main()

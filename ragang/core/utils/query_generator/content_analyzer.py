@@ -38,7 +38,7 @@ class ContentAnalyzer:
         parsed_results: List[Tuple[str, List[str]]] = []
         for response_dict in responses:
             if isinstance(response_dict, Exception):
-                logger.error(f"LLM 호출 중 예외 발생: {response_dict}")
+                logger.error("LLM 호출이 실패했습니다. 응답 본문은 기록하지 않습니다.")
                 parsed_results.append(("", []))
                 continue
 
@@ -54,7 +54,7 @@ class ContentAnalyzer:
                 parsed_results.append((summary, keywords))
             else:
                 # 파싱 실패 시 에러 로그 기록
-                logger.error(f"LLM 응답 파싱 실패. 원본 응답: {response_text}")
+                logger.error("LLM 응답 파싱에 실패했습니다. 응답 본문은 기록하지 않습니다.")
                 parsed_results.append(("", []))
 
         return parsed_results

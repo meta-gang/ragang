@@ -63,6 +63,16 @@ for normal regression coverage.
   results and UI copy.
 - Preserve metric scale, units, parameter ordering, and version semantics.
   Any intentional semantic change needs focused tests and user-facing notes.
+- Never aggregate heterogeneous metrics into an overall score or best/worst
+  module ranking. Direction and units must be interpreted per metric.
+- Every evaluated score must be a finite non-boolean real number. A valid zero
+  remains evaluated; unsupported inputs and calculation failures do not.
+- Graph and retry changes must preserve every module repetition, bounded
+  `max_steps`, parent execution IDs, the actually selected next modules,
+  latency, and failure state. Trace input/output values only by key name.
+- Counterfactual perturbations must be deterministic from recorded parameters,
+  keep semantic labels explicitly user-supplied/unverified, and avoid causal
+  claims.
 - Tests must encode correct behavior. Never weaken or delete a test merely to
   make a change pass.
 

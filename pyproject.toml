@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ragang"
 version = "0.0.8b0"
-description = "Retrieval Augmented Generation Assessing tool with No Gold"
+description = "Ground-truth-free RAG evaluation and diagnosis framework"
 requires-python = ">=3.13"
 dependencies = [
     "httpx>=0.28.1",
@@ -25,7 +25,7 @@ authors = [
     {name = "Jung-MoonGyu", email = "jmoongyu24@gmail.com"},
     {name = "Kim-JaeJun", email = "jaeiko@g.skku.edu"},
 ]
-keywords = ["rag", "llm"]
+keywords = ["rag", "evaluation", "diagnosis", "llm", "graphrag"]
 
 [project.scripts]
 ragang = 'ragang.cli_script.entry:main'
