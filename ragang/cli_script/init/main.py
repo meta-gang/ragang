@@ -27,8 +27,13 @@ def run(args: Namespace):
     except Exception as e:
         raise RagangInitError(e)
 
-    # keep derived output out of git. the API key comes from RAGANG_API_KEY, so
-    # settings.py itself stays tracked
+    # Keep derived output and local secrets out of git. Preserve user rules
+    # when initializing into an existing directory.
     gitignore = target_path / '.gitignore'
-    if not gitignore.exists():
-        gitignore.write_text("__pycache__/\nhistory/\n", encoding='utf-8')
+    existing_rules = gitignore.read_text(encoding='utf-8').splitlines() if gitignore.exists() else []
+    required_rules = ["__pycache__/", ".env", "history/", "datas/queries/generated/"]
+    merged_rules = [*existing_rules]
+    for rule in required_rules:
+        if rule not in merged_rules:
+            merged_rules.append(rule)
+    gitignore.write_text("\n".join(merged_rules) + "\n", encoding='utf-8')

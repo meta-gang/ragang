@@ -35,11 +35,23 @@ class Status:
         return mid in [src for src, _ in self.x_status]
 
     def find_loop_before_mid(self, target_mid: str, dept_mids: list[str]) -> str:
-        if target_mid in dept_mids:
-            return target_mid
-        for link in self.flow_graph:
-            if link[0] == target_mid:
-                return self.find_loop_before_mid(link[1], dept_mids)
+        department_ids = set(dept_mids)
+        pending = [target_mid]
+        visited: set[str] = set()
+
+        while pending:
+            current = pending.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            if current in department_ids:
+                return current
+
+            pending.extend(
+                destination
+                for source, destination in self.flow_graph
+                if source == current and destination not in visited
+            )
         return None
 
 

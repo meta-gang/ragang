@@ -1,12 +1,12 @@
 import datetime as dt
 import json
 import os
-import traceback
 import time
 from typing import Dict, Tuple, List
 from pathlib import Path
 
 from ragang.core.utils.cli import get_history, update_history
+from ragang.evaluator import safe_failure
 from ragang.exceptions.user.cli import NotAllowedQueryFileException
 
 
@@ -60,13 +60,13 @@ class Runner:
         try:
             await fn(msg, ws)
         except Exception as e:
-            # the traceback stays on the server console; broadcasting it would leak
-            # absolute paths and internal structure to every subscriber
-            print(f"[Runner] Dispatch Error: {e}")
-            traceback.print_exc()
+            # Keep both logs and unauthenticated websocket payloads free of raw
+            # credentials, local paths, and tracebacks.
+            failure = safe_failure(e)
+            print(f"[Runner] Dispatch Error: {failure['type']}: {failure['message']}")
             await self.handler.broadcast("error", {
                 "module": "runner",
-                "message": str(e),
+                "message": failure["message"],
             })
 
     # ------------------------------------------------------------------
@@ -82,11 +82,12 @@ class Runner:
         """
         if not file_name:
             raise ValueError("file_name must be provided")
-        if Path(file_name).suffix != suffix:
+        supplied_path = Path(file_name)
+        if supplied_path.is_absolute() or supplied_path.suffix != suffix:
             raise NotAllowedQueryFileException(file_name)
 
         base = base_dir.resolve()
-        target = (base / file_name).resolve()
+        target = (base / supplied_path).resolve()
         if not target.is_relative_to(base):
             raise NotAllowedQueryFileException(file_name)
         if not target.is_file():
@@ -232,5 +233,5 @@ class Runner:
                 "history": safe_history
             })
         except Exception as e:
-            print(f"[Backend] Error in _start_react: {e}")
-            print(traceback.format_exc())
+            failure = safe_failure(e)
+            print(f"[Backend] Error in _start_react: {failure['type']}: {failure['message']}")

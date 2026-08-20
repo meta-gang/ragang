@@ -5,6 +5,7 @@ from .show import run as show_run
 from .init import run as init_run
 from .gen import run as gen_run
 from .run import run as run_run
+from .compare import run as compare_run
 
 
 def main():
@@ -27,6 +28,14 @@ def main():
     parser_run.add_argument('-Q', '--query', action='store', type=str, help="query file path from datas/queries/ to run", dest='query_path', required=True)
     parser_run.add_argument('--no-save', action='store_false', help="don't save the results", dest='save', default=True)
     parser_run.set_defaults(func=run_run)
+
+    # $ ragang compare -F <flow_id> [--baseline <ts> --candidate <ts>]
+    parser_compare = subparsers.add_parser("compare", help="Compare two saved evaluation runs")
+    parser_compare.add_argument('-F', '--flow', action='store', type=str, help="flow id to compare", dest='flow_id', required=True)
+    parser_compare.add_argument('--baseline', action='store', type=str, help="baseline history timestamp")
+    parser_compare.add_argument('--candidate', action='store', type=str, help="candidate history timestamp")
+    parser_compare.add_argument('--json', action='store_true', help="print structured JSON", dest='json_output')
+    parser_compare.set_defaults(func=compare_run)
 
     # $ ragang query-gen
     parser_gen = subparsers.add_parser("query-gen", help="Generate new test queries")

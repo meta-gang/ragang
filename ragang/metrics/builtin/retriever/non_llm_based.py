@@ -325,6 +325,8 @@ class PrecisionMetric(BaseBuiltinMetric):
         """
         if not retrieved:
             return Performance(score=0.0, unit='0 to 1', metric='Precision')
+        if not ground_truth:
+            return Performance(unit='0 to 1', metric='Precision', _eval=False)
 
         relevant_count = 0
         if self.mode == 'token':
@@ -339,7 +341,7 @@ class PrecisionMetric(BaseBuiltinMetric):
             ground_truth_embs = self.embedding_adapter.create_embeddings(ground_truth)
 
             if retrieved_embs.size == 0 or ground_truth_embs.size == 0:
-                return Performance(score=0.0, unit='0 to 1', metric='Precision')
+                return Performance(unit='0 to 1', metric='Precision', _eval=False)
 
             for ret_emb in retrieved_embs:
                 sims = cosine_similarity([ret_emb], ground_truth_embs)[0]
@@ -390,13 +392,13 @@ class DiversityMetric(BaseBuiltinMetric):
         :return: 계산된 다양성 점수를 담은 Performance 객체
         :rtype: Performance
         """
-        if len(ret_docs) < 2:
-            return Performance(score=0.0, unit='0 to 1', metric='Diversity')
+        if not ret_docs or len(ret_docs) < 2:
+            return Performance(unit='0 to 1', metric='Diversity', _eval=False)
 
         doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)
 
-        if doc_embeddings.size < 2:  # np.array는 len()보다 .size로 확인하는 것이 더 명확합니다.
-            return Performance(score=0.0, unit='0 to 1', metric='Diversity')
+        if len(doc_embeddings) < 2:
+            return Performance(unit='0 to 1', metric='Diversity', _eval=False)
 
         similarity_matrix = cosine_similarity(doc_embeddings)
         indices = np.triu_indices(len(doc_embeddings), k=1)
@@ -424,7 +426,7 @@ class GeneralizedEmbeddingCoverageError(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not ret_docs:
-            return Performance(score=float('inf'), unit='distance', metric='GECE')
+            return Performance(unit='distance', metric='GECE', _eval=False)
 
         query_embeddings = self.embedding_adapter.create_embeddings([query])
         doc_embeddings = self.embedding_adapter.create_embeddings(ret_docs)

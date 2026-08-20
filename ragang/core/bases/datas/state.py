@@ -11,6 +11,8 @@ class State:
         self.snapshots: dict[str, list[Packet]] = dict()  # module output packet snapshots
         self.performances: list[Performance] = None
         self.gen: str | None = None
+        self.run_metadata: dict = {}
+        self.diagnosis: dict | None = None
 
     def save_snapshots(self, packet: Packet):
         if self.snapshots.get(packet.src, None) is None:

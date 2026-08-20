@@ -128,9 +128,11 @@ class A2RYNFaithfulnessMetric(BaseBuiltinMetric):
                 return Performance(_eval=False)
             # read the last verdict only; few-shot examples echoed back by smaller models
             # would otherwise be counted again and push a single claim above 1 point
+            found_verdict = False
             for line in reversed(response["text"].strip().splitlines()):
                 line = line.strip()
                 if line.startswith("Groundedness:"):
+                    found_verdict = True
                     value = line.split(":", 1)[1].strip()
                     if value == "Grounded":
                         print("Grounded")
@@ -138,6 +140,8 @@ class A2RYNFaithfulnessMetric(BaseBuiltinMetric):
                     else:
                         print("Not Grounded")
                     break
+            if not found_verdict:
+                return Performance(unit="", metric="Yes/No Relevancy", _eval=False)
         if not claim_list:  # llm did not answer in the expected numbered format
             return Performance(_eval=False)
         return Performance(score=score / len(claim_list), unit="", metric="Yes/No Relevancy")
@@ -203,6 +207,8 @@ class A2RSimpleScoringFaithfulnessMetric(BaseBuiltinMetric):
             for line in response["text"].split('\n')
             if re.match(r"^\d+\.\s+", line.strip())
         ]
+        if not claim_list:
+            return Performance(unit="score", metric="Simple Scoring Faithfulness", _eval=False)
 
         prompt_claim_scoring = (
             """
@@ -250,17 +256,22 @@ class A2RSimpleScoringFaithfulnessMetric(BaseBuiltinMetric):
             if "error" in response or not response.get("text"):  # llm api failed
                 return Performance(_eval=False)
             score = 0
+            found_score = False
             try:
                 for line in reversed(response["text"].strip().splitlines()):
                     line = line.strip()
                     if line.startswith("Score:"):
                         value = line.split(":", 1)[1].strip()
                         score = int(value)
+                        if score not in {0, 2, 4}:
+                            return Performance(unit="score", metric="Simple Scoring Faithfulness", _eval=False)
                         total_score += score
+                        found_score = True
                         break
             except (ValueError, IndexError):
-                # In case of parsing error, assume the worst score
-                score = 0
+                return Performance(unit="score", metric="Simple Scoring Faithfulness", _eval=False)
+            if not found_score:
+                return Performance(unit="score", metric="Simple Scoring Faithfulness", _eval=False)
 
             print(f"claim {i + 1}: {claim} score: {score}")
 
@@ -309,7 +320,8 @@ class A2RHallucinationFaithfulnessMetric(BaseBuiltinMetric):
         if "error" in response or not response.get("text"):  # llm api failed
             return Performance(_eval=False)
         result = response["text"].strip().lower()
-
+        if result not in {"factual", "hallucinated"}:
+            return Performance(unit="", metric="Hallucination Faithfulness", _eval=False)
         score = 1 if result == "factual" else 0
 
         return Performance(score=score, unit="", metric="Hallucination (Factual/Hallucinated)")
@@ -426,9 +438,11 @@ class A2RTruthfulFaithfulnessMetric(BaseBuiltinMetric):
                 return Performance(_eval=False)
             # read the last verdict only; few-shot examples echoed back by smaller models
             # would otherwise be counted again and push a single claim above 1 point
+            found_verdict = False
             for line in reversed(response["text"].strip().splitlines()):
                 line = line.strip()
                 if line.startswith("Faithfulness:"):
+                    found_verdict = True
                     value = line.split(":", 1)[1].strip()
                     if value == "Truthful":
                         print("Truthful")
@@ -436,6 +450,8 @@ class A2RTruthfulFaithfulnessMetric(BaseBuiltinMetric):
                     else:
                         print("Not Truthful")
                     break
+            if not found_verdict:
+                return Performance(unit="", metric="Yes/No Relevancy", _eval=False)
         if not claim_list:  # llm did not answer in the expected numbered format
             return Performance(_eval=False)
         return Performance(score=score / len(claim_list), unit="", metric="Yes/No Relevancy")
@@ -475,7 +491,7 @@ class A2RYNFaithfulnessMetricSingleCall(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not gen or not gen.strip():
-            return Performance(score=0.0, unit="", metric="Faithfulness (Single Call)")
+            return Performance(unit="", metric="Faithfulness (Single Call)", _eval=False)
 
         # Truncate inputs to manage context window size
         truncated_gen = gen[:max_gen_chars]
@@ -526,13 +542,13 @@ class A2RYNFaithfulnessMetricSingleCall(BaseBuiltinMetric):
             if not match:
                 logger.error("Failed to find a valid JSON array in the LLM response.")
                 logger.debug(f"Malformed response: {response_text}")
-                return Performance(score=np.nan, unit="", metric="Faithfulness (Single Call)")
+                return Performance(unit="", metric="Faithfulness (Single Call)", _eval=False)
 
             json_part = match.group(1) or match.group(2)
             evaluations = json.loads(json_part)
 
             if not evaluations:
-                return Performance(score=0.0, unit="", metric="Faithfulness (Single Call)")
+                return Performance(unit="", metric="Faithfulness (Single Call)", _eval=False)
 
             grounded_count = sum(1 for e in evaluations if e.get("grounded") is True)
             score = grounded_count / len(evaluations)
@@ -540,11 +556,11 @@ class A2RYNFaithfulnessMetricSingleCall(BaseBuiltinMetric):
         except json.JSONDecodeError as e:
             logger.error(f"JSON decoding failed for single-call faithfulness: {e}")
             logger.debug(f"Invalid JSON content: {json_part}")
-            score = np.nan
+            return Performance(unit="", metric="Faithfulness (Single Call)", _eval=False)
         except (KeyError, AttributeError, IndexError) as e:
             logger.error(f"Failed to parse LLM response structure for single-call faithfulness: {e}")
             logger.debug(f"Full response text: {response_text}")
-            score = np.nan
+            return Performance(unit="", metric="Faithfulness (Single Call)", _eval=False)
 
         return Performance(score=score, unit="", metric="Faithfulness (Single Call)")
 
@@ -705,12 +721,12 @@ class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
         :rtype: Performance
         """
         if not gen or not gen.strip():
-            return Performance(score=0.0, unit="", metric="Hybrid Faithfulness")
+            return Performance(unit="", metric="Hybrid Faithfulness", _eval=False)
 
-        claims = self._extract_claims(gen)
+        claims = self._extract_claims(gen=gen)
         if not claims:
             logger.warning("No claims were extracted from the generated answer.")
-            return Performance(score=0.0, unit="", metric="Hybrid Faithfulness")
+            return Performance(unit="", metric="Hybrid Faithfulness", _eval=False)
 
         all_evaluations = []
         truncated_docs = ret_docs[:max_docs]  # 상위 [max_docs]개만 포함
@@ -722,10 +738,11 @@ class A2RHybridFaithfulnessMetric(BaseBuiltinMetric):
                 all_evaluations.extend(evaluations)
             else:
                 logger.warning(f"A batch of {len(batch)} claims failed to be judged.")
+                return Performance(unit="", metric="Hybrid Faithfulness", _eval=False)
 
         if not all_evaluations:
             logger.error("All claim judgment batches failed.")
-            return Performance(score=np.nan, unit="", metric="Hybrid Faithfulness")
+            return Performance(unit="", metric="Hybrid Faithfulness", _eval=False)
 
         grounded_count = sum(1 for e in all_evaluations if isinstance(e, dict) and e.get("grounded") is True)
 

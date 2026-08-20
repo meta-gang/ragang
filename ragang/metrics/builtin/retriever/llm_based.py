@@ -109,8 +109,7 @@ class RandomDocumentInjectionEffect(BaseBuiltinMetric):
         if "error" not in response_data and response_data.get("text"):
             adversarial_doc_text = response_data["text"].strip()
         else:
-            print("Warning: Failed to generate adversarial document. Using a generic random document instead.")
-            adversarial_doc_text = "This is a generic irrelevant document for system testing."
+            return Performance(unit='precision_drop', metric='Random Doc Injection Effect', _eval=False)
 
         injected_docs = retrieved_documents + [adversarial_doc_text]
         injected_precision = self.precision_calculator.evaluate(injected_docs, ground_truth)

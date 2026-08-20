@@ -69,6 +69,8 @@ class E2ESYNRelevancyMetric(BaseBuiltinMetric):
 
         try:
             response = self.llm_adapter.request(prompt, user_query)
+            if "error" in response or not response.get("text"):
+                return Performance(unit="", metric="Yes/No Relevancy", _eval=False)
             response_text = response["text"].strip().upper()
             if response_text == "Y":
                 score = 1.0
@@ -76,10 +78,10 @@ class E2ESYNRelevancyMetric(BaseBuiltinMetric):
                 score = 0.0
             else:
                 logger.warning(f"LLM returned an unexpected value: {response['text']}")
-                score = np.nan
+                return Performance(unit="", metric="Yes/No Relevancy", _eval=False)
         except (KeyError, AttributeError) as e:
             logger.error(f"Failed to parse LLM response: {e}")
-            score = np.nan
+            return Performance(unit="", metric="Yes/No Relevancy", _eval=False)
         return Performance(score=score, unit="", metric="Yes/No Relevancy")
 
 
@@ -136,10 +138,15 @@ class E2EScoringRelevancyMetric(BaseBuiltinMetric):
 
         try:
             response = self.llm_adapter.request(prompt, user_query)
-            score = float(response["text"]) / 2.0
+            if "error" in response or not response.get("text"):
+                return Performance(unit="", metric="Simple Score Relevancy", _eval=False)
+            raw_score = float(response["text"])
+            if raw_score not in {0.0, 1.0, 2.0}:
+                return Performance(unit="", metric="Simple Score Relevancy", _eval=False)
+            score = raw_score / 2.0
         except (ValueError, KeyError, TypeError) as e:
             logger.warning(f"Failed to parse score from LLM response: {e}")
-            score = np.nan
+            return Performance(unit="", metric="Simple Score Relevancy", _eval=False)
         return Performance(score=score, unit="", metric="Simple Score Relevancy")
 
 
@@ -186,13 +193,15 @@ class E2EQGenRelevancyMetric(BaseBuiltinMetric):
 
         try:
             response_data = self.llm_adapter.request(prompt, user_query)
+            if "error" in response_data or not response_data.get("text"):
+                return Performance(unit="", metric="Q-Gen Relevancy", _eval=False)
             responses = [line.strip() for line in response_data["text"].splitlines() if line.strip()]
             if not responses:
                 logger.warning("LLM failed to generate any questions.")
-                return Performance(score=np.nan, unit="", metric="Q-Gen Relevancy")
+                return Performance(unit="", metric="Q-Gen Relevancy", _eval=False)
         except (KeyError, AttributeError) as e:
             logger.error(f"Failed to parse LLM response for question generation: {e}")
-            return Performance(score=np.nan, unit="", metric="Q-Gen Relevancy")
+            return Performance(unit="", metric="Q-Gen Relevancy", _eval=False)
 
         all_texts = [query] + responses
 
@@ -201,12 +210,12 @@ class E2EQGenRelevancyMetric(BaseBuiltinMetric):
             query_embedding = embeddings[0:1]
             generated_embeddings = embeddings[1:]
 
-            if generated_embeddings.shape[0] == 0:
-                return Performance(score=0.0, unit="", metric="Q-Gen Relevancy")
+            if len(embeddings) != len(all_texts) or generated_embeddings.shape[0] == 0:
+                return Performance(unit="", metric="Q-Gen Relevancy", _eval=False)
 
         except Exception as e:
             logger.error(f"An error occurred during embedding creation: {e}")
-            return Performance(score=np.nan, unit="", metric="Q-Gen Relevancy")
+            return Performance(unit="", metric="Q-Gen Relevancy", _eval=False)
 
         similarity_scores = cosine_similarity(query_embedding, generated_embeddings)
         final_score = np.mean(similarity_scores) if similarity_scores.size > 0 else 0.0

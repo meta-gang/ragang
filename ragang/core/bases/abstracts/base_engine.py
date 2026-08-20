@@ -14,6 +14,8 @@ from ragang.core.bases.datas.state import State
 from ragang.core.bases.datas.status import Status
 from ragang.core.network.socket_sender import SocketSender
 from ragang.core.utils.ansi_styler import ANSIStyler
+from ragang.diagnostics import diagnose_state
+from ragang.evaluator import attach_evaluator_context, build_run_metadata
 from ragang.exceptions.frameworks.engine import FlowIdNotFoundException
 
 from ragang.exceptions.user.module import FlowOutputException, InvalidModuleIdException
@@ -25,6 +27,9 @@ class FlowEngine:
     def __init__(self, containers: list[BaseContainer]):
         self.__validate_unique_flow_ids(containers)
         self.containers: dict[str, BaseContainer] = {c.flow_id: c for c in containers}
+        self.run_metadata: dict[str, dict] = {
+            container.flow_id: build_run_metadata(container) for container in containers
+        }
         self.ws_sender: SocketSender = None
 
     def set_ws_sender(self, ws_sender: SocketSender):
@@ -94,12 +99,25 @@ class FlowEngine:
     def __eval(self, c_mid: str, state: State, output: dict[str, Any], metrics: list[BaseMetric] | None) -> list[
         Performance]:
         if metrics is None:
-            return [Performance(_eval=False)]
+            return []
 
         results: list[Performance] = []
         for metric in metrics:
-            args: list = [self.__resolve_param(c_mid, state, output, ref) for ref in metric.param_refs]
-            performance: Performance = metric.evaluate(*args)
+            try:
+                args: list = [self.__resolve_param(c_mid, state, output, ref) for ref in metric.param_refs]
+                performance: Performance = metric.evaluate(*args)
+                performance = attach_evaluator_context(performance, metric)
+            except Exception as exc:
+                warnings.warn(
+                    f"Metric '{metric.__class__.__name__}' was not evaluated: "
+                    f"{type(exc).__name__}: {exc}",
+                    RuntimeWarning,
+                )
+                performance = attach_evaluator_context(
+                    Performance(metric=metric.__class__.__name__, _eval=False),
+                    metric,
+                    exc,
+                )
             results.append(performance)
         return results
 
@@ -201,6 +219,7 @@ class FlowEngine:
     async def __execute_flow(self, cont: BaseContainer, q_id: str, query: str) -> str:
         status: Status = Status(cont.storage.flow_graph)
         state: State = State(q_id, query)
+        state.run_metadata = copy.deepcopy(self.run_metadata[cont.flow_id])
         mod_queue: list[tuple[BaseModule, dict[str, Any]]] = [(cont.starter, {'query': query})]
         while len(mod_queue) != 0:
             c_module, param = mod_queue.pop(0)
@@ -233,11 +252,26 @@ class FlowEngine:
         # eval e2e metrics
         # parameters for the e2e metrics' evaluate() are limited to 'query' and 'gen'
         if cont.metrics is None:
-            performances: list[Performance] = [Performance(_eval=False)]
+            performances: list[Performance] = []
         else:
-            performances: list[Performance] = [m.evaluate(query, gen) for m in cont.metrics]
+            performances = []
+            for metric in cont.metrics:
+                try:
+                    performances.append(attach_evaluator_context(metric.evaluate(query, gen), metric))
+                except Exception as exc:
+                    warnings.warn(
+                        f"Metric '{metric.__class__.__name__}' was not evaluated: "
+                        f"{type(exc).__name__}: {exc}",
+                        RuntimeWarning,
+                    )
+                    performances.append(attach_evaluator_context(
+                        Performance(metric=metric.__class__.__name__, _eval=False),
+                        metric,
+                        exc,
+                    ))
 
         state.performances = performances
+        state.diagnosis = diagnose_state(state)
 
         await self.containers[cont.flow_id].save_state(q_id, state)  # save result (using lock)
         return gen

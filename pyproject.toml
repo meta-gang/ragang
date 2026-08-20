@@ -31,7 +31,13 @@ keywords = ["rag", "llm"]
 ragang = 'ragang.cli_script.entry:main'
 
 [tool.setuptools]
-packages = {find={}}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ['ragang*']
 
 [tool.setuptools.package-data]
-ragang = ['templates/**/*', 'web/**/*']
+ragang = ['templates/**/*']
+
+[tool.setuptools.exclude-package-data]
+ragang = ['**/__pycache__/*', '**/*.pyc', '**/*.pyo']
