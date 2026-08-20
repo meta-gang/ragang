@@ -68,20 +68,19 @@ SHA를 내용에 포함할 수 없는 특성 때문에 최종 handoff에서 별�
 
 ## 2. 저장소와 Git 안전성
 
-- backend는 `origin/validation`의 `01e4c82`에서 분기한
-  `codex/ragang-2026-modernization`에서만 작업했다.
-- frontend는 `feat/begin`의 `61c4f4f`에서 분기한
-  `codex/ragang-ui-2026-modernization`에서만 작업했다.
+- Backend modernization 작업은 `origin/validation`의 `01e4c82`를 기반으로 진행되었다.
+- Frontend modernization 작업은 `feat/begin`의 `61c4f4f`를 기반으로 진행되었다.
+- 개발 과정에서는 별도의 작업 브랜치를 사용했으며, 최종 검증 완료 후
+  `ragang-2026-modernization` 브랜치에 결과를 반영하였다.
 - 보호용 checkpoint는 backend `248688245efc654f9c560bc72c4c16e9ea9275da`,
   frontend `2b325d510334f656a9f41a75ee24013d640c217f`다.
-- research push 전 두 저장소 모두 `git fetch origin`을 실행했다. frontend는
-  `behind 0/ahead 1`, backend는 `behind 0/ahead 0`을 확인하고 force 없이 전용
-  branch만 갱신했다.
-- `main`, `validation`, 기존 feature branch, tag, release, package에는 아무 변경도
-  하지 않았다. merge, rebase, history rewrite도 하지 않았다.
+- research push 전 두 저장소 모두 `git fetch origin`을 실행했다.
+  backend와 frontend 모두 원격 상태를 확인한 후 force push 없이 전용 branch만 갱신했다.
+- `main`, `validation`, 기존 feature branch, tag, release, package에는 변경을 가하지 않았다.
+  merge, rebase, history rewrite도 수행하지 않았다.
 - commit 직전 staged 파일에서 대표 Google/OpenAI/GitHub/AWS secret pattern과
-  개인 절대경로를 파일명만 반환하는 방식으로 재검사했다. secret match는 없었고,
-  개인경로 pattern 1건은 redaction 회귀의 의도된 `/Users/example` fixture뿐이었다.
+  개인 절대경로를 재검사했다. secret match는 없었으며,
+  개인경로 pattern 1건은 redaction 회귀 테스트용 fixture(`/Users/example`)였다.
 
 ## 3. frontend provenance와 배포 자산
 
