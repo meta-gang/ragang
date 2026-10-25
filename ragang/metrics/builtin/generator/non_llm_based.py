@@ -1,3 +1,5 @@
+
+from ragang.metrics.builtin._validation import valid_text, valid_texts
 import numpy as np
 from ragang.core.bases.datas.performance import Performance
 from ragang.core.bases.abstracts.base_metric import BaseMetric
@@ -66,6 +68,9 @@ class AnswerContextSimilarity(BaseBuiltinMetric):
     :vartype embedding_adapter: BaseEmbeddingAdapter
     """
 
+    metric_version = "legacy-absolute-cosine-v1"
+    evaluation_kind = "experimental_similarity_proxy"
+
     def evaluate(self, ret_docs: list[str], gen: str) -> Performance:
         """
         Compute average cosine similarity between embedded retrieval chunks and generator's answer
@@ -77,6 +82,9 @@ class AnswerContextSimilarity(BaseBuiltinMetric):
         :returns: mean of cosine similarities between gen and each retrieval chunks
         :rtype: Performance
         """
+        if not (valid_texts(ret_docs) and valid_text(gen)):
+            return Performance(unit='0 to 1', metric='ACS', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         ans_vecs = self.embedding_adapter.create_embeddings([gen])
         chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
         if ans_vecs.size == 0 or chunk_vecs.size == 0:  # embedding api failed
@@ -114,6 +122,9 @@ class AnswerCentricSimilarityVariance(BaseBuiltinMetric):
         :returns: Veriance of angles beteween gen_vec and each chunk_vecs
         :rtype: Performance
         """
+        if not (valid_texts(ret_docs) and valid_text(gen)):
+            return Performance(unit='1 - angle variance', metric='ACSV', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         ans_vecs = self.embedding_adapter.create_embeddings([gen])
         chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
         if ans_vecs.size == 0 or chunk_vecs.size == 0:  # embedding api failed
@@ -176,6 +187,9 @@ class MutualInformation_KSG(BaseBuiltinMetric):
         :returns: Estimated mutual information score
         :rtype: Performance
         """
+        if not (valid_texts(ret_docs) and valid_text(generation) and valid_text(query)):
+            return Performance(unit='nats', metric='MI_GC_KSG', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
         gen_vecs = self.embedding_adapter.create_embeddings([generation])
         query_vecs = self.embedding_adapter.create_embeddings([query])
@@ -220,6 +234,9 @@ class RetrievalDeviationfromAnswer(BaseBuiltinMetric):
         :returns: Inverse of dispersion score indicating deviation of answer from retrieval embeddings
         :rtype: Performance
         """
+        if not (valid_texts(ret_docs) and valid_text(gen)):
+            return Performance(unit='0 to 1', metric='RDA', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
         ans_vecs = self.embedding_adapter.create_embeddings([gen])
         if chunk_vecs.size == 0 or ans_vecs.size == 0:  # embedding api failed
@@ -262,6 +279,9 @@ class RetrievaltopkMeanAnswerSimilarity(BaseBuiltinMetric):
         :returns: Adjusted similarity score emphasizing top-k retrieval relevance
         :rtype: Performance
         """
+        if not (valid_texts(ret_docs) and valid_text(gen) and valid_text(query)):
+            return Performance(unit='heuristic score', metric='RMAS', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         chunk_vecs = self.embedding_adapter.create_embeddings(ret_docs)
         gen_vecs = self.embedding_adapter.create_embeddings([gen])
         query_vecs = self.embedding_adapter.create_embeddings([query])

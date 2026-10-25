@@ -7,10 +7,16 @@ from ragang.core.decorators.serializable import serializable
 @serializable
 class Packet:
     def __init__(self, src_mid: str, data: dict[str, object], formed_output: dict[str, dict[str, Any]],
-                 performances: list[Performance], x_time: float):
+                 performances: list[Performance], x_time: float, *,
+                 terminal: bool | None = None, evaluator_time: float = 0.0,
+                 is_starter: bool = False):
         self.src: str = src_mid  # src_mid
         self.data: dict[str, Any] = data  # {key: value}
         self.formed_output: dict[str, dict[str, Any]] = formed_output  # {dst_mid: dict}
         self.performances: list[Performance] = performances
         self.x_time: float = x_time  # sec
-        self.is_answer: bool = 'gen' in data.keys()
+        self.is_starter: bool = is_starter
+        self.evaluator_time: float = evaluator_time
+        # A generation with a selected successor is a draft. Leaf generations
+        # retain the historical terminal behavior unless explicitly overridden.
+        self.is_answer: bool = ('gen' in data and not formed_output) if terminal is None else terminal

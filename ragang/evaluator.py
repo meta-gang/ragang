@@ -46,6 +46,12 @@ _CONTENT_FIELD_PARTS = (
     "response",
     "text",
 )
+_EXPLICIT_PROVENANCE_FIELDS = {
+    "prompt_version", "corpus_version", "dataset_version", "metric_version",
+    "model_digest", "model_revision", "model_version", "configuration_version",
+    "temperature", "seed", "top_p", "top_k", "max_tokens", "num_predict",
+    "repeat_penalty",
+}
 _STRUCTURAL_FIELDS = {
     "dependency",
     "direction",
@@ -78,7 +84,7 @@ def _implementation_descriptor(component: Any) -> dict:
     implementation = f"{component_class.__module__}.{component_class.__qualname__}"
     try:
         source = inspect.getsource(component_class)
-    except (OSError, TypeError):
+    except Exception:
         source = implementation
     return {
         "implementation": implementation,
@@ -86,18 +92,29 @@ def _implementation_descriptor(component: Any) -> dict:
     }
 
 
+def _component_attributes(component: Any) -> dict:
+    try:
+        return dict(vars(component))
+    except (TypeError, AttributeError):
+        return {}
+
+
 def _adapter_descriptors(component: Any) -> list[dict]:
     adapters = []
-    for attribute, adapter in sorted(vars(component).items()):
+    for attribute, adapter in sorted(_component_attributes(component).items()):
         if not attribute.endswith("_adapter") or adapter is None:
             continue
         descriptor = {
             "role": attribute.removesuffix("_adapter"),
             **_implementation_descriptor(adapter),
         }
-        model_name = getattr(adapter, "model_name", None)
+        try:
+            model_name = getattr(adapter, "model_name", None)
+        except Exception:
+            model_name = None
         if isinstance(model_name, str) and model_name:
             descriptor["model"] = model_name
+        descriptor["settings"] = _safe_settings(adapter)
         adapters.append(descriptor)
     return adapters
 
@@ -109,23 +126,37 @@ def _safe_settings(component: Any) -> dict:
     user documents, prompts, local paths, or credentials into every result.
     """
     settings = {}
-    for attribute, value in sorted(vars(component).items()):
+    attributes = _component_attributes(component)
+    for name in _EXPLICIT_PROVENANCE_FIELDS:
+        if name not in attributes:
+            try:
+                attributes[name] = getattr(component, name)
+            except (AttributeError, TypeError):
+                pass
+            except Exception:
+                # Provenance must not cause an otherwise valid evaluation to fail.
+                pass
+    for attribute, value in sorted(attributes.items()):
         lowered = attribute.lower()
+        explicit = attribute in _EXPLICIT_PROVENANCE_FIELDS
         if (
             attribute.startswith("_")
             or attribute in _STRUCTURAL_FIELDS
             or attribute.endswith("_adapter")
-            or any(part in lowered for part in _SENSITIVE_FIELD_PARTS)
-            or any(part in lowered for part in _CONTENT_FIELD_PARTS)
+            or (not explicit and any(part in lowered for part in _SENSITIVE_FIELD_PARTS))
+            or (not explicit and any(part in lowered for part in _CONTENT_FIELD_PARTS))
         ):
             continue
-        if value is None or isinstance(value, (bool, int, float)):
+        if value is None or isinstance(value, (bool, int)):
+            settings[attribute] = value
+        elif isinstance(value, float) and math.isfinite(value):
             settings[attribute] = value
         elif isinstance(value, str) and len(value) <= 200:
             settings[attribute] = _redact_message(value)
         elif isinstance(value, (list, tuple)) and all(
             item is None
-            or isinstance(item, (bool, int, float))
+            or isinstance(item, (bool, int))
+            or (isinstance(item, float) and math.isfinite(item))
             or (isinstance(item, str) and len(item) <= 200)
             for item in value
         ):
@@ -139,12 +170,14 @@ def _safe_settings(component: Any) -> dict:
 
 def evaluator_provenance(metric: Any) -> dict:
     """Return deterministic metric identity without credentials or raw prompts."""
-    return {
+    descriptor = {
         **_implementation_descriptor(metric),
         "parameter_sources": list(getattr(metric, "param_refs", [])),
         "settings": _safe_settings(metric),
         "adapters": _adapter_descriptors(metric),
     }
+    descriptor["fingerprint"] = _fingerprint(descriptor)
+    return descriptor
 
 
 def safe_failure(error: BaseException | None = None) -> dict:
@@ -158,14 +191,78 @@ def safe_failure(error: BaseException | None = None) -> dict:
     return {"type": type(error).__name__, "message": message}
 
 
+def valid_score_value(value: Any) -> bool:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except (ValueError, TypeError, OverflowError):
+        return False
+
+
+def _json_metadata_value(value: Any, depth: int = 0) -> bool:
+    """Accept bounded-depth JSON-native metadata; reject cycles and objects."""
+    if depth > 32:
+        return False
+    if value is None or isinstance(value, (str, bool, int)):
+        return True
+    if isinstance(value, float):
+        return math.isfinite(value)
+    if isinstance(value, list):
+        return all(_json_metadata_value(item, depth + 1) for item in value)
+    if isinstance(value, dict):
+        return all(isinstance(key, str) and _json_metadata_value(item, depth + 1)
+                   for key, item in value.items())
+    return False
+
+
+def performance_metadata_error(performance: dict) -> str | None:
+    """Validate public/legacy serialized metric metadata without echoing values.
+
+    Imported histories use the same checks as new evaluator output. Empty units
+    remain valid for legacy unitless metrics; identity names must be present.
+    """
+    def field(name, default=None):
+        return performance.get(name, performance.get(f"_Performance__{name}", default))
+    name = field("metric")
+    if not isinstance(name, str) or not name.strip():
+        return "metric must be a non-empty string"
+    if not isinstance(field("unit", ""), str):
+        return "unit must be a string"
+    for name in ("direction", "metric_version"):
+        value = field(name)
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            return f"{name} must be a non-empty string or None"
+    evidence = field("evidence", [])
+    if not isinstance(evidence, list) or any(not isinstance(item, dict) for item in evidence):
+        return "evidence must be a list of objects"
+    for name, value in (("evidence", evidence), ("scope", field("scope", {})),
+                        ("evaluator", field("evaluator", {}))):
+        if name != "evidence" and not isinstance(value, dict):
+            return f"{name} must be an object"
+        if not _json_metadata_value(value):
+            return f"{name} must contain finite JSON-native metadata"
+    failure = field("failure")
+    if failure is not None:
+        if not isinstance(failure, dict) or not _json_metadata_value(failure):
+            return "failure must be a JSON object or None"
+        for name in ("type", "message"):
+            if name in failure and not isinstance(failure[name], str):
+                return f"failure.{name} must be a string"
+    return None
+
+
 def attach_evaluator_context(performance: Performance, metric: Any, error: BaseException | None = None) -> Performance:
     if not isinstance(performance, Performance):
         raise TypeError(f"Metric '{metric.__class__.__name__}' must return Performance")
-    if performance.did_eval and (
-        isinstance(performance.score, bool)
-        or not isinstance(performance.score, Real)
-        or not math.isfinite(float(performance.score))
-    ):
+    metadata = {name: getattr(performance, name) for name in (
+        "metric", "unit", "direction", "metric_version", "evidence", "scope", "evaluator", "failure")}
+    metadata_error = performance_metadata_error(metadata)
+    if metadata_error:
+        raise ValueError(f"Metric '{metric.__class__.__name__}' returned invalid metadata: {metadata_error}")
+    if type(performance.did_eval) is not bool:
+        raise ValueError(f"Metric '{metric.__class__.__name__}' must use a boolean evaluation flag")
+    if performance.did_eval and not valid_score_value(performance.score):
         raise ValueError(
             f"Metric '{metric.__class__.__name__}' marked a non-finite or non-numeric score as evaluated"
         )
@@ -189,7 +286,15 @@ def build_run_metadata(container: Any) -> dict:
     configuration = {
         "flow_id": container.flow_id,
         "flow_graph": [list(edge) for edge in container.storage.flow_graph],
-        "execution_policy": {"max_steps": container.max_steps},
+        "execution_policy": {
+            "max_steps": container.max_steps,
+            "module_timeout_seconds": getattr(container, "module_timeout_seconds", None),
+            "max_concurrency": getattr(container, "max_concurrency", None),
+        },
+        "versions": {
+            key: value for key, value in _safe_settings(container).items()
+            if key in _EXPLICIT_PROVENANCE_FIELDS
+        },
         "modules": modules,
         "e2e_metrics": [evaluator_provenance(metric) for metric in (container.metrics or [])],
     }
@@ -198,7 +303,7 @@ def build_run_metadata(container: Any) -> dict:
     except PackageNotFoundError:
         framework_version = "unknown"
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "framework_version": framework_version,
         "config_fingerprint": _fingerprint(configuration),
         "configuration": configuration,

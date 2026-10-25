@@ -73,3 +73,25 @@ panel은 parent, next, status, latency, revisit, failure type을 보여줍니다
 명시적 tool call/decision/rewrite를 module로 모델링하면 hop-level diagnosis가 가능합니다.
 그러나 adapter 내부의 숨은 reasoning이나 외부 agent framework 내부 step은 RAGANG이 볼 수
 없습니다. 관측이 필요하면 안전한 bounded output key와 module boundary로 노출해야 합니다.
+
+
+## 종료·실패 보존 계약 보강
+
+`gen`은 선택된 후속 모듈이 있으면 중간 답변입니다. leaf의 유효한 `gen`은 기존처럼
+최종 답변이 되며, 명시적인 `terminal=True`로 일찍 완료하거나 `terminal=False`로
+계속할 수 있습니다. `terminal=True`에는 비어 있지 않은 문자열 `gen`이 필요합니다.
+여러 종료 경로는 먼저 도달한 terminal에서 종료됩니다.
+
+의존성 상태에는 실제 선택한 next 간선만 반영합니다. 비활성 간선이 필요한 AND join은
+충족되지 않습니다. 끝내 답변에 도달하지 않으면 `missing_output`이며, 스케줄러 오류도
+출력 스냅샷과 함께 실패 상태로 저장합니다.
+
+매 호출의 `run_metadata.run_id`와 UTC `started_at`이 같은 batch의 질문에 공유됩니다.
+이벤트에는 run/query/execution ID와 running/completed/failed 상태를 보존합니다.
+`execution_summary`의 모듈 소요 시간, 평가 소요 시간, 질문 전체 wall time을 구별합니다.
+`evaluation_summary`의 미도달 모듈은 비활성 분기일 수 있으므로 실패 수와 합산하지 않습니다.
+
+`max_concurrency` 기본값은 flow batch당 8이고, `module_timeout_seconds`는 선택적 양의
+유한 시간입니다. 시간제한은 cooperative async 실행에 적용됩니다. 동기 블로킹 코드와
+이미 시작한 worker thread를 강제로 중단하지 못하므로 사용자 어댑터도 timeout을 설정해야
+합니다. 동기 평가는 event loop 밖에서 수행하며 공유 E2E evaluator의 동시 호출은 직렬화합니다.

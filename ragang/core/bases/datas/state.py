@@ -9,11 +9,14 @@ class State:
         self.query: str = query
         self.q_id: str = q_id  # any distinguishable id for each query
         self.snapshots: dict[str, list[Packet]] = dict()  # module output packet snapshots
-        self.performances: list[Performance] = None
+        self.performances: list[Performance] = []
         self.gen: str | None = None
         self.run_metadata: dict = {}
         self.diagnosis: dict | None = None
         self.execution_trace: list[dict] = []
+        self.evaluator_latency_seconds: float = 0.0
+        self.total_wall_seconds: float = 0.0
+        self.evaluation_summary: dict = {}
         self.execution_summary: dict = {
             "total_executions": 0,
             "completed_executions": 0,
@@ -56,7 +59,8 @@ class State:
                          parent_execution_ids: list[str], dependency_modules: list[str],
                          status: str, latency_seconds: float, input_keys: list[str],
                          output_keys: list[str], next_modules: list[str],
-                         failure: dict | None = None) -> None:
+                         failure: dict | None = None,
+                         evaluator_latency_seconds: float = 0.0) -> None:
         event = {
             "execution_id": execution_id,
             "module_id": module_id,
@@ -66,6 +70,7 @@ class State:
             "dependency_modules": list(dependency_modules),
             "status": status,
             "latency_seconds": latency_seconds,
+            "evaluator_latency_seconds": evaluator_latency_seconds,
             "input_keys": sorted(input_keys),
             "output_keys": sorted(output_keys),
             "next_modules": list(next_modules),
@@ -107,6 +112,9 @@ class State:
             "total_latency_seconds": sum(
                 float(event.get("latency_seconds") or 0.0) for event in self.execution_trace
             ),
+            "evaluator_latency_seconds": self.evaluator_latency_seconds,
+            "total_wall_seconds": self.total_wall_seconds,
+            "success": termination_reason == "answer" if termination_reason else None,
             "terminated": terminated,
             "termination_reason": termination_reason,
         }

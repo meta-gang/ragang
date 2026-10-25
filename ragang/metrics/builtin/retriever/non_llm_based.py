@@ -35,6 +35,8 @@
     필요한 입력 타입이 명시되어 있습니다.
 
 """
+
+from ragang.metrics.builtin._validation import valid_text, valid_texts
 import numpy as np
 from ragang.core.bases.datas.performance import Performance
 from ragang.core.bases.abstracts.base_metric import BaseMetric
@@ -74,6 +76,9 @@ class KeywordMatchingMetric(BaseBuiltinMetric):
         :return: Keyword Matching 점수를 담은 Performance 객체
         :rtype: Performance
         """
+        if not (valid_text(query) and valid_texts(ret_docs)):
+            return Performance(unit='%', metric='Keyword Matching Metric', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         if not ret_docs:
             return Performance(unit='%', metric='Keyword Matching Metric', _eval=False)
 
@@ -110,6 +115,9 @@ class JaccardSimilarityMetric(BaseBuiltinMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
+        if not (valid_text(query) and valid_texts(ret_docs)):
+            return Performance(unit='%', metric='Jaccard Similarity Metric', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         if not ret_docs:
             return Performance(unit='%', metric='Jaccard Similarity Metric', _eval=False)
 
@@ -149,6 +157,9 @@ class CosineSimilarityMetric(BaseBuiltinMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
+        if not (valid_text(query) and valid_texts(ret_docs)):
+            return Performance(unit='-1 to 1', metric='Cosine Similarity Metric', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         if not ret_docs:
             return Performance(unit='-1 to 1', metric='Cosine Similarity Metric', _eval=False)
 
@@ -185,6 +196,9 @@ class EuclideanDistanceMetric(BaseBuiltinMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
+        if not (valid_text(query) and valid_texts(ret_docs)):
+            return Performance(unit='distance', metric='Euclidean Distance Metric', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         if not ret_docs:
             return Performance(unit='distance', metric='Euclidean Distance Metric', _eval=False)
 
@@ -219,6 +233,9 @@ class ManhattanDistanceMetric(BaseBuiltinMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
+        if not (valid_text(query) and valid_texts(ret_docs)):
+            return Performance(unit='distance', metric='Manhattan Distance Metric', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         if not ret_docs:
             return Performance(unit='distance', metric='Manhattan Distance Metric', _eval=False)
 
@@ -252,6 +269,9 @@ class NegativeRejectionRateMetric(BaseBuiltinMetric):
         :return: Jaccard 유사도 점수를 담은 Performance 객체
         :rtype: Performance
         """
+        if not (valid_text(query) and valid_texts(ret_docs)):
+            return Performance(unit='%', metric='Negative Rejection Rate Metric', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         if not ret_docs:
             return Performance(unit='%', metric='Negative Rejection Rate Metric', _eval=False)
 
@@ -323,6 +343,9 @@ class PrecisionMetric(BaseBuiltinMetric):
         :return: 계산된 정밀도 점수를 담은 Performance 객체
         :rtype: Performance
         """
+        if not (valid_texts(retrieved) and valid_texts(ground_truth)):
+            return Performance(unit='0 to 1', metric='Precision', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         if not retrieved:
             return Performance(unit='0 to 1', metric='Precision', _eval=False)
         if not ground_truth:
@@ -394,6 +417,9 @@ class DiversityMetric(BaseBuiltinMetric):
         :return: 계산된 다양성 점수를 담은 Performance 객체
         :rtype: Performance
         """
+        if not (valid_texts(ret_docs)):
+            return Performance(unit='0 to 2', metric='Diversity', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         if not ret_docs or len(ret_docs) < 2:
             return Performance(unit='0 to 2', metric='Diversity', _eval=False)
 
@@ -427,6 +453,9 @@ class GeneralizedEmbeddingCoverageError(BaseBuiltinMetric):
         :return: 계산된 평균 거리(coverage_error)를 담은 Performance 객체
         :rtype: Performance
         """
+        if not (valid_text(query) and valid_texts(ret_docs)):
+            return Performance(unit='distance', metric='GECE', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         if not ret_docs:
             return Performance(unit='distance', metric='GECE', _eval=False)
 
@@ -460,6 +489,9 @@ class EmbeddingCosineSimilarityEvaluation(BaseBuiltinMetric):
         :return: 계산된 일관성 점수를 담은 Performance 객체
         :rtype: Performance
         """
+        if not (valid_text(query) and valid_texts(ret_docs)):
+            return Performance(unit='-1 to 1', metric='Embedding Cosine Similarity', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         if not ret_docs:
             return Performance(unit='-1 to 1', metric='Embedding Cosine Similarity', _eval=False)
 
@@ -496,6 +528,9 @@ class PairwiseCosineSimilarityVariance(BaseBuiltinMetric):
         :returns: Variance score of pairwise cosine similarities indicating semantic spread
         :rtype: Performance
         """
+        if not (valid_texts(ret_docs)):
+            return Performance(unit='variance', metric='PCSV', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         embeddings = self.embedding_adapter.create_embeddings(ret_docs)
         if len(embeddings) < 2:  # embedding api failed, or not enough chunks to pair
             return Performance(unit="variance", metric="PCSV", _eval=False)

@@ -2,6 +2,7 @@ import asyncio
 import copy
 import time
 import warnings
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -73,11 +74,28 @@ class FlowEngine:
                     if value is not None:
                         formed_output[n_mid][param] = value
 
+        if not isinstance(output, dict) or not all(isinstance(key, str) for key in output):
+            raise ModuleOutputException("Module output must be a dictionary with string keys")
+        if 'terminal' in output and not isinstance(output['terminal'], bool):
+            raise ModuleOutputException("Module output 'terminal' must be a boolean")
+        if 'gen' in output and (not isinstance(output['gen'], str) or not output['gen'].strip()):
+            raise ModuleOutputException("Module output 'gen' must be a non-empty string")
+        if output.get('terminal') is True:
+            if 'gen' not in output:
+                raise ModuleOutputException("A terminal output requires a non-empty 'gen'")
+            if output.get('next'):
+                raise ModuleOutputException("A terminal output cannot select successors")
+            return {}
+
         formed_output: dict[str, dict[str, Any]] = {}
 
         next_module_ids: list[str] = module.direction.get_directions()
 
         if (dest_mids := output.get('next', None)) is not None:  # conditional branching module
+            if not isinstance(dest_mids, list) or not all(isinstance(mid, str) for mid in dest_mids):
+                raise ModuleOutputException("Module output 'next' must be a list of module IDs")
+            if len(dest_mids) != len(set(dest_mids)):
+                raise ModuleOutputException("Module output 'next' must not contain duplicate module IDs")
             if unlinked := set(dest_mids) - set(next_module_ids):
                 raise UnlinkedModuleException(module.module_id, unlinked)
             set_formed_output(dest_mids)
@@ -110,7 +128,7 @@ class FlowEngine:
             except Exception as exc:
                 warnings.warn(
                     f"Metric '{metric.__class__.__name__}' was not evaluated: "
-                    f"{type(exc).__name__}: {exc}",
+                    f"{safe_failure(exc)['type']}: {safe_failure(exc)['message']}",
                     RuntimeWarning,
                 )
                 performance = attach_evaluator_context(
@@ -157,7 +175,12 @@ class FlowEngine:
         start_t = time.perf_counter()
         try:
             # may be bounded network io
-            output: dict[str, Any] = await module.execute(**params)
+            if cont.module_timeout_seconds is None:
+                output: dict[str, Any] = await module.execute(**params)
+            else:
+                output = await asyncio.wait_for(
+                    module.execute(**params), timeout=cont.module_timeout_seconds
+                )
         finally:
             # do not retain a state reference on the copied module, including failure paths
             module.lazy_state = None
@@ -167,14 +190,21 @@ class FlowEngine:
         formed_output: dict[str, dict[str, Any]] = self.__validate_output(cont, module, output)
 
         # eval performances
-        performances: list[Performance] = self.__eval(module.module_id, state, output, module.metrics)
+        evaluation_started = time.perf_counter()
+        performances: list[Performance] = await asyncio.to_thread(
+            self.__eval, module.module_id, state, output, module.metrics
+        ) if module.metrics else []
+        evaluator_time = time.perf_counter() - evaluation_started if module.metrics else 0.0
 
         # build packet
         return Packet(src_mid=module.module_id,
                       data=output,
                       formed_output=formed_output,
                       performances=performances,
-                      x_time=duration)
+                      x_time=duration,
+                      terminal=output.get('terminal'),
+                      evaluator_time=evaluator_time,
+                      is_starter=module.is_starter)
 
     def __schedule_next_module(self, c_packet: Packet, cont: BaseContainer, status: Status, state: State) -> list[
         tuple[BaseModule, dict[str, Any], list[str]]]:
@@ -189,11 +219,16 @@ class FlowEngine:
                 # concatenate formed outputs from dep modules' snapshots for next module's param
                 for dep in dep_modules:
                     # ensured not none formed_output due to dependency checking
-                    if n_module.dependency.is_or and not status.executed(dep):  # pass conditionally not executed mid
+                    if n_module.dependency.is_or and not status.active(dep, n_mid):  # pass conditionally not executed mid
                         continue
                     if parent_execution_id := state.latest_execution_id(dep):
                         parent_execution_ids.append(parent_execution_id)
-                    formed_output: dict[str, Any] = state.get_latest_packet(dep).formed_output[n_mid]
+                    packet = state.get_latest_packet(dep)
+                    if packet is None or n_mid not in packet.formed_output:
+                        raise ModuleOutputException(
+                            f"Active dependency '{dep}' has no selected output for '{n_mid}'"
+                        )
+                    formed_output: dict[str, Any] = dict(packet.formed_output[n_mid])
                     if duplicated := set(formed_output.keys()).intersection(formed_params.keys()):
                         loop_end_mid: str = status.find_loop_before_mid(n_mid, dep_modules)
                         if loop_end_mid and loop_end_mid == dep:  # loop - flow came back to n_mid
@@ -220,129 +255,181 @@ class FlowEngine:
                 scheduled.append((n_module, formed_params, list(dict.fromkeys(parent_execution_ids))))
         return scheduled
 
-    async def __execute_flow(self, cont: BaseContainer, q_id: str, query: str) -> str:
-        status: Status = Status(cont.storage.flow_graph)
-        state: State = State(q_id, query)
-        state.run_metadata = copy.deepcopy(self.run_metadata[cont.flow_id])
-        mod_queue: list[tuple[BaseModule, dict[str, Any], list[str]]] = [
-            (cont.starter, {'query': query}, [])
-        ]
-        while len(mod_queue) != 0:
-            if len(state.execution_trace) >= cont.max_steps:
-                error = FlowExecutionLimitException(
-                    f"Flow '{cont.flow_id}' reached max_steps={cont.max_steps} before producing an answer"
-                )
-                state.finalize_execution("max_steps", success=False)
-                state.diagnosis = diagnose_state(state)
-                await cont.save_state(q_id, state)
-                raise error
-
-            c_module, param, parent_execution_ids = mod_queue.pop(0)
-            execution_id, execution_index = state.next_execution_identity(c_module.module_id)
-            dependency_modules = c_module.dependency.get_dependencies()
-            execution_started = time.perf_counter()
-
-            # send start module execution signal
-            if self.ws_sender:
-                await self.ws_sender.send_module_status(c_module.module_id, True)
-
-            try:
-                out: Packet = await self.__run_module(cont, state, c_module, param)
-            except Exception as exc:
-                state.record_execution(
-                    execution_id=execution_id,
-                    module_id=c_module.module_id,
-                    execution_index=execution_index,
-                    parent_execution_ids=parent_execution_ids,
-                    dependency_modules=dependency_modules,
-                    status="failed",
-                    latency_seconds=time.perf_counter() - execution_started,
-                    input_keys=list(param),
-                    output_keys=[],
-                    next_modules=[],
-                    failure=safe_failure(exc),
-                )
-                state.finalize_execution("module_error", success=False)
-                state.diagnosis = diagnose_state(state)
-                await cont.save_state(q_id, state)
-                raise
-            finally:
-                # signal completion even when module execution or output validation fails
-                if self.ws_sender:
-                    await self.ws_sender.send_module_status(c_module.module_id, False)
-
-            state.save_snapshots(out)
-            state.record_execution(
-                execution_id=execution_id,
-                module_id=c_module.module_id,
-                execution_index=execution_index,
-                parent_execution_ids=parent_execution_ids,
-                dependency_modules=dependency_modules,
-                status="completed",
-                latency_seconds=out.x_time,
-                input_keys=list(param),
-                output_keys=list(out.data),
-                next_modules=list(out.formed_output),
+    async def __send_module_status(self, module_id: str, is_start: bool, *, state: State,
+                                   execution_id: str, status: str) -> None:
+        if self.ws_sender:
+            await self.ws_sender.send_module_status(
+                module_id, is_start, query_id=state.q_id, execution_id=execution_id,
+                run_id=state.run_metadata.get("run_id"), status=status,
             )
 
-            # optimize / refresh module execution status (manages each module's dependency)
-            status.optimize_n_add_xs([(c_module.module_id, dst) for dst in c_module.direction.get_directions()])
+    def __eval_e2e(self, cont: BaseContainer, query: str, gen: str) -> list[Performance]:
+        # Acquiring this lock inside the worker never blocks the event loop.
+        with cont._e2e_eval_lock:
+            return self.__eval_e2e_unlocked(cont.metrics, query, gen)
 
-            # exit if it is output
-            if out.is_answer:
-                break
+    def __eval_e2e_unlocked(self, metrics: list[BaseMetric], query: str, gen: str) -> list[Performance]:
+        performances = []
+        for metric in metrics:
+            try:
+                performances.append(attach_evaluator_context(metric.evaluate(query, gen), metric))
+            except Exception as exc:
+                failure = safe_failure(exc)
+                warnings.warn(
+                    f"Metric '{metric.__class__.__name__}' was not evaluated: "
+                    f"{failure['type']}: {failure['message']}", RuntimeWarning,
+                )
+                performances.append(attach_evaluator_context(
+                    Performance(metric=metric.__class__.__name__, _eval=False), metric, exc,
+                ))
+        return performances
 
-            # schedule next modules
-            mod_queue.extend(self.__schedule_next_module(out, cont, status, state))
+    @staticmethod
+    def __refresh_evaluation_summary(cont: BaseContainer, state: State) -> None:
+        module_performances = [
+            performance
+            for packets in state.snapshots.values()
+            for packet in packets
+            for performance in packet.performances
+        ]
+        performances = module_performances + (state.performances or [])
+        state.evaluation_summary = {
+            "attempted": len(performances),
+            "evaluated": sum(performance.did_eval for performance in performances),
+            "not_evaluated": sum(not performance.did_eval for performance in performances),
+            "configured_e2e_metrics": len(cont.metrics or []),
+            "not_reached_e2e_metrics": max(0, len(cont.metrics or []) - len(state.performances or [])),
+            # A non-reached module may be an intentionally inactive branch. It is
+            # reported separately and is not fabricated as a failed metric attempt.
+            "not_reached_modules": [
+                {"module_id": mid, "configured_metrics": len(module.metrics or [])}
+                for mid, module in cont.modules.items()
+                if mid not in state.snapshots and module.metrics
+            ],
+        }
 
-        if (gen := state.gen) is None:
-            state.finalize_execution("missing_output", success=False)
+    async def __execute_flow(self, cont: BaseContainer, q_id: str, query: str,
+                             run_context: dict | None = None) -> str:
+        status = Status(cont.storage.flow_graph)
+        state = State(q_id, query)
+        state.run_metadata = copy.deepcopy(self.run_metadata[cont.flow_id])
+        state.run_metadata.update(run_context or self.__new_run_context())
+        flow_started = time.perf_counter()
+        termination_reason = "engine_error"
+        success = False
+        mod_queue = [(cont.starter, {'query': query}, [])]
+        try:
+            while mod_queue:
+                if len(state.execution_trace) >= cont.max_steps:
+                    termination_reason = "max_steps"
+                    raise FlowExecutionLimitException(
+                        f"Flow '{cont.flow_id}' reached max_steps={cont.max_steps} before producing an answer"
+                    )
+
+                c_module, param, parent_execution_ids = mod_queue.pop(0)
+                execution_id, execution_index = state.next_execution_identity(c_module.module_id)
+                dependency_modules = c_module.dependency.get_dependencies()
+                execution_started = time.perf_counter()
+                await self.__send_module_status(
+                    c_module.module_id, True, state=state, execution_id=execution_id, status="running"
+                )
+                try:
+                    out = await self.__run_module(cont, state, c_module, param)
+                except BaseException as exc:
+                    termination_reason = "cancelled" if isinstance(exc, asyncio.CancelledError) else "module_error"
+                    state.record_execution(
+                        execution_id=execution_id, module_id=c_module.module_id,
+                        execution_index=execution_index, parent_execution_ids=parent_execution_ids,
+                        dependency_modules=dependency_modules, status="failed",
+                        latency_seconds=time.perf_counter() - execution_started,
+                        input_keys=list(param), output_keys=[], next_modules=[], failure=safe_failure(exc),
+                    )
+                    await self.__send_module_status(
+                        c_module.module_id, False, state=state, execution_id=execution_id, status="failed"
+                    )
+                    raise
+
+                state.save_snapshots(out)
+                state.evaluator_latency_seconds += out.evaluator_time
+                state.record_execution(
+                    execution_id=execution_id, module_id=c_module.module_id,
+                    execution_index=execution_index, parent_execution_ids=parent_execution_ids,
+                    dependency_modules=dependency_modules, status="completed", latency_seconds=out.x_time,
+                    evaluator_latency_seconds=out.evaluator_time, input_keys=list(param),
+                    output_keys=list(out.data), next_modules=list(out.formed_output),
+                )
+                try:
+                    status.optimize_n_add_xs(
+                        [(c_module.module_id, dst) for dst in out.formed_output],
+                        source_mid=c_module.module_id,
+                    )
+                    if not out.is_answer:
+                        mod_queue.extend(self.__schedule_next_module(out, cont, status, state))
+                except Exception as exc:
+                    termination_reason = "scheduler_error"
+                    # The output snapshot survives even if scheduling its successors
+                    # fails; annotate this same execution instead of inventing a step.
+                    state.execution_trace[-1].update(status="failed", failure=safe_failure(exc))
+                    await self.__send_module_status(
+                        c_module.module_id, False, state=state, execution_id=execution_id, status="failed"
+                    )
+                    raise
+                await self.__send_module_status(
+                    c_module.module_id, False, state=state, execution_id=execution_id, status="completed"
+                )
+                if out.is_answer:
+                    break
+
+            if state.gen is None:
+                termination_reason = "missing_output"
+                raise FlowOutputException()
+
+            if cont.metrics:
+                evaluation_started = time.perf_counter()
+                try:
+                    state.performances = await asyncio.to_thread(self.__eval_e2e, cont, query, state.gen)
+                finally:
+                    state.evaluator_latency_seconds += time.perf_counter() - evaluation_started
+            termination_reason = "answer"
+            success = True
+            return state.gen
+        except asyncio.CancelledError:
+            termination_reason = "cancelled"
+            raise
+        finally:
+            state.total_wall_seconds = time.perf_counter() - flow_started
+            state.finalize_execution(termination_reason, success=success)
+            self.__refresh_evaluation_summary(cont, state)
             state.diagnosis = diagnose_state(state)
             await cont.save_state(q_id, state)
-            raise FlowOutputException()
 
-        # eval e2e metrics
-        # parameters for the e2e metrics' evaluate() are limited to 'query' and 'gen'
-        if cont.metrics is None:
-            performances: list[Performance] = []
-        else:
-            performances = []
-            for metric in cont.metrics:
-                try:
-                    performances.append(attach_evaluator_context(metric.evaluate(query, gen), metric))
-                except Exception as exc:
-                    warnings.warn(
-                        f"Metric '{metric.__class__.__name__}' was not evaluated: "
-                        f"{type(exc).__name__}: {exc}",
-                        RuntimeWarning,
-                    )
-                    performances.append(attach_evaluator_context(
-                        Performance(metric=metric.__class__.__name__, _eval=False),
-                        metric,
-                        exc,
-                    ))
+    @staticmethod
+    def __new_run_context() -> dict:
+        return {"run_id": str(uuid4()), "started_at": datetime.now(timezone.utc).isoformat()}
 
-        state.performances = performances
-        state.finalize_execution("answer", success=True)
-        state.diagnosis = diagnose_state(state)
+    async def __run_query(self, query: str, flow_id: str, run_context: dict | None = None) -> dict:
+        q_id = str(uuid4())
+        run_context = run_context or self.__new_run_context()
+        status = "failed"
+        try:
+            res = await self.__execute_flow(self.containers[flow_id], q_id, query, run_context)
+            status = "completed"
+            return {flow_id: {q_id: {'query': query, 'answer': res}}}
+        finally:
+            if self.ws_sender:
+                await self.ws_sender.send_query_end(q_id, run_id=run_context["run_id"], status=status)
 
-        await self.containers[cont.flow_id].save_state(q_id, state)  # save result (using lock)
-        return gen
+    async def __run_container(self, flow_id: str, queries: list[str], run_context: dict | None = None):
+        limit = getattr(self.containers[flow_id], "max_concurrency", 8)
+        semaphore = asyncio.Semaphore(limit)
 
-    async def __run_query(self, query: str, flow_id: str) -> dict[str, dict[str, dict[str, str]]]:
-        q_id: str = str(uuid4())
-        res = await self.__execute_flow(self.containers[flow_id], q_id, query)
+        async def bounded_query(query):
+            async with semaphore:
+                if run_context is None:
+                    return await self.__run_query(query, flow_id)
+                return await self.__run_query(query, flow_id, run_context)
 
-        if self.ws_sender:
-            await self.ws_sender.send_query_end(q_id)  # send query end signal
-
-        return {flow_id: {q_id: {'query': query, 'answer': res}}}
-
-    async def __run_container(self, flow_id: str, queries: list[str]):
-        tasks = [
-            self.__run_query(query, flow_id)
-            for query in queries
-        ]
+        tasks = [bounded_query(query) for query in queries]
         # isolate failures: one failing query must not discard the results already produced
         results = await asyncio.gather(*tasks, return_exceptions=True)
         merged = {}
@@ -350,7 +437,7 @@ class FlowEngine:
         for res in results:
             if isinstance(res, BaseException):
                 errors.append(res)
-                warnings.warn(f"Skipped a failed execution: {type(res).__name__}: {res}", RuntimeWarning)
+                warnings.warn(f"Skipped a failed execution: {safe_failure(res)['type']}: {safe_failure(res)['message']}", RuntimeWarning)
                 continue  # error
             for k, v in res.items():  # merge into {flow_id: {q_id1: {...}, q_id2: {...}, ...}
                 merged.setdefault(k, {}).update(v)
@@ -360,6 +447,7 @@ class FlowEngine:
         return merged
 
     async def async_invoke(self, query: str, flow_ids: list[str] = None):
+        run_context = self.__new_run_context()
         async def run():
             tasks = []
 
@@ -370,7 +458,7 @@ class FlowEngine:
                 f_ids = self.__validate_flow_ids_existence(flow_ids)
 
             for f_id in f_ids:
-                tasks.append(self.__run_query(query, f_id))
+                tasks.append(self.__run_query(query, f_id, run_context))
 
             if self.ws_sender:
                 await self.ws_sender.send_rag_preparation_sig(n_query=1)  # send rag preparation signal
@@ -383,7 +471,7 @@ class FlowEngine:
             for res in results:
                 if isinstance(res, BaseException):
                     errors.append(res)
-                    warnings.warn(f"Skipped a failed execution: {type(res).__name__}: {res}", RuntimeWarning)
+                    warnings.warn(f"Skipped a failed execution: {safe_failure(res)['type']}: {safe_failure(res)['message']}", RuntimeWarning)
                     continue  # error
                 for k, v in res.items():
                     merged.setdefault(k, {}).update(v)
@@ -401,7 +489,8 @@ class FlowEngine:
             self.async_invoke(query, flow_ids)
         )  # return {flow_id1: {q_id1: {'query': query, 'answer': gen}, q_id2: {...}}, flow_id2: {...}}
 
-    async def async_invoke_batch(self, queries: list[str], flow_ids: list[str] = None):  # threading
+    async def async_invoke_batch(self, queries: list[str], flow_ids: list[str] = None):
+        run_context = self.__new_run_context()
         async def run():
             tasks = []
 
@@ -412,7 +501,7 @@ class FlowEngine:
                 f_ids = self.__validate_flow_ids_existence(flow_ids)
 
             for f_id in f_ids:
-                tasks.append(self.__run_container(f_id, queries))
+                tasks.append(self.__run_container(f_id, queries, run_context))
 
             if self.ws_sender:
                 await self.ws_sender.send_rag_preparation_sig(len(queries))  # send rag preparation signal
@@ -425,7 +514,7 @@ class FlowEngine:
             for res in results:
                 if isinstance(res, BaseException):
                     errors.append(res)
-                    warnings.warn(f"Skipped a failed execution: {type(res).__name__}: {res}", RuntimeWarning)
+                    warnings.warn(f"Skipped a failed execution: {safe_failure(res)['type']}: {safe_failure(res)['message']}", RuntimeWarning)
                     continue  # error
                 for k, v in res.items():
                     merged.setdefault(k, {}).update(v)

@@ -65,6 +65,9 @@ report = compare_counterfactual_runs(
 )
 ```
 
+Metric delta는 양쪽의 대응 질문 중 동일 평가자 조건으로 마지막 평가가 유효한 표본에서만 계산합니다.
+전체 실행 요약의 단순 차이와 구별하세요.
+
 Report는 일반 `compare_runs` 결과에 perturbation provenance, paired query 수와
 `pairing_basis`,
 `causal_claim_supported=false`와 해석 warning을 추가합니다. Metric delta의 방향은 catalog를

@@ -212,7 +212,10 @@ class ReportingTests(unittest.TestCase):
 
         self.assertEqual(context_metric["baseline"]["evaluated"], 1)
         self.assertEqual(context_metric["candidate"]["evaluated"], 2)
-        self.assertEqual(context_metric["delta"], 30.0)
+        # The second query failed only in baseline; it cannot contribute a
+        # one-sided success to a claimed improvement.
+        self.assertEqual(context_metric["delta"], 20.0)
+        self.assertEqual(context_metric["paired"]["evaluated"], 1)
         self.assertEqual(report["evaluator_health"]["baseline"]["not_evaluated"], 2)
         self.assertEqual(report["evaluator_health"]["candidate"]["not_evaluated"], 0)
         self.assertAlmostEqual(report["latency_seconds"]["baseline_mean"], 0.3)

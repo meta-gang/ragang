@@ -1,6 +1,9 @@
 import re
+import math
+from numbers import Real
 from abc import ABCMeta
 from asyncio import Lock
+from threading import Lock as ThreadLock
 
 from ragang.core.bases.abstracts.base_metric import BaseMetric
 from ragang.core.bases.abstracts.base_module import BaseModule
@@ -15,9 +18,21 @@ from ragang.core.utils.ansi_styler import ANSIStyler
 
 class BaseContainer(metaclass=ABCMeta):
     def __init__(self, flow_id: str, modules: list[BaseModule], e2e_metrics: list[BaseMetric] = None,
-                 max_steps: int = 1000):
+                 max_steps: int = 1000, *, module_timeout_seconds: float | None = None,
+                 max_concurrency: int = 8):
         if isinstance(max_steps, bool) or not isinstance(max_steps, int) or max_steps <= 0:
             raise ValueError("max_steps must be a positive integer")
+        if module_timeout_seconds is not None and (
+            isinstance(module_timeout_seconds, bool)
+            or not isinstance(module_timeout_seconds, Real)
+            or not math.isfinite(float(module_timeout_seconds))
+            or module_timeout_seconds <= 0
+        ):
+            raise ValueError("module_timeout_seconds must be a positive finite number or None")
+        if isinstance(max_concurrency, bool) or not isinstance(max_concurrency, int) or max_concurrency <= 0:
+            raise ValueError("max_concurrency must be a positive integer")
+        self.module_timeout_seconds = module_timeout_seconds
+        self.max_concurrency = max_concurrency
         self.flow_id: str = flow_id
         self.max_steps: int = max_steps
         self.modules: dict[str, BaseModule] = {m.module_id: m for m in self.__validate_module_id(modules)}
@@ -25,6 +40,9 @@ class BaseContainer(metaclass=ABCMeta):
         self.metrics: list[BaseMetric] | None = e2e_metrics
         self.storage: FlowStorage = FlowStorage(flow_id, self.__init_graph(modules))
         self._storage_state_lock: Lock = Lock()
+        # E2E metric instances are shared across queries; user adapters may be
+        # stateful or non-thread-safe. Worker-side serialization keeps them safe.
+        self._e2e_eval_lock = ThreadLock()
         self.__set_starter_module()
         self.__set_directions()
 
@@ -102,7 +120,9 @@ class BaseContainer(metaclass=ABCMeta):
                     tot_x_time += x_time
 
             print(ANSIStyler.style(f"E2E Performances:", font_style='bold', fore_color='light-blue'))
-            for perf in state.performances:
+            for perf in state.performances or []:
                 print(ANSIStyler.style(f"\t{perf} ({tot_x_time:.4f}ms)", font_style='bold',
                                        fore_color='light-yellow'))
+            if state.execution_summary.get("terminated"):
+                print(f"Execution failed: {state.execution_summary.get('termination_reason')}")
             print()

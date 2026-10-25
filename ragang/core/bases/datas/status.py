@@ -6,7 +6,7 @@ class Status:
         self.flow_graph: list[tuple[str, str]] = flow_graph
         self.x_status: list[tuple[str, str]] = list()  # execution status (for dependency checking)
 
-    def optimize_n_add_xs(self, cur_x: list[tuple[str, str]]):  # should optimize first and add current x statuses
+    def optimize_n_add_xs(self, cur_x: list[tuple[str, str]], source_mid: str | None = None):  # should optimize first and add current x statuses
         # find target tuples to remove in flow graph
         target_links: list[tuple[str, str]] = []
 
@@ -25,9 +25,16 @@ class Status:
                     if link[1] not in visited:
                         pending.append(link[1])
 
-        self.x_status = list(set(self.x_status) - set(target_links))
-        # add current execution status
-        self.x_status.extend(cur_x)
+        # Replace this execution's old outgoing choices as well as invalidated
+        # descendants. Only actually selected edges can satisfy dependencies.
+        sources = {src for src, _ in cur_x}
+        if source_mid is not None:
+            sources.add(source_mid)
+        self.x_status = [
+            link for link in self.x_status
+            if link not in target_links and link[0] not in sources
+        ]
+        self.x_status.extend(link for link in dict.fromkeys(cur_x) if link not in self.x_status)
 
     def check_dependencies(self, dep: Dependency) -> bool:  # TODO: do we also need to acquire lock here?
         """
@@ -36,6 +43,9 @@ class Status:
         """
         check = any if dep.is_or else all
         return check(dependency in self.x_status for dependency in dep.dependencies)
+
+    def active(self, source: str, destination: str) -> bool:
+        return (source, destination) in self.x_status
 
     def executed(self, mid: str) -> bool:
         return mid in [src for src, _ in self.x_status]

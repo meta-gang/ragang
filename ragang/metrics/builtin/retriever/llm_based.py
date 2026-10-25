@@ -36,6 +36,8 @@
 
 """
 
+from ragang.metrics.builtin._validation import valid_text, valid_texts
+
 from typing import List
 
 # --- 공통 기반 클래스 및 어댑터 import ---
@@ -100,6 +102,9 @@ class RandomDocumentInjectionEffect(BaseBuiltinMetric):
         :return: 정밀도 하락폭(effect) 점수를 담은 Performance 객체
         :rtype: Performance
         """
+        if not (valid_text(query) and valid_texts(retrieved_documents) and valid_texts(ground_truth)):
+            return Performance(unit='precision_drop', metric='Random Doc Injection Effect', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         original_precision = self.precision_calculator.evaluate(retrieved_documents, ground_truth)
         if not original_precision.did_eval:
             return Performance(unit='precision_drop', metric='Random Doc Injection Effect', _eval=False)

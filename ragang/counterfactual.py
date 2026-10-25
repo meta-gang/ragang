@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import random
-from collections import Counter
 from typing import Any, Sequence
 
 from ragang.comparison import compare_runs
@@ -118,30 +117,11 @@ def compare_counterfactual_runs(
         raise ValueError("perturbation provenance with a kind is required")
 
     report = compare_runs(baseline_states, candidate_states)
-    def query_counts(states: dict[str, dict]) -> Counter[str]:
-        return Counter(
-            query
-            for state in states.values()
-            if isinstance(state, dict)
-            and isinstance((query := state.get("query", state.get("_State__query"))), str)
-            and query
-        )
-
-    baseline_queries = query_counts(baseline_states)
-    candidate_queries = query_counts(candidate_states)
-    if baseline_queries and candidate_queries:
-        paired_query_count = sum(
-            min(count, candidate_queries.get(query, 0))
-            for query, count in baseline_queries.items()
-        )
-        pairing_basis = "query_text"
-    else:
-        paired_query_count = len(set(baseline_states).intersection(candidate_states))
-        pairing_basis = "query_id"
+    pairing = report["pairing"]
     report["counterfactual"] = {
         "perturbation": dict(perturbation),
-        "paired_query_count": paired_query_count,
-        "pairing_basis": pairing_basis,
+        "paired_query_count": pairing["paired_query_count"],
+        "pairing_basis": pairing["pairing_basis"],
         "causal_claim_supported": False,
         "interpretation": (
             "보고된 delta는 관측된 실행 차이입니다. RAGANG은 perturbation 외의 조건이 "

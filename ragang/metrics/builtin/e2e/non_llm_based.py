@@ -1,3 +1,5 @@
+
+from ragang.metrics.builtin._validation import valid_text, valid_texts
 import numpy as np
 from ragang.core.bases.datas.performance import Performance
 from ragang.core.bases.abstracts.base_metric import BaseMetric
@@ -35,6 +37,9 @@ class AnswerQuerySimilarity(BaseBuiltinMetric):
         :returns: Cosine similarity between query_vec and ans_vec
         :rtype: Performance
         """
+        if not (valid_text(query) and valid_text(gen)):
+            return Performance(unit='-1 to 1', metric='AQS', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         embeddings = self.embedding_adapter.create_embeddings([query, gen])
         if len(embeddings) < 2:  # embedding api failed
             return Performance(unit="-1 to 1", metric="AQS", _eval=False)
@@ -64,6 +69,9 @@ class e2eCosineConsistencyMetric(BaseBuiltinMetric):
         :returns: Performance object with the mean cosine similarity score
         :rtype: Performance
         """
+        if not (valid_texts(gens, minimum=2)):
+            return Performance(unit='-1 to 1', metric='E2E Consistency', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         # the engine passes a single generated answer (str); consistency needs several
         if isinstance(gens, str):
             gens = [gens]
@@ -120,6 +128,9 @@ class e2eCovarianceConsistencyMetric(BaseBuiltinMetric):
         :returns: Performance object with the variance of cosine similarities
         :rtype: Performance
         """
+        if not (valid_text(query) and valid_texts(gens, minimum=2)):
+            return Performance(unit='variance', metric='E2E Query-Answer Consistency Variance', _eval=False,
+                               failure={"type": "invalid_metric_input", "message": "Metric requires non-empty text inputs of the declared types."})
         # the engine passes a single generated answer (str); variance needs several
         if isinstance(gens, str):
             gens = [gens]

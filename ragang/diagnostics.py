@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from ragang.evaluator import performance_metadata_error, valid_score_value
+
 
 def _serialized(state: Any) -> dict:
     return state.serialize() if hasattr(state, "serialize") else state
@@ -39,6 +41,48 @@ def _execution_path(trace: list[dict], target_execution_id: str) -> list[str]:
         f"{event.get('module_id', 'unknown')}#{event.get('execution_index', '?')}"
         for event in ordered
     ]
+
+
+def _answer_retrieval_frontier(payload: dict) -> tuple[list[list], bool]:
+    """Find nearest recorded retrieval output on each final answer ancestry path.
+
+    Earlier failed/empty attempts remain observations, but a successful retry must
+    not turn into an unsupported claim that the final answer lacked evidence.
+    Raw snapshot content is used only to inspect presence and is not copied.
+    """
+    trace = payload.get("execution_trace") or []
+    completed = [event for event in trace if event.get("status") == "completed"]
+    answer_events = [event for event in completed if "gen" in (event.get("output_keys") or [])]
+    final = answer_events[-1] if answer_events else completed[-1] if completed else None
+    if final is not None:
+        by_id = {event.get("execution_id"): event for event in trace}
+        frontier, visited = [], set()
+        def visit(event):
+            execution_id = event.get("execution_id")
+            if execution_id in visited:
+                return
+            visited.add(execution_id)
+            snapshots = (payload.get("snapshots") or {}).get(event.get("module_id")) or []
+            index = event.get("execution_index", 0) - 1
+            if 0 <= index < len(snapshots):
+                docs = (snapshots[index].get("data") or {}).get("ret_docs")
+                if isinstance(docs, list):
+                    frontier.append(docs)
+                    return
+            for parent_id in event.get("parent_execution_ids") or []:
+                if parent_id in by_id:
+                    visit(by_id[parent_id])
+        visit(final)
+        return frontier, True
+    # Legacy payloads have no execution ancestry. Inspect only each module's
+    # latest retrieval snapshot and explicitly lower inference confidence.
+    frontier = []
+    for snapshots in (payload.get("snapshots") or {}).values():
+        retrieval_outputs = [(snapshot.get("data") or {}).get("ret_docs") for snapshot in snapshots or []]
+        retrieval_outputs = [docs for docs in retrieval_outputs if isinstance(docs, list)]
+        if retrieval_outputs:
+            frontier.append(retrieval_outputs[-1])
+    return frontier, False
 
 
 def diagnose_state(state: Any) -> dict:
@@ -94,7 +138,7 @@ def diagnose_state(state: Any) -> dict:
                     "code": "retrieval.empty",
                     "stage": "retrieval",
                     "module": module_name,
-                    "execution": execution_index,
+                    "execution": execution_index + 1,
                     "message": "검색 모듈이 문서를 반환하지 않았습니다.",
                 })
             performance_groups.append(("module", module_name, snapshot.get("performances") or []))
@@ -102,28 +146,43 @@ def diagnose_state(state: Any) -> dict:
 
     for stage, module_name, performances in performance_groups:
         for performance in performances:
-            did_eval = bool(_field(performance, "did_eval", "_Performance__did_eval", False))
-            metric = _field(performance, "metric", "_Performance__metric", "Unknown")
+            raw_score = _field(performance, "score", "_Performance__score")
+            metadata_error = performance_metadata_error(performance)
+            did_eval = (metadata_error is None
+                        and _field(performance, "did_eval", "_Performance__did_eval", False) is True
+                        and valid_score_value(raw_score))
+            metric = _field(performance, "metric", "_Performance__metric")
+            if not isinstance(metric, str) or not metric.strip():
+                metric = "Invalid metric identity"
             if did_eval:
                 evaluated += 1
                 continue
             not_evaluated += 1
-            failure = _field(performance, "failure", "_Performance__failure", None) or {}
+            failure = _field(performance, "failure", "_Performance__failure", None)
+            if not isinstance(failure, dict):
+                failure = {}
+            failure_type = failure.get("type", "not_evaluated")
+            failure_message = failure.get("message", "평가 결과가 생성되지 않았습니다.")
+            if metadata_error:
+                failure_type = "invalid_performance_metadata"
+                failure_message = "지표 메타데이터가 선언된 형식과 일치하지 않습니다."
             observations.append({
                 "code": "evaluator.not_evaluated",
                 "stage": stage,
                 "module": module_name,
                 "metric": metric,
-                "failure_type": failure.get("type", "not_evaluated"),
-                "message": failure.get("message", "평가 결과가 생성되지 않았습니다."),
+                "failure_type": failure_type if isinstance(failure_type, str) else "not_evaluated",
+                "message": failure_message if isinstance(failure_message, str) else "평가 결과가 생성되지 않았습니다.",
             })
 
-    if empty_retrieval_modules and payload.get("gen"):
+    answer_retrieval, ancestry_available = _answer_retrieval_frontier(payload)
+    if answer_retrieval and all(not documents for documents in answer_retrieval) and payload.get("gen"):
         inferences.append({
             "code": "answer_without_retrieved_evidence",
-            "possible_cause": "검색 근거가 없는 상태에서 답변이 생성되었습니다.",
-            "confidence": "high",
-            "based_on": ["retrieval.empty", "state.gen_present"],
+            "possible_cause": "최종 답변의 기록된 경로에서 최근 검색 결과가 비어 있습니다.",
+            "confidence": "medium" if ancestry_available else "low",
+            "confidence_basis": "heuristic_rule_not_calibrated_probability",
+            "based_on": ["retrieval.latest_answer_ancestry_empty", "state.gen_present"],
             "next_action": "답변가능성/안전 거절 동작과 검색 설정을 확인하세요.",
         })
     if not_evaluated:
@@ -151,6 +210,7 @@ def diagnose_state(state: Any) -> dict:
             "evaluated": evaluated,
             "not_evaluated": not_evaluated,
             "coverage": evaluated / total if total else None,
+            "coverage_basis": "recorded_metric_attempts",
         },
         "graph_health": {
             "trace_available": bool(execution_trace),
