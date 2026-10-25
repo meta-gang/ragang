@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-25",
+  "backend_tests": 121,
+  "frontend_tests": 24,
+  "frontend_source": "506259325969336b411198ff48415c1683027b51",
+  "backend_base": "d851f7e9e6ab7177ac5c037146feeef3af1f2b3f",
+  "python": "3.14.0",
+  "node": "26.10.0",
+  "npm": "11.19.0",
+  "wheel": {
+    "wheel": "ragang-0.0.8b0-py3-none-any.whl",
+    "sha256": "4ff159515a841919f6293ef047e238ba72c065f2818943f209942fd855cabfb9",
+    "reproducible": true,
+    "web_assets": 16,
+    "precache_references_verified": 3
+  },
+  "installed_cli": {
+    "installed_wheel_cli": "passed",
+    "separate_runs": 2,
+    "paired_queries": 1,
+    "external_http_blocked": true
+  },
+  "browser": [
+    "selected_run_consistency",
+    "all_batch_queries_persisted",
+    "failed_node_state",
+    "claim_source_details",
+    "automatic_reconnection_after_server_restart",
+    "all_four_kpis_visible_at_552px",
+    "module_not_reached_preserved_in_pairing"
+  ],
+  "not_evaluated": [
+    "live_ollama_milvus",
+    "domain_judge_accuracy",
+    "large_scale_load",
+    "python_3_13_runtime"
+  ]
+}

@@ -1,3 +1,43 @@
+# 현재 설치된 프런트엔드 빌드
+
+검증일: 2026-10-25. Source repository: `meta-gang/RAG-APP-UI`.
+Source branch: `codex/ragang-ui-2026-modernization`.
+Exact source SHA: `506259325969336b411198ff48415c1683027b51`.
+
+Node 26.10.0 / npm 11.19.0에서 npm ci, UI 테스트 24개, 타입 검사와 production build를 검증했다.
+연속 두 build의 전체 16개 파일 SHA-256 목록이 일치했고, source commit 후 세 번째 build도 동일했다.
+전체 파일 집합을 ragang/web/에 설치하고 MANIFEST.in을 같은 목록으로 갱신했다.
+
+Index와 service worker는 같은 빌드 파일만 참조한다. HTML과 동적 ragang-session.js는 precache하지
+않으며 navigation과 session bootstrap은 NetworkOnly다. 세션 bootstrap은 로컬 HTTP 서버가
+실행별로 제공하므로 build artifact나 Git에 토큰을 넣지 않는다.
+
+이전 버전의 service worker가 이미 열려 있던 브라우저는 새 빌드 활성화 후 한 번 새로고침해야 할 수
+있다. 이후 navigation/세션 스크립트는 현재 서버에서 가져온다.
+
+## 설치 파일 SHA-256
+
+- `12c5f3f90455943689153262702765ca.woff2`: `85ade9c84e0fc0bb6d920ea1e3c9231590200ba0a79264968c6b9a0fb527a2fc`
+- `2ac864a194a4c2b8049b22eec5d89072.woff2`: `e03745300b3a5fbc59afe513946e38083628edf0954dbd025f37dfb08f54c618`
+- `304.a93eeb0835a69d3ec799.js`: `a7413ee7522c78caab77b6bdab6500dd445f0cb27630c7c9330a6049dd294401`
+- `304.a93eeb0835a69d3ec799.js.LICENSE.txt`: `d0fe364d118744fae25dfc40064f78ec6ea8bc131f8fbd3d6ba5e3163b2fedb2`
+- `304.a93eeb0835a69d3ec799.js.map`: `53f6b7abf87e7a14e1a0ed5c04097d6dc092286927e247bc643b35a90a16e181`
+- `43b5c29006f365a91ccd1e8e9e0d04ee.woff2`: `302cb692a03de6e625f7272e5adfe8c75d3069eba320256c9d93572d505a88b9`
+- `9a72164420c5bea92570652a34fd378f.woff2`: `cfaf5fe58b1fa5768f7ec867edd5a35bc8fbd8a5988ef9440df8ddbbb554d381`
+- `a2b8ed27e25e7116ab30cab19b2fff77.woff2`: `06939e852b59474a2134e644c56e8bd2bd10f2d3997ec4afb2301e8b977b61b2`
+- `d3283d226f8f74e7a8d573c221c95608.woff2`: `aacccc8381dde9f0aa6379831fc972b6e7fbebb8529a7adf6fe4e90e9840fe49`
+- `index.html`: `07a355c74f21a78cec00c084434a311baa515bf5db02fb4fe4cc133e71761233`
+- `main.a0c0b10b85ec64da476b.js`: `28dadc79450b5f82a7cc933c9fb4bde6fae8cfecfa55be47508187c7a86c0587`
+- `main.a0c0b10b85ec64da476b.js.map`: `58a7c391a0e738564ec23713aed36f592941cb361e6db84857d0ad4071a801a9`
+- `main.css`: `c0378f689e6834a74fc60720a80fba0d8ff90ceea3220a67af880fd1b6c2a8e6`
+- `main.css.map`: `6ec164b95531dc26b48c95f3a63cb86ee643a131a021e3b963e220cfc8ba313a`
+- `service-worker.js`: `1acbbcfaab71086071c15cee7bbd064befa76d9fdfb6cacbfbb5166fc9e566bf`
+- `workbox-39fa566e.js`: `4fc0e53b2aa52344aef1a9cd1935bb67122816a6cf52606ccfd1738d3eec9b1c`
+
+---
+
+## 이전 조사 기록
+
 # 프런트엔드 provenance 분석
 
 분석 기준일: 2026-08-20
