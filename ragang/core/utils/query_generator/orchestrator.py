@@ -17,7 +17,7 @@ from ragang.core.utils.query_generator.scenario_generator import ScenarioGenerat
 from ragang.core.utils.query_generator.query_generator import QueryGenerator
 
 # Adapters (Assuming correct import path based on context)
-from ragang.adapters.llm_adapter import OpenAIAdapter, GeminiAdapter
+from ragang.adapters.llm_adapter import OpenAIAdapter, GeminiAdapter, OllamaLocalLLMAdapter
 
 # Logging Setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -36,7 +36,19 @@ class Orchestrator:
 
         # 1. LLM Adapter 초기화
         # config.py의 설정을 사용하여 어댑터 생성
-        self.llm_adapter = GeminiAdapter(model_name=self.USER_CONFIG.LLM_MODEL, api_key=self.USER_CONFIG.API_KEY)
+        provider = getattr(self.USER_CONFIG, 'LLM_PROVIDER', 'gemini')
+        if provider == 'ollama':
+            from urllib.parse import urlsplit
+            endpoint = getattr(self.USER_CONFIG, 'OLLAMA_HOST', '127.0.0.1:11434')
+            if urlsplit(f'http://{endpoint}').hostname not in {'localhost', '127.0.0.1', '::1'}:
+                raise ValueError('Local query generation requires a loopback endpoint')
+            self.llm_adapter = OllamaLocalLLMAdapter(endpoint, self.USER_CONFIG.LLM_MODEL)
+        elif provider == 'gemini':
+            self.llm_adapter = GeminiAdapter(model_name=self.USER_CONFIG.LLM_MODEL, api_key=self.USER_CONFIG.API_KEY)
+        elif provider == 'openai':
+            self.llm_adapter = OpenAIAdapter(model_name=self.USER_CONFIG.LLM_MODEL, api_key=self.USER_CONFIG.API_KEY)
+        else:
+            raise ValueError('LLM_PROVIDER must be ollama, gemini, or openai')
 
         # 2. 하위 모듈 초기화 (Dependency Injection)
         self.processor = DocumentProcessor()

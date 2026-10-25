@@ -2,10 +2,11 @@ import datetime as dt
 import json
 import os
 import time
+import asyncio
 from typing import Dict, Tuple, List
 from pathlib import Path
 
-from ragang.core.utils.cli import get_history, update_history
+from ragang.core.utils.cli import get_history, update_history, read_queries
 from ragang.evaluator import safe_failure
 from ragang.exceptions.user.cli import NotAllowedQueryFileException
 
@@ -21,6 +22,7 @@ class Runner:
         self.engine = engine
         self.flow_id = flow_id
         self._query_store: Dict[str, str] = {}
+        self._execution_lock = asyncio.Lock()
 
         self._install_status_callback()
 
@@ -103,46 +105,55 @@ class Runner:
             if qid in cont.storage.results.keys()
         }
 
-        await self.handler.broadcast("rag-result-data", {
-            "ts": _ts_str(),
-            "storage": {
-                "flow_id": cont.flow_id,
-                "states": states_payload
-            }
-        })
-
+        persisted = False
+        history_key = None
         try:
             current_ts = time.time()
             results = [cont.storage.results[qid] for qid in query_ids if qid in cont.storage.results.keys()]
-            update_history(self.flow_id, current_ts, results)
+            history_key = update_history(self.flow_id, current_ts, results)
+            persisted = True
             print(f"[Runner] History updated: {len(results)} results saved.")
         except Exception as e:
             failure = safe_failure(e)
             print(f"[Runner] Error updating history: {failure['type']}: {failure['message']}")
+            await self.handler.broadcast('error', {
+                'module': 'history', 'message': '실행 결과를 디스크에 저장하지 못했습니다. 현재 결과는 메모리에만 있습니다.',
+                'failure_type': failure['type'],
+            })
+
+        await self.handler.broadcast("rag-result-data", {
+            "ts": history_key or _ts_str(),
+            "persisted": persisted,
+            "storage": {"flow_id": cont.flow_id, "states": states_payload},
+        })
 
     async def _broadcast_container_topology(self):
         try:
             cont = self.engine.containers[self.flow_id]
             edges: List[Tuple[str, str]] = getattr(cont.storage, "flow_graph", [])
-            await self.handler.broadcast("rag-container", {"rag-container": edges})
+            await self.handler.broadcast("rag-container", {
+                "rag-container": edges,
+                "module_ids": list(getattr(cont, 'modules', {})),
+            })
         except Exception as e:
             failure = safe_failure(e)
             print(f"[Runner] Error broadcasting topology: {failure['type']}: {failure['message']}")
 
     async def _run_and_broadcast(self, operation):
         """Broadcast every newly stored State, including executions that raise."""
-        container = self.engine.containers[self.flow_id]
-        previous_query_ids = set(container.storage.results)
-        try:
-            return await operation()
-        finally:
-            new_query_ids = [
-                query_id
-                for query_id in container.storage.results
-                if query_id not in previous_query_ids
-            ]
-            if new_query_ids:
-                await self._broadcast_rag_result(new_query_ids)
+        async with self._execution_lock:
+            container = self.engine.containers[self.flow_id]
+            previous_query_ids = set(container.storage.results)
+            try:
+                return await operation()
+            finally:
+                new_query_ids = [
+                    query_id
+                    for query_id in container.storage.results
+                    if query_id not in previous_query_ids
+                ]
+                if new_query_ids:
+                    await self._broadcast_rag_result(new_query_ids)
 
     async def _rag_on_run(self, query_num: int):
         await self.handler.broadcast("rag-on", {
@@ -159,12 +170,7 @@ class Runner:
         settings = msg.get("settings") or {}
         file_path = self._resolve_query_file(QUERY_DIR, settings.get("file_name"), '.txt')
 
-        queries = []
-        with open(file_path, "r", encoding="utf-8") as f:
-            queries = [line.strip() for line in f if line.strip()]
-
-        if not queries:
-            raise ValueError("No queries extracted for execution.")
+        queries = read_queries(file_path)
 
         await self._rag_on_run(len(queries))
         await self._run_and_broadcast(
@@ -176,18 +182,7 @@ class Runner:
         settings = msg.get("settings") or {}
         file_path = self._resolve_query_file(QUERY_DIR, settings.get("file_name"), '.json')
 
-        queries = []
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            query_list = data.get('query', [])
-            for q in query_list:
-                if isinstance(q, dict):
-                    queries.append(q.get('query', ''))
-                elif isinstance(q, str):
-                    queries.append(q)
-
-        if not queries:
-            raise ValueError("No queries extracted for execution.")
+        queries = read_queries(file_path, generated=True)
 
         await self._rag_on_run(len(queries))
         await self._run_and_broadcast(
@@ -209,7 +204,7 @@ class Runner:
         try:
             if base_dir.exists() and base_dir.is_dir():
                 for p in sorted(base_dir.rglob("*.json")):
-                    file_list.append(p.name)
+                    file_list.append(p.relative_to(base_dir).as_posix())
         except Exception:
             file_list = []
 
@@ -224,7 +219,7 @@ class Runner:
         try:
             if base_dir.exists() and base_dir.is_dir():
                 for p in sorted(base_dir.rglob("*.txt")):
-                    file_list.append(p.name)
+                    file_list.append(p.relative_to(base_dir).as_posix())
         except Exception:
             file_list = []
 

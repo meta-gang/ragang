@@ -64,6 +64,9 @@ class SocketHandler:
                 except Exception:
                     continue
 
+                if not isinstance(msg, dict):
+                    continue
+
                 t = msg.get("topic")
                 if not t or not isinstance(t, str):
                     continue

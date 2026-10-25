@@ -137,44 +137,58 @@ cd my_rag_project
 
 ## 7. Workflow Example
 
-### Defining a Container (`manager.py`)
-```python
-from ragang.container import RAGContainer
-from ragang.core.bases.datas.linker import Linker
-from ragang.modules.generation_module import GenerationModule
-from ragang.modules.retrieval_module import RetrievalModule
-from ragang.metrics.builtin.retriever.non_llm_based import CosineSimilarityMetric
-from ragang.metrics.builtin.generator.llm_based import FaithfulnessMetric
+### Start locally without API keys
 
-# Configure modules and metric parameter bindings
-retriever = RetrievalModule("retrieval", linker=Linker("starter"), metrics=[
-    CosineSimilarityMetric(["starter.query", "retrieval.ret_docs"])
-])
-generator = GenerationModule("generation", linker=Linker("retrieval"), metrics=[
-    FaithfulnessMetric(["retrieval.ret_docs", "generation.gen"])
-])
-
-def containers():
-    return [
-        RAGContainer(
-            flow_id="production_rag",
-            modules=[starter, retriever, generator],
-            max_steps=50,
-        )
-    ]
-```
-
-### Running & Comparing Evaluations via CLI
 ```bash
-# Run batch evaluation on test queries
-ragang run -F production_rag -Q datas/queries/custom/test_queries.txt
-
-# Compare the latest two runs with structured JSON output
-ragang compare -F production_rag --json
-
-# Launch the real-time local visual dashboard
-ragang show -F production_rag
+ragang init my_rag_project
+cd my_rag_project
+ragang run -F sample_rag -Q custom/queries.txt
+ragang show -F sample_rag
 ```
+
+The generated project defaults to an offline, in-memory retrieval and extractive
+answer demonstration. It verifies the real execution, metric, history, and dashboard
+workflow without contacting a model server or changing a vector database. These
+fixture scores are **not a model-quality benchmark**. The generated README explains
+the `RAGANG_PROFILE=ollama` path for actual local generation and embeddings.
+
+### Connect your own modules
+
+Implement `execute()` in `CustomModule`, `RetrievalModule`, or `GenerationModule`;
+the public module classes are contracts, not ready-made retrievers or generators.
+Return `ret_docs: list[str]` for retrieved text and `gen: str` for an answer.
+A `gen` with outgoing modules is a draft; a leaf answer finishes the flow.
+Use `terminal=True` with a non-empty `gen` for explicit early completion, or
+`terminal=False` to continue. See the generated `manager.py` for a runnable flow
+and [the execution contract](docs/graph-rag/execution-trace.md).
+
+```python
+from ragang.metrics.builtin.generator.llm_based import A2RYNFaithfulnessMetricSingleCall
+
+# local_judge is your configured local BaseLLMAdapter implementation.
+faithfulness = A2RYNFaithfulnessMetricSingleCall(
+    ["ret.ret_docs", "output.gen"], llm_adapter=local_judge,
+)
+```
+
+This optional judge evaluates support in the supplied documents, not absolute
+factual correctness. Its result records the assessed scope and claim verdicts.
+Malformed judgments are not evaluated; a valid negative verdict remains zero.
+
+### Compare evaluations
+
+```bash
+# Run twice after changing one pipeline setting, keeping the questions fixed.
+ragang run -F sample_rag -Q custom/queries.txt
+ragang compare -F sample_rag --json
+```
+
+Comparison deltas use paired questions with valid scores on both sides and
+compatible evaluator configurations. Whole-run summaries remain available, with
+unmatched, failed, or incompatible samples explicitly reported. The dashboard
+separates query completion, evaluator coverage, and each metric's declared scale.
+See [the persona-driven hardening report](docs/validation/PERSONA_HARDENING_2026.md)
+for changed behavior, checks, and remaining limits.
 
 ---
 

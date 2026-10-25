@@ -1,3 +1,5 @@
+import asyncio
+
 from ragang.modules import *
 from ragang.adapters.llm_adapter import BaseLLMAdapter
 from ragang.core.bases.abstracts.base_metric import BaseMetric
@@ -19,10 +21,10 @@ class MyRetrievalModule(RetrievalModule):
         self.milvus_adapter = vec_db_adapter
 
     async def execute(self, query: str):
-        query_vector = self.embedding_adapter.create_embeddings([query])
+        query_vector = await asyncio.to_thread(self.embedding_adapter.create_embeddings, [query])
         if query_vector.size == 0:
-            raise RuntimeError("Embedding request failed. Check API_KEY in settings.py and the network.")
-        retrieval_raw = self.milvus_adapter.retrieve('test', query_vector, top_k=3)
+            raise RuntimeError("Embedding request failed. Check the local embedding model and endpoint.")
+        retrieval_raw = await asyncio.to_thread(self.milvus_adapter.retrieve, 'test', query_vector, top_k=3)
         if retrieval_raw is None:
             raise RuntimeError("Vector DB retrieval failed. Check that Milvus is running "
                                "(config/docker-compose.yml) and the collection exists.")
@@ -41,6 +43,10 @@ class MyGenerationModule(GenerationModule):
         self.llm_adapter = llm_adapter
 
     async def execute(self, query: str, ret_docs: list[str]):
+        if not ret_docs:
+            return {'gen': '검색된 근거가 없어 답변할 수 없습니다.'}
+        if self.llm_adapter is None:
+            return {'gen': f'오프라인 연결 확인용 문서 발췌: {ret_docs[0][:400]}'}
         ret_docs = "\n".join(f'{i + 1}. {doc}' for i, doc in enumerate(ret_docs))
         prompt = ("""
             You are a highly knowledgeable and reliable assistant that answers questions using only the information provided in the context below.
@@ -75,9 +81,11 @@ class MyGenerationModule(GenerationModule):
             "---\n" \
             "answer: "
         )
-        response = self.llm_adapter.request(prompt=prompt, query=input_query)
+        response = await asyncio.to_thread(self.llm_adapter.request, prompt=prompt, query=input_query)
         if 'error' in response:
             raise RuntimeError(f"LLM request failed: {response['error']}")
+        if not isinstance(response.get('text'), str) or not response['text'].strip():
+            raise RuntimeError('The local model returned an empty answer')
         return {
             'gen': response['text'],
         }

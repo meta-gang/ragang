@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from argparse import Namespace
 
 from ragang.comparison import compare_runs
@@ -8,7 +9,21 @@ from ragang.core.utils.cli import get_history
 
 
 def _select_runs(history: dict, baseline: str | None, candidate: str | None) -> tuple[str, str]:
-    timestamps = sorted(history)
+    def chronology(key):
+        states = history[key]
+        started = next(((state.get('run_metadata') or {}).get('started_at')
+                        for state in states.values() if isinstance(state, dict)
+                        and (state.get('run_metadata') or {}).get('started_at')), None)
+        if started:
+            try:
+                return datetime.fromisoformat(started).timestamp(), key
+            except (TypeError, ValueError):
+                pass
+        try:
+            return datetime.strptime(key[:12], '%y%m%d%H%M%S').timestamp(), key
+        except ValueError:
+            raise ValueError('History run has no valid started_at or legacy timestamp') from None
+    timestamps = sorted(history, key=chronology)
     if baseline is None and candidate is None:
         if len(timestamps) < 2:
             raise ValueError("At least two history runs are required for comparison.")

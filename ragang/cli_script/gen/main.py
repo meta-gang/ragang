@@ -12,9 +12,8 @@ def run(args: Namespace):
     doc_path = args.doc_path
     output_file = Path(os.getcwd()) / 'datas/queries/generated' / args.query_file
 
-    config_values = {k: v for k, v in vars(USER_CONFIG).items() if k.isupper()}
-    print(ANSIStyler.style(f"Generate queries with config\n"
-                           f"{config_values}", fore_color='light-cyan', font_style="bold"))
+    # Configuration may contain credentials and private endpoints. Never echo it.
+    print(ANSIStyler.style("Generating queries with project settings", fore_color='light-cyan', font_style="bold"))
     orchestrator = Orchestrator()
     gen_file_names = orchestrator.generate_queries(doc_path, output_file)
     print(ANSIStyler.style(f"Generated query files: {gen_file_names}", fore_color='yellow'))
