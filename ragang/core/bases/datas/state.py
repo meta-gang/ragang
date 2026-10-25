@@ -43,6 +43,32 @@ class State:
             return None  # no packet
         return snapshot[-1]  # latest packet
 
+    def get_ancestor_packet(self, module_id: str, parent_execution_ids: list[str]) -> Packet | None:
+        """Resolve the newest packet in this scheduled execution's own ancestry.
+
+        A queued branch may execute after the same upstream module ran again.
+        Looking at the global latest snapshot would evaluate a different input.
+        """
+        event_by_id = {event["execution_id"]: event for event in self.execution_trace}
+        ancestors: set[str] = set()
+        pending = list(parent_execution_ids)
+        while pending:
+            execution_id = pending.pop()
+            if execution_id in ancestors:
+                continue
+            ancestors.add(execution_id)
+            event = event_by_id.get(execution_id)
+            if event:
+                pending.extend(event.get("parent_execution_ids") or [])
+        for event in reversed(self.execution_trace):
+            if (event.get("execution_id") in ancestors and event.get("module_id") == module_id
+                    and event.get("status") == "completed"):
+                index = event.get("execution_index", 0) - 1
+                snapshots = self.snapshots.get(module_id, [])
+                if 0 <= index < len(snapshots):
+                    return snapshots[index]
+        return None
+
     def next_execution_identity(self, module_id: str) -> tuple[str, int]:
         execution_index = 1 + sum(
             event.get("module_id") == module_id for event in self.execution_trace

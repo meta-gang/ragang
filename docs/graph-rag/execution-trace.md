@@ -7,6 +7,11 @@ merge, `OR` dependency, query rewrite, retry/self-correction cycle을 실행하�
 GraphRAG system은 graph retriever/community summarizer를 custom module로 감싸 계측할 수
 있습니다.
 
+실제로 실행할 수 있는 [오프라인 복합 예제](../../examples/advanced_graph_demo/README.md)는
+선형 검색, 문서 그래프의 2-hop 탐색, 두 검색기의 AND 합류와 생성→검증→재검색 순환을
+제공합니다. 검증기는 한 번 더 검색하도록 정한 예제 정책이며, 추가 반복이 답변 품질을
+높인다는 의미는 아닙니다.
+
 RAGANG은 knowledge graph entity/triple extraction, community detection, graph index를 직접
 제공하지 않습니다. 그러므로 “GraphRAG 지원”은 pipeline compatibility와 module-level
 diagnosis를 의미하며 knowledge graph 품질 보증을 의미하지 않습니다.
@@ -95,3 +100,31 @@ panel은 parent, next, status, latency, revisit, failure type을 보여줍니다
 유한 시간입니다. 시간제한은 cooperative async 실행에 적용됩니다. 동기 블로킹 코드와
 이미 시작한 worker thread를 강제로 중단하지 못하므로 사용자 어댑터도 timeout을 설정해야
 합니다. 동기 평가는 event loop 밖에서 수행하며 공유 E2E evaluator의 동시 호출은 직렬화합니다.
+
+## 반복 실행의 평가 입력과 스냅샷
+
+각 모듈 평가는 **해당 실행과 실제 부모 실행에서 이어지는 출력**을 먼저 참조합니다.
+같은 모듈이 다음 회차를 시작했더라도 대기 중이던 자식의 평가는 이전 회차의 입력을
+사용합니다. `Performance.scope.input_execution_ids`에 참조별 실제 실행 ID를 기록합니다.
+같은 모듈이 조상 경로에 여러 번 있으면 그 경로 안에서 가장 최근에 완료된 실행을 선택합니다.
+
+조상 경로 밖의 모듈을 명시적으로 참조한 기존 지표는 호환성을 위해 전체 상태의 최신
+출력으로 대체합니다. 이런 교차 경로 참조는 부모 의존성이 아니며, 회차별 대응을 원하면
+입력을 합류 모듈의 출력으로 전달한 뒤 그 모듈을 참조하세요. 대체된 참조도 실제 사용한
+실행 ID를 기록합니다.
+
+이 의미론은 `ancestry-first-v1`로 평가자 설정과 실행 설정에 기록됩니다. 이전 버전의
+전역 최신 입력 방식과 fingerprint가 달라, 서로 다른 의미론의 점수 차이를 바로 계산하지
+않습니다. 비교하려면 같은 질문을 현재 버전으로 다시 실행하세요.
+
+모듈에 넘기는 입력과 저장 패킷은 복사하여 보존합니다. 자식 모듈이 받은 리스트·딕셔너리를
+수정해도 이전 단계의 이력과 그 평가 근거가 바뀌지 않습니다. 외부 연결 객체 대신
+직렬화 가능한 값 중심으로 모듈 입출력을 구성하세요.
+
+AND 합류는 선택된 간선의 도착을 기다리는 방식이며, 임의의 비동기 작업을 업무상
+같은 회차로 자동 분류하는 correlation key 기능은 없습니다. 서로 독립적으로 반복하는
+분기를 합칠 때는 라우터가 양쪽을 같은 회차로 시작하고 회차 값을 검사하는 등의 명시적
+정책이 필요합니다. 예제의 `MergeEvidence`가 이 조건을 검사합니다.
+활성 선행 모듈의 최신값을 재사용하는 combine-latest 방식이므로, 한 분기만 갱신되면
+다른 분기의 기존값과 합류할 수 있습니다. OR 연결에서 같은 키가 겹치면 가장 최근에
+완료된 선행 실행의 값이 우선하며 경고를 기록합니다.

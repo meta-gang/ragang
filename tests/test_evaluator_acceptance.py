@@ -239,6 +239,18 @@ class PairedComparisonAcceptanceTests(unittest.TestCase):
 
 
 class ProvenanceAndDiagnosisAcceptanceTests(unittest.TestCase):
+    def test_parameter_binding_semantics_change_evaluator_identity(self):
+        judge = metric("[]")
+        previous = evaluator_provenance(judge)
+        current = evaluator_provenance(judge, parameter_binding_version="ancestry-first-v1")
+        self.assertNotEqual(previous["fingerprint"], current["fingerprint"])
+        self.assertEqual(current["parameter_binding_version"], "ancestry-first-v1")
+        report = compare_runs(
+            {"a": state("same", .1, evaluator=previous)},
+            {"b": state("same", .9, evaluator=current)},
+        )
+        self.assertTrue(all(item["delta"] is None for item in report["metrics"]))
+
     def test_explicit_versions_and_adapter_decoding_change_identity_without_content(self):
         first, second = metric("[]"), metric("[]")
         first.prompt, second.prompt = "private text A", "private text B"

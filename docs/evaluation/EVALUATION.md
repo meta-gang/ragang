@@ -23,13 +23,20 @@ RAGANG은 gold 없이 실행 가능한 evaluation/diagnosis framework입니다. 
 
 - Metric implementation과 source fingerprint
 - `param_refs`
+- 모듈 평가 입력 결합 의미론 버전(`ancestry-first-v1`)과 실제 입력 실행 ID
 - Bounded public settings
 - LLM/embedding adapter implementation과 공개 model name
 - Failure type과 redacted/bounded message
 
 API key, token, endpoint, header, prompt, document, answer, query, local path는 제외합니다.
 `run_metadata.config_fingerprint`는 flow graph, module/metric 구현, 공개 설정,
-`execution_policy.max_steps`를 포함합니다.
+`execution_policy.max_steps`와 입력 결합 버전을 포함합니다. 같은 이름의 지표라도
+평가자 fingerprint가 다르면 별개 조건으로 보존하며, 화면에서는 필요할 때 `평가 설정 1/2`로
+구분합니다. 긴 원본 ID와 설정은 상세의 `기술 정보`에서 확인합니다.
+
+순환 흐름의 모듈 평가는 현재 실행의 실제 조상 출력을 먼저 사용합니다. 조상 밖을 참조한
+기존 지표에는 최신 출력 대체 규칙이 남아 있습니다. 입력 추적과 변경된 의미론은
+[그래프 실행 계약](../graph-rag/execution-trace.md#반복-실행의-평가-입력과-스냅샷)에 설명합니다.
 
 ## 진단
 

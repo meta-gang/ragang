@@ -114,17 +114,23 @@ class FlowEngine:
 
         return formed_output
 
-    def __eval(self, c_mid: str, state: State, output: dict[str, Any], metrics: list[BaseMetric] | None) -> list[
-        Performance]:
+    def __eval(self, c_mid: str, state: State, output: dict[str, Any],
+               metrics: list[BaseMetric] | None, parent_execution_ids: list[str] | None = None,
+               execution_id: str | None = None) -> list[Performance]:
         if metrics is None:
             return []
 
         results: list[Performance] = []
         for metric in metrics:
+            bindings: dict[str, str] = {}
             try:
-                args: list = [self.__resolve_param(c_mid, state, output, ref) for ref in metric.param_refs]
+                args = [self.__resolve_param(
+                    c_mid, state, output, ref, parent_execution_ids, bindings, execution_id
+                ) for ref in metric.param_refs]
                 performance: Performance = metric.evaluate(*args)
-                performance = attach_evaluator_context(performance, metric)
+                performance = attach_evaluator_context(
+                    performance, metric, parameter_binding_version="ancestry-first-v1"
+                )
             except Exception as exc:
                 warnings.warn(
                     f"Metric '{metric.__class__.__name__}' was not evaluated: "
@@ -135,16 +141,22 @@ class FlowEngine:
                     Performance(metric=metric.__class__.__name__, _eval=False),
                     metric,
                     exc,
+                    parameter_binding_version="ancestry-first-v1",
                 )
+            performance.scope["input_execution_ids"] = bindings
             results.append(performance)
         return results
 
-    def __resolve_param(self, c_mid: str, state: State, c_output: dict[str, Any], ref: str):
+    def __resolve_param(self, c_mid: str, state: State, c_output: dict[str, Any], ref: str,
+                        parent_execution_ids: list[str] | None = None,
+                        bindings: dict[str, str] | None = None, execution_id: str | None = None):
         module_id, key = ref.split('.', 1)
 
         # get from current executed module
         if module_id == c_mid:
             if (value := c_output.get(key, None)) is not None:
+                if bindings is not None and execution_id:
+                    bindings[ref] = execution_id
                 return value
             raise ModuleOutputException(f"Cannot resolve metric parameter '{key}' from module '{module_id}' output")
 
@@ -155,7 +167,12 @@ class FlowEngine:
                                            additional_msg=f"Cannot resolve metric parameter '{key}' from module '{module_id}' output.\n"
                                                           f"not defined or executed yet")
 
-        last_packet = snapshot[-1]
+        # Prefer the execution which actually supplied this queued branch. A
+        # deliberately referenced non-ancestor module retains legacy latest-value
+        # access, and its exact source execution is recorded in metric scope.
+        last_packet = state.get_ancestor_packet(module_id, parent_execution_ids or []) or snapshot[-1]
+        if bindings is not None and last_packet.execution_id:
+            bindings[ref] = last_packet.execution_id
         output = getattr(last_packet, "data", None)
         value = output.get(key, None)
         if value is None:
@@ -164,9 +181,13 @@ class FlowEngine:
         return value
 
     async def __run_module(self, cont: BaseContainer, state: State, module: BaseModule,
-                           params: dict[str, Any]) -> Packet:
+                           params: dict[str, Any], parent_execution_ids: list[str] | None = None,
+                           execution_id: str | None = None) -> Packet:
         # for coroutine-safe module access; allocated here, deallocated after this method returns
         module: BaseModule = copy.deepcopy(module)
+        # Modules own their inputs. In-place user transformations must not mutate
+        # upstream packets or inputs already queued for a different branch.
+        params = copy.deepcopy(params)
 
         # lazy injection - state obj
         module.lazy_state = state
@@ -186,13 +207,18 @@ class FlowEngine:
             module.lazy_state = None
         duration = time.perf_counter() - start_t
 
+        # Freeze the returned value before metric evaluation or downstream work.
+        # User adapters may reuse mutable buffers between their own calls.
+        output = copy.deepcopy(output)
+
         # validate output
         formed_output: dict[str, dict[str, Any]] = self.__validate_output(cont, module, output)
 
         # eval performances
         evaluation_started = time.perf_counter()
         performances: list[Performance] = await asyncio.to_thread(
-            self.__eval, module.module_id, state, output, module.metrics
+            self.__eval, module.module_id, state, output, module.metrics,
+            parent_execution_ids, execution_id
         ) if module.metrics else []
         evaluator_time = time.perf_counter() - evaluation_started if module.metrics else 0.0
 
@@ -204,7 +230,8 @@ class FlowEngine:
                       x_time=duration,
                       terminal=output.get('terminal'),
                       evaluator_time=evaluator_time,
-                      is_starter=module.is_starter)
+                      is_starter=module.is_starter,
+                      execution_id=execution_id)
 
     def __schedule_next_module(self, c_packet: Packet, cont: BaseContainer, status: Status, state: State) -> list[
         tuple[BaseModule, dict[str, Any], list[str]]]:
@@ -216,30 +243,33 @@ class FlowEngine:
                 formed_params: dict[str, Any] = {}
                 parent_execution_ids: list[str] = []
 
-                # concatenate formed outputs from dep modules' snapshots for next module's param
+                # A retained starter packet and a retry predecessor may both be
+                # active in an OR dependency. Assemble oldest to newest so a
+                # fresh rewrite wins independently of Linker declaration order.
+                # AND joins retain combine-latest semantics: a static predecessor
+                # can be reused while another predecessor refreshes its output.
+                ordered_dependencies = []
+                event_order = {event["execution_id"]: index for index, event in enumerate(state.execution_trace)}
                 for dep in dep_modules:
-                    # ensured not none formed_output due to dependency checking
-                    if n_module.dependency.is_or and not status.active(dep, n_mid):  # pass conditionally not executed mid
+                    if n_module.dependency.is_or and not status.active(dep, n_mid):
                         continue
-                    if parent_execution_id := state.latest_execution_id(dep):
-                        parent_execution_ids.append(parent_execution_id)
                     packet = state.get_latest_packet(dep)
                     if packet is None or n_mid not in packet.formed_output:
                         raise ModuleOutputException(
                             f"Active dependency '{dep}' has no selected output for '{n_mid}'"
                         )
-                    formed_output: dict[str, Any] = dict(packet.formed_output[n_mid])
-                    if duplicated := set(formed_output.keys()).intersection(formed_params.keys()):
-                        loop_end_mid: str = status.find_loop_before_mid(n_mid, dep_modules)
-                        if loop_end_mid and loop_end_mid == dep:  # loop - flow came back to n_mid
-                            for k in duplicated:  # set latest (right before come back)
-                                formed_output[k] = state.get_latest_packet(dep).formed_output[n_mid][k]
-                        else:
-                            warnings.warn(
-                                f"Detected duplicate parameters {duplicated} for module '{n_mid}', derived from dependency modules {dep_modules}. "
-                                f"These overlapping parameter names may cause value overwriting and lead to unexpected runtime behavior.",
-                                RuntimeWarning
-                            )
+                    parent_id = state.latest_execution_id(dep)
+                    ordered_dependencies.append((event_order.get(parent_id, -1), dep, packet, parent_id))
+                ordered_dependencies.sort(key=lambda item: item[0])
+                for _, dep, packet, parent_id in ordered_dependencies:
+                    if parent_id:
+                        parent_execution_ids.append(parent_id)
+                    formed_output = dict(packet.formed_output[n_mid])
+                    if duplicated := set(formed_output).intersection(formed_params):
+                        warnings.warn(
+                            f"Overlapping parameters {duplicated} for module '{n_mid}' are resolved "
+                            "using the most recently completed dependency execution.", RuntimeWarning,
+                        )
                     formed_params.update(formed_output)
 
                 # warn if all required params are not exists
@@ -334,7 +364,9 @@ class FlowEngine:
                     c_module.module_id, True, state=state, execution_id=execution_id, status="running"
                 )
                 try:
-                    out = await self.__run_module(cont, state, c_module, param)
+                    out = await self.__run_module(
+                        cont, state, c_module, param, parent_execution_ids, execution_id
+                    )
                 except BaseException as exc:
                     termination_reason = "cancelled" if isinstance(exc, asyncio.CancelledError) else "module_error"
                     state.record_execution(

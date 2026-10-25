@@ -168,7 +168,7 @@ def _safe_settings(component: Any) -> dict:
     return settings
 
 
-def evaluator_provenance(metric: Any) -> dict:
+def evaluator_provenance(metric: Any, *, parameter_binding_version: str | None = None) -> dict:
     """Return deterministic metric identity without credentials or raw prompts."""
     descriptor = {
         **_implementation_descriptor(metric),
@@ -176,6 +176,8 @@ def evaluator_provenance(metric: Any) -> dict:
         "settings": _safe_settings(metric),
         "adapters": _adapter_descriptors(metric),
     }
+    if parameter_binding_version is not None:
+        descriptor["parameter_binding_version"] = parameter_binding_version
     descriptor["fingerprint"] = _fingerprint(descriptor)
     return descriptor
 
@@ -252,7 +254,8 @@ def performance_metadata_error(performance: dict) -> str | None:
     return None
 
 
-def attach_evaluator_context(performance: Performance, metric: Any, error: BaseException | None = None) -> Performance:
+def attach_evaluator_context(performance: Performance, metric: Any, error: BaseException | None = None,
+                             *, parameter_binding_version: str | None = None) -> Performance:
     if not isinstance(performance, Performance):
         raise TypeError(f"Metric '{metric.__class__.__name__}' must return Performance")
     metadata = {name: getattr(performance, name) for name in (
@@ -269,7 +272,7 @@ def attach_evaluator_context(performance: Performance, metric: Any, error: BaseE
     failure = None
     if not performance.did_eval:
         failure = performance.failure or safe_failure(error)
-    performance.attach_context(evaluator_provenance(metric), failure)
+    performance.attach_context(evaluator_provenance(metric, parameter_binding_version=parameter_binding_version), failure)
     return performance
 
 
@@ -281,12 +284,14 @@ def build_run_metadata(container: Any) -> dict:
             **_implementation_descriptor(module),
             "settings": _safe_settings(module),
             "adapters": _adapter_descriptors(module),
-            "metrics": [evaluator_provenance(metric) for metric in (module.metrics or [])],
+            "metrics": [evaluator_provenance(metric, parameter_binding_version="ancestry-first-v1")
+                        for metric in (module.metrics or [])],
         })
     configuration = {
         "flow_id": container.flow_id,
         "flow_graph": [list(edge) for edge in container.storage.flow_graph],
         "execution_policy": {
+            "metric_binding_version": "ancestry-first-v1",
             "max_steps": container.max_steps,
             "module_timeout_seconds": getattr(container, "module_timeout_seconds", None),
             "max_concurrency": getattr(container, "max_concurrency", None),

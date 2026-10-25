@@ -9,8 +9,9 @@ class Packet:
     def __init__(self, src_mid: str, data: dict[str, object], formed_output: dict[str, dict[str, Any]],
                  performances: list[Performance], x_time: float, *,
                  terminal: bool | None = None, evaluator_time: float = 0.0,
-                 is_starter: bool = False):
+                 is_starter: bool = False, execution_id: str | None = None):
         self.src: str = src_mid  # src_mid
+        self.execution_id: str | None = execution_id
         self.data: dict[str, Any] = data  # {key: value}
         self.formed_output: dict[str, dict[str, Any]] = formed_output  # {dst_mid: dict}
         self.performances: list[Performance] = performances
