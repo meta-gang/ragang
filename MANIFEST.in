@@ -1,3 +1,4 @@
+include setup.py build_support.py
 graft ragang/templates
 recursive-exclude ragang/templates __pycache__/* *.py[cod]
 recursive-exclude ragang/web *

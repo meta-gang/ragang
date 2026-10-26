@@ -17,6 +17,12 @@ SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) .venv/bin/python -m build --wheel
 Wheel을 만들 때 `MANIFEST.in`과 tracked `ragang/web/` inventory가 일치하는지 확인합니다.
 Dirty worktree의 orphan asset은 package에 포함하지 않습니다.
 
+빌드 훅은 재사용하는 `build_lib/ragang/web/`의 과거 생성 자산을 먼저 정리합니다.
+소스 패키지와 겹치는 경로·심볼릭 링크·예상 밖 파일은 거부하며 다른 빌드 파일은 보존합니다.
+`setup.py`와 `build_support.py`도 sdist에 포함해야 합니다. 최종 wheel 안의 웹 파일 **집합과
+각 파일 해시**를 현재 자산 목록과 대조하세요. 연속 빌드 해시가 같아도 같은 과거 파일이
+두 번 섞였을 수 있으므로 파일 집합 검증을 생략하지 않습니다.
+
 ## Frontend bundle 설치
 
 1. `RAG-APP-UI` source branch에서 `npm ci`, test, typecheck, build를 통과합니다.
