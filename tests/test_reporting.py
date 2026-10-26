@@ -245,6 +245,55 @@ class ReportingTests(unittest.TestCase):
         self.assertTrue(report["configuration"]["match"])
         self.assertIn('"candidate_run": "260103000000"', output.getvalue())
 
+    def test_compare_cli_human_labels_preserve_raw_json_and_paired_means(self):
+        baseline_id = "baseline-opaque-fc420a568612"
+        candidate_id = "candidate-opaque-a7c38c6d7634"
+        baseline = {
+            "q1": _state(score=40, did_eval=True, latency=.2, fingerprint="raw-config-baseline"),
+            "q2": _state(score=None, did_eval=False, latency=.2, fingerprint="raw-config-baseline"),
+        }
+        candidate = {
+            "q1": _state(score=60, did_eval=True, latency=.2, fingerprint="raw-config-candidate"),
+            "q2": _state(score=80, did_eval=True, latency=.2, fingerprint="raw-config-candidate"),
+        }
+        for states, started in ((baseline, "2026-10-24T01:00:00+00:00"),
+                                (candidate, "2026-10-25T01:00:00+00:00")):
+            for state in states.values():
+                state["run_metadata"]["started_at"] = started
+        history = {baseline_id: baseline, candidate_id: candidate}
+        args = SimpleNamespace(flow_id="flow", baseline=None, candidate=None, json_output=False)
+        output = io.StringIO()
+        with patch("ragang.cli_script.compare.main.get_history", return_value=history), redirect_stdout(output):
+            report = run_compare(args)
+        display = output.getvalue()
+        for raw in (baseline_id, candidate_id, "raw-config-baseline", "raw-config-candidate"):
+            self.assertNotIn(raw, display)
+        self.assertIn("40.0 -> 60.0", display)
+        self.assertIn("공통 유효 표본 1개", display)
+        self.assertNotIn("40.0 -> 70.0", display)
+        self.assertEqual(report["baseline_run"], baseline_id)
+        args.json_output = True
+        raw_output = io.StringIO()
+        with patch("ragang.cli_script.compare.main.get_history", return_value=history), redirect_stdout(raw_output):
+            run_compare(args)
+        self.assertIn(baseline_id, raw_output.getvalue())
+        self.assertIn("raw-config-baseline", raw_output.getvalue())
+
+    def test_compare_cli_explicit_runs_do_not_need_timestamps_or_sort_unselected_records(self):
+        history = {
+            "opaque-baseline": {"q": _state(score=20, did_eval=True, latency=.1, fingerprint="same")},
+            "opaque-candidate": {"q": _state(score=30, did_eval=True, latency=.1, fingerprint="same")},
+            "unselected-legacy-record": {},
+        }
+        args = SimpleNamespace(flow_id="flow", baseline="opaque-baseline",
+                               candidate="opaque-candidate", json_output=False)
+        output = io.StringIO()
+        with patch("ragang.cli_script.compare.main.get_history", return_value=history), redirect_stdout(output):
+            report = run_compare(args)
+        self.assertEqual(report["baseline_run"], "opaque-baseline")
+        self.assertIn("시각 정보 없음", output.getvalue())
+        self.assertIn("20.0 -> 30.0", output.getvalue())
+
     def test_summarize_multi_runs_aggregates_trials_and_computes_variance(self):
         from ragang.comparison import summarize_multi_runs
 

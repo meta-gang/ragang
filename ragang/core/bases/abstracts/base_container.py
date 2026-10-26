@@ -101,18 +101,18 @@ class BaseContainer(metaclass=ABCMeta):
 
     def print_eval(self):
         print(ANSIStyler.style(f"[{self.flow_id}]", font_style='bold', fore_color='light-magenta'))  # flow name
-        for query_idx, state in self.storage.results.items():
+        for query_idx, state in enumerate(self.storage.results.values(), start=1):
             tot_x_time: float = 0  # ms
-            print(ANSIStyler.style(f'Query({state.q_id}): {state.query}', font_style='bold',
+            print(ANSIStyler.style(f'질문 {query_idx}: {state.query}', font_style='bold',
                                    fore_color='light-green'))  # query
-            print(ANSIStyler.style(f"Generated Answer: {state.gen}", font_style='bold',
+            print(ANSIStyler.style(f"생성 답변: {state.gen}", font_style='bold',
                                    fore_color='light-green'))  # answer
 
             for mid, packet_list in state.snapshots.items():  # per modules
                 print(ANSIStyler.style(f"\t'{mid}' Performances:", font_style='normal', fore_color='blue'))
                 for idx, packet in enumerate(packet_list):  # per executions (for loop graph or sth)
                     x_time = packet.x_time * 1000
-                    print(ANSIStyler.style(f"\t\texecution {idx} ({x_time:.4f}ms)", font_style='normal',
+                    print(ANSIStyler.style(f"\t\texecution {idx + 1} ({x_time:.4f}ms)", font_style='normal',
                                            fore_color='yellow'))
                     for perf in packet.performances:  # per metrics
                         print(ANSIStyler.style(f"\t\t\t{perf}", font_style='normal',

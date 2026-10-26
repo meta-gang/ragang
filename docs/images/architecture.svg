@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="890" viewBox="0 0 1440 890" role="img" aria-labelledby="title desc">
+<title id="title">RAGANG 아키텍처</title><desc id="desc">사용자가 정의한 RAG를 모듈로 연결하고, 실행 엔진이 분기와 반복을 실행하며 지표와 실패 상태를 기록한다. 같은 기록을 대시보드와 실행 비교에서 확인한다.</desc>
+<rect width="1440" height="890" fill="#f8fafc"/>
+<text x="48" y="70.2" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="36" fill="#172b4d">내 RAG를 연결하고, 평가 근거를 확인하는 흐름</text>
+<text x="48" y="112.5" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="22" fill="#52647b">Gold 정답을 필수로 요구하지 않는 로컬 평가·진단 프레임워크</text>
+<text x="48" y="182.7" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="27" fill="#172b4d">1  사용자 프로젝트</text>
+<text x="48" y="218.0" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="19" fill="#52647b">문서·질문·실제 RAG 준비</text>
+<text x="510" y="182.7" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="27" fill="#172b4d">2  RAGANG 실행·평가</text>
+<text x="510" y="218.0" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="19" fill="#52647b">각 단계의 실행과 평가 상태 보존</text>
+<text x="972" y="182.7" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="27" fill="#172b4d">3  결과 확인·개선</text>
+<text x="972" y="218.0" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="19" fill="#52647b">같은 실행 기록으로 판단</text>
+<rect x="48" y="248" width="420" height="138" rx="14" fill="#fff" stroke="#d5dee9"/>
+<text x="72" y="293.0" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="25" fill="#172b4d">manager.py</text>
+<text x="72" y="334.5" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="22" fill="#172b4d">모듈·연결·평가 지표·종료 조건</text>
+<text x="72" y="368.0" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="19" fill="#52647b">질문 파일과 문서 입력</text>
+<rect x="48" y="420" width="420" height="166" rx="14" fill="#fff" stroke="#d5dee9"/>
+<text x="72" y="466.0" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="25" fill="#172b4d">내 검색기 · 생성기 · 도구</text>
+<text x="72" y="507.6" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="21" fill="#172b4d">선형 / 분기·합류 / 재시도·순환</text>
+<text x="72" y="551.8" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="20" fill="#52647b">로컬 모델·임베딩·DB 어댑터</text>
+<path d="M258 386 L258 420" stroke="#64748b" stroke-width="3" fill="none"/>
+<polygon points="258.0,420.0 252.0,410.0 264.0,410.0" fill="#64748b"/>
+<rect x="510" y="248" width="420" height="138" rx="14" fill="#eaf2fd" stroke="#9bbce7"/>
+<text x="534" y="293.0" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="25" fill="#172b4d">FlowEngine</text>
+<text x="534" y="333.5" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="22" fill="#172b4d">선택한 경로 실행 · 반복 추적</text>
+<text x="534" y="368.0" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="19" fill="#52647b">최대 단계 · 실패 · 부모 실행</text>
+<rect x="510" y="420" width="420" height="166" rx="14" fill="#fff" stroke="#d5dee9"/>
+<text x="534" y="465.2" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="24" fill="#172b4d">단계별 지표 + 최종 답변 지표</text>
+<text x="534" y="507.6" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="21" fill="#172b4d">유효한 점수 / 미평가와 실패 사유</text>
+<text x="534" y="551.8" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="20" fill="#52647b">판정 근거 · 평가 범위 · 소요 시간</text>
+<path d="M720 386 L720 420" stroke="#64748b" stroke-width="3" fill="none"/>
+<polygon points="720.0,420.0 714.0,410.0 726.0,410.0" fill="#64748b"/>
+<rect x="510" y="624" width="420" height="100" rx="14" fill="#fff" stroke="#d5dee9"/>
+<text x="534" y="666.2" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="24" fill="#172b4d">State · 실행 이력</text>
+<text x="534" y="702.8" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="20" fill="#52647b">관측된 사실과 추정 원인을 구분</text>
+<path d="M720 586 L720 624" stroke="#64748b" stroke-width="3" fill="none"/>
+<polygon points="720.0,624.0 714.0,614.0 726.0,614.0" fill="#64748b"/>
+<path d="M468 318 L510 318" stroke="#64748b" stroke-width="3" fill="none"/>
+<polygon points="510.0,318.0 500.0,312.0 500.0,324.0" fill="#64748b"/>
+<path d="M468 500 L510 500" stroke="#64748b" stroke-width="3" fill="none"/>
+<polygon points="510.0,500.0 500.0,494.0 500.0,506.0" fill="#64748b"/>
+<rect x="972" y="248" width="420" height="138" rx="14" fill="#fff" stroke="#d5dee9"/>
+<text x="996" y="293.0" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="25" fill="#172b4d">실시간 대시보드</text>
+<text x="996" y="334.5" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="22" fill="#172b4d">질문 성공·실패 · 지표별 수치</text>
+<text x="996" y="368.0" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="19" fill="#52647b">흐름 그래프 · 반복 · 실패 지점</text>
+<rect x="972" y="420" width="420" height="166" rx="14" fill="#fff" stroke="#d5dee9"/>
+<text x="996" y="466.0" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="25" fill="#172b4d">같은 질문의 실행 비교</text>
+<text x="996" y="507.6" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="21" fill="#172b4d">평가 조건 · 유효 표본 확인</text>
+<text x="996" y="551.8" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="20" fill="#52647b">주장 → 판정 → 문서 근거</text>
+<rect x="972" y="624" width="420" height="100" rx="14" fill="#fff" stroke="#d5dee9"/>
+<text x="996" y="666.2" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="24" fill="#172b4d">이력 복원 · 다음 실험</text>
+<text x="996" y="702.8" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="20" fill="#52647b">설정 한 가지 변경 후 다시 검증</text>
+<path d="M930 318 L972 318" stroke="#64748b" stroke-width="3" fill="none"/>
+<polygon points="972.0,318.0 962.0,312.0 962.0,324.0" fill="#64748b"/>
+<path d="M930 500 L972 500" stroke="#64748b" stroke-width="3" fill="none"/>
+<polygon points="972.0,500.0 962.0,494.0 962.0,506.0" fill="#64748b"/>
+<path d="M930 674 L972 674" stroke="#64748b" stroke-width="3" fill="none"/>
+<polygon points="972.0,674.0 962.0,668.0 962.0,680.0" fill="#64748b"/>
+<rect x="48" y="770" width="1344" height="72" rx="12" fill="#eaf2fd" stroke="#c9d9ed"/>
+<text x="72" y="812.3" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="23" fill="#172b4d">평가 성공률 ≠ 정답률    ·    지표의 단위·방향 유지    ·    Gold 없이 얻은 증거의 범위를 명시</text>
+</svg>
