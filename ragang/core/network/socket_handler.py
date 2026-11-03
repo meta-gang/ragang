@@ -4,6 +4,7 @@ import time
 from collections import defaultdict
 from typing import Dict, Set, Any, Callable, Awaitable, Optional
 from websockets import ServerConnection
+from ragang.core.network.request_context import correlated_payload
 
 
 def _ts() -> float:
@@ -43,9 +44,17 @@ class SocketHandler:
         for t in list(self.subscribers.keys()):
             self.subscribers[t].discard(ws)
 
+    async def send(self, ws: ServerConnection, topic: str, payload: dict):
+        """A status query replies only to its requester, without a subscription."""
+        try:
+            await ws.send(json.dumps({"topic": topic, "ts": _ts(), **correlated_payload(topic, payload)}, ensure_ascii=False))
+        except Exception:
+            # Disconnecting a client must not cancel its accepted evaluation.
+            self._purge_ws(ws)
+
     # 브로드케스트로 메시지 전송
     async def broadcast(self, topic: str, payload: dict):
-        msg = {"topic": topic, "ts": _ts(), **payload}
+        msg = {"topic": topic, "ts": _ts(), **correlated_payload(topic, payload)}
         dead = []
         for ws in list(self.subscribers.get(topic, set())):
             try:

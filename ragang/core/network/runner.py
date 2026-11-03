@@ -8,6 +8,9 @@ from pathlib import Path
 
 from ragang.core.utils.cli import get_history, update_history, read_queries
 from ragang.evaluator import safe_failure
+from ragang.core.network.request_context import (
+    current_request, RequestContext, EXECUTION_TOPICS, supplied_request_id, validate_request_id,
+)
 from ragang.exceptions.user.cli import NotAllowedQueryFileException
 
 
@@ -23,6 +26,11 @@ class Runner:
         self.flow_id = flow_id
         self._query_store: Dict[str, str] = {}
         self._execution_lock = asyncio.Lock()
+        self._request_lock = asyncio.Lock()
+        self._requests: dict[str, dict] = {}
+        self._request_tasks: set[asyncio.Task] = set()
+        self.max_request_records = 1024
+        self._closing = False
 
         self._install_status_callback()
 
@@ -33,7 +41,8 @@ class Runner:
             "start!": self._start_react,
             "generated-query-files": self._generated_query_files,
             "custom-query-files": self._custom_query_files,
-            "get-module-pairs": self._on_get_module_pairs
+            "get-module-pairs": self._on_get_module_pairs,
+            "get-request-status": self._on_get_request_status
         }
 
     def _install_status_callback(self):
@@ -53,23 +62,179 @@ class Runner:
     async def setup_handlers(self):
         await self._broadcast_container_topology()
 
+    async def _reply(self, ws, topic: str, payload: dict):
+        if ws is None:
+            return
+        if hasattr(self.handler, 'send'):
+            await self.handler.send(ws, topic, payload)
+        else:
+            try:
+                await ws.send(json.dumps({"topic": topic, **payload}, ensure_ascii=False))
+            except Exception:
+                pass
+
+    async def _reply_status(self, ws, record):
+        await self._reply(ws, 'request-status', {key: value for key, value in record.items() if not key.startswith('_')})
+
+    @staticmethod
+    def _restored_record(request_id, states, *, persisted):
+        failed = any(state.get('execution_summary', {}).get('terminated') is True or
+                     state.get('execution_summary', {}).get('success') is False for state in states.values())
+        completed = all(state.get('execution_summary', {}).get('success') is True or
+                        state.get('execution_summary', {}).get('termination_reason') == 'answer' or
+                        (isinstance(state.get('gen'), str) and state['gen'].strip() and
+                         not state.get('execution_summary', {}).get('termination_reason')) for state in states.values())
+        return {'request_id': request_id, 'status': 'failed' if failed else 'completed' if completed else 'unknown',
+                'query_ids': list(states), 'run_ids': list(dict.fromkeys(
+                    state.get('run_metadata', {}).get('run_id') for state in states.values()
+                    if isinstance(state.get('run_metadata', {}).get('run_id'), str))), 'persisted': persisted}
+
+    def _memory_request(self, request_id):
+        """Snapshot completed States on the event loop, before any disk-worker await."""
+        memory = {}
+        container = self.engine.containers[self.flow_id]
+        for query_id, state in getattr(container.storage, 'results', {}).items():
+            metadata = getattr(state, 'run_metadata', {})
+            if isinstance(metadata, dict) and metadata.get('request_id') == request_id:
+                memory[query_id] = state.serialize()
+        return memory
+
+    def _find_stored_request(self, request_id, memory):
+        """Disk I/O runs in a worker; mutable engine state is never read there."""
+        saved = {}
+        history = get_history(self.flow_id)
+        for states in history.values():
+            if not isinstance(states, dict):
+                continue
+            for query_id, state in states.items():
+                if isinstance(state, dict) and isinstance(state.get('run_metadata'), dict) and state['run_metadata'].get('request_id') == request_id:
+                    saved[query_id] = state
+        if saved:
+            return self._restored_record(request_id, saved, persisted=True)
+        if memory:
+            return self._restored_record(request_id, memory, persisted=False)
+        return None
+
+    def _make_request_room(self):
+        while len(self._requests) >= self.max_request_records:
+            removable = next((key for key, value in self._requests.items()
+                              if value['status'] in ('completed', 'failed') and value.get('persisted') is True), None)
+            if removable is None:
+                return False
+            del self._requests[removable]
+        return True
+
+    async def _accept_execution(self, msg, ws, operation):
+        try:
+            request_id = supplied_request_id(msg)
+        except ValueError as error:
+            await self._reply(ws, 'error', {'request_id': None, 'code': 'invalid_request_id', 'message': str(error)})
+            return
+        async with self._request_lock:
+            record = self._requests.get(request_id)
+            if record is None:
+                try:
+                    record = await asyncio.to_thread(self._find_stored_request, request_id, self._memory_request(request_id))
+                except Exception:
+                    await self._reply(ws, 'error', {'request_id': request_id, 'code': 'history_unavailable',
+                        'message': '이력을 확인하지 못해 중복 실행 방지를 위해 요청을 시작하지 않았습니다.'})
+                    return
+            if record is not None:
+                await self._reply_status(ws, record)
+                return
+            if self._closing:
+                await self._reply(ws, 'error', {'request_id': request_id, 'code': 'server_stopping',
+                    'message': '서버가 종료 중이므로 새 평가를 시작하지 않았습니다.'})
+                return
+            if not self._make_request_room():
+                await self._reply(ws, 'error', {'request_id': request_id, 'code': 'request_capacity',
+                    'message': '미저장 요청 기록의 보존 한도에 도달했습니다. 결과 저장 상태를 확인하고 서버를 재시작한 뒤 새 평가를 실행하세요.'})
+                return
+            record = {'request_id': request_id, 'status': 'queued', 'query_ids': [], 'run_ids': [], 'persisted': False, '_ws': ws}
+            self._requests[request_id] = record
+            await self._reply_status(ws, record)
+            task = asyncio.create_task(self._execute_request(msg, ws, operation, record))
+            self._request_tasks.add(task)
+            task.add_done_callback(self._request_finished)
+
+    def _request_finished(self, task):
+        self._request_tasks.discard(task)
+        if not task.cancelled():
+            error = task.exception()  # Retrieve unexpected transport/cleanup errors too.
+            if error is not None:
+                failure = safe_failure(error)
+                print(f"[Runner] Request cleanup error: {failure['type']}: {failure['message']}")
+
+    async def _execute_request(self, msg, ws, operation, record):
+        token = current_request.set(RequestContext(record['request_id']))
+        record['_ws'] = ws
+        try:
+            await operation(msg, ws)
+            if record['status'] not in ('failed', 'completed'):
+                record['status'] = 'completed'
+        except BaseException as error:
+            record['status'] = 'failed'
+            failure = safe_failure(error)
+            await self.handler.broadcast('error', {'module': 'runner', 'request_id': record['request_id'],
+                'message': failure['message'], 'failure_type': failure['type']})
+        finally:
+            try:
+                await self._reply_status(ws, record)
+            finally:
+                record.pop('_ws', None)
+                current_request.reset(token)
+
+    async def _on_get_request_status(self, msg, ws):
+        try:
+            request_id = validate_request_id(msg.get('request_id'))
+        except ValueError as error:
+            await self._reply(ws, 'error', {'request_id': None, 'code': 'invalid_request_id', 'message': str(error)})
+            return
+        async with self._request_lock:
+            record = self._requests.get(request_id)
+            if record is None:
+                try:
+                    record = await asyncio.to_thread(self._find_stored_request, request_id, self._memory_request(request_id))
+                except Exception:
+                    record = {'request_id': request_id, 'status': 'unknown', 'reason': 'history_unavailable'}
+        await self._reply_status(ws, record or {'request_id': request_id, 'status': 'unknown'})
+
+    async def shutdown(self):
+        self._closing = True
+        async with self._request_lock:
+            tasks = list(self._request_tasks)
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        # A task cancelled before its first instruction never enters its finally.
+        for record in list(self._requests.values()):
+            if record['status'] in ('queued', 'running'):
+                record['status'] = 'failed'
+                await self.handler.broadcast('error', {'module': 'runner', 'request_id': record['request_id'],
+                    'failure_type': 'CancelledError', 'message': '서버 종료로 대기 중인 요청이 취소되었습니다.'})
+                await self._reply_status(record.pop('_ws', None), record)
+
     async def dispatch(self, msg: dict, ws):
-        topic = msg.get("topic")
-        fn = self.topic_map.get(topic)
-        if not fn:
-            print("[Runner] Unknown topic received.")
+        if not isinstance(msg, dict) or not isinstance(msg.get('topic'), str):
+            return
+        topic = msg['topic']
+        operation = self.topic_map.get(topic)
+        if operation is None:
+            return
+        if topic in EXECUTION_TOPICS:
+            await self._accept_execution(msg, ws, operation)
             return
         try:
-            await fn(msg, ws)
-        except Exception as e:
-            # Keep both logs and unauthenticated websocket payloads free of raw
-            # credentials, local paths, and tracebacks.
-            failure = safe_failure(e)
+            await operation(msg, ws)
+        except Exception as error:
+            failure = safe_failure(error)
             print(f"[Runner] Dispatch Error: {failure['type']}: {failure['message']}")
-            await self.handler.broadcast("error", {
-                "module": "runner",
-                "message": failure["message"],
-            })
+            payload = {'module': 'runner', 'message': failure['message']}
+            if ws is None:
+                await self.handler.broadcast('error', payload)
+            else:
+                await self._reply(ws, 'error', payload)
 
     # ------------------------------------------------------------------
     # [Helper Methods]
@@ -99,6 +264,14 @@ class Runner:
     async def _broadcast_rag_result(self, query_ids: List[str]):
         cont = self.engine.containers[self.flow_id]
 
+        context = current_request.get()
+        if context is not None:
+            for query_id in query_ids:
+                if query_id in cont.storage.results:
+                    state = cont.storage.results[query_id]
+                    if not isinstance(getattr(state, 'run_metadata', None), dict):
+                        state.run_metadata = {}
+                    state.run_metadata['request_id'] = context.request_id
         states_payload = {
             qid: cont.storage.results[qid].serialize()
             for qid in query_ids
@@ -121,6 +294,12 @@ class Runner:
                 'failure_type': failure['type'],
             })
 
+        if context is not None:
+            record = self._requests.get(context.request_id)
+            if record is not None:
+                record.update(self._restored_record(context.request_id, states_payload, persisted=persisted))
+                if not persisted:
+                    record['status'] = 'failed'
         await self.handler.broadcast("rag-result-data", {
             "ts": history_key or _ts_str(),
             "persisted": persisted,
@@ -139,9 +318,16 @@ class Runner:
             failure = safe_failure(e)
             print(f"[Runner] Error broadcasting topology: {failure['type']}: {failure['message']}")
 
-    async def _run_and_broadcast(self, operation):
+    async def _run_and_broadcast(self, operation, query_num=None):
         """Broadcast every newly stored State, including executions that raise."""
         async with self._execution_lock:
+            context = current_request.get()
+            if context is not None:
+                record = self._requests[context.request_id]
+                record['status'] = 'running'
+                await self._reply_status(record.get('_ws'), record)
+            if query_num is not None:
+                await self._rag_on_run(query_num)
             container = self.engine.containers[self.flow_id]
             previous_query_ids = set(container.storage.results)
             try:
@@ -160,6 +346,9 @@ class Runner:
             "ts": _ts_str(),
             "query-num": int(query_num),
         })
+        context = current_request.get()
+        if context is not None:
+            context.preparation_sent = True
 
     # ------------------------------------------------------------------
     # [Handlers]
@@ -172,9 +361,8 @@ class Runner:
 
         queries = read_queries(file_path)
 
-        await self._rag_on_run(len(queries))
         await self._run_and_broadcast(
-            lambda: self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id])
+            lambda: self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id]), query_num=len(queries)
         )
 
     async def _on_run_rag_llm_query(self, msg: dict, ws):
@@ -184,9 +372,8 @@ class Runner:
 
         queries = read_queries(file_path, generated=True)
 
-        await self._rag_on_run(len(queries))
         await self._run_and_broadcast(
-            lambda: self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id])
+            lambda: self.engine.async_invoke_batch(queries, flow_ids=[self.flow_id]), query_num=len(queries)
         )
 
     async def _on_test_query(self, msg: dict, ws):
@@ -195,7 +382,7 @@ class Runner:
             raise ValueError("`query` must be a non-empty string.")
 
         await self._run_and_broadcast(
-            lambda: self.engine.async_invoke(query, flow_ids=[self.flow_id])
+            lambda: self.engine.async_invoke(query, flow_ids=[self.flow_id]), query_num=1
         )
 
     async def _generated_query_files(self, msg, ws):

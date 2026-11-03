@@ -41,9 +41,12 @@ async def main(root_path: str, flow_id: str, host: str, port: int,
     origins = allowed_origins if allowed_origins is not None else [
         'http://127.0.0.1:8080', 'http://localhost:8080', None,
     ]
-    async with websockets.serve(handler.handle_connection, host, port,
-                                 origins=origins, process_request=authenticate,
-                                 max_size=2**20):
-        if on_ready is not None:
-            on_ready()
-        await asyncio.Future()
+    try:
+        async with websockets.serve(handler.handle_connection, host, port,
+                                     origins=origins, process_request=authenticate,
+                                     max_size=2**20):
+            if on_ready is not None:
+                on_ready()
+            await asyncio.Future()
+    finally:
+        await runner.shutdown()

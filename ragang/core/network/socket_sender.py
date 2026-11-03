@@ -1,4 +1,5 @@
 from ragang.core.network.socket_handler import SocketHandler
+from ragang.core.network.request_context import current_request
 
 
 class SocketSender:
@@ -16,6 +17,9 @@ class SocketSender:
         })
 
     async def send_rag_preparation_sig(self, n_query: int):
+        context = current_request.get()
+        if context is not None and context.preparation_sent:
+            return
         await self.handler.broadcast('rag-on', {
             'query-num': n_query,
         })

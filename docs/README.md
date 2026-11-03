@@ -27,8 +27,11 @@ Welcome to the comprehensive documentation repository for **RAGANG** (*Ground-Tr
 ---
 
 ## ✅ Validation & Acceptance Reports
+- [요청 연결·자동 사용자 과제 검증 (2026-11-03)](validation/REQUEST_USABILITY_2026.md) — 내 요청의 진행·완료·복구를 정확히 연결하고 자동 회귀를 반복하는 흐름.
+- [다섯 사용자 과제와 자동 검증팩](validation/USABILITY_TASKS.md) — 반복 가능한 오프라인 수용 검사와 실제 사용자 검사의 구분.
+- [요청 연결·동시 실행·복구](development/DASHBOARD_REQUESTS.md) — 짧은 표시 이름과 내부 요청 ID, 중복 실행 방지·복구 범위.
 - [대시보드 디자인·한글·사용 흐름 검증 (2026-11-03)](validation/DASHBOARD_REDESIGN_2026.md) — 새 탐색·한글 글꼴·차트·복합 그래프·키보드 및 반응형 검증.
-- [표시 단순화·복합 그래프·첫 사용 안내 검증 (2026-10-26)](validation/USABILITY_GRAPH_ONBOARDING_2026.md) — 최신 사용자 흐름·그래프 결함 수정·오프라인 검증 범위.
+- [표시 단순화·복합 그래프·첫 사용 안내 검증 (2026-10-26)](validation/USABILITY_GRAPH_ONBOARDING_2026.md) — 당시 사용자 흐름·그래프 결함 수정·오프라인 검증 범위.
 - [페르소나 기반 신뢰성 개선 (2026-10-25)](validation/PERSONA_HARDENING_2026.md) — 다섯 사용자 시나리오와 재현 문제·해결·한계.
 
 아래는 각 문서의 작성 시점에 해당하는 과거 기록입니다. 현재 환경의 실제 모델·DB 연동 검증 여부는 최신 보고서를 기준으로 확인하세요.

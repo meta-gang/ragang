@@ -3,13 +3,13 @@ graft ragang/templates
 recursive-exclude ragang/templates __pycache__/* *.py[cod]
 recursive-exclude ragang/web *
 include ragang/web/2bc582461caf4e05b51d42787b901205.woff2
-include ragang/web/819.46f14f5bd159e26a7397.js
-include ragang/web/819.46f14f5bd159e26a7397.js.LICENSE.txt
-include ragang/web/819.46f14f5bd159e26a7397.js.map
+include ragang/web/819.d7a7bc6f5542898b10e2.js
+include ragang/web/819.d7a7bc6f5542898b10e2.js.LICENSE.txt
+include ragang/web/819.d7a7bc6f5542898b10e2.js.map
 include ragang/web/index.html
 include ragang/web/licenses/Pretendard-LICENSE.txt
-include ragang/web/main.2fe35c8e4efeec85b029.js
-include ragang/web/main.2fe35c8e4efeec85b029.js.map
+include ragang/web/main.90c45acc2bde2ecee3ff.js
+include ragang/web/main.90c45acc2bde2ecee3ff.js.map
 include ragang/web/main.css
 include ragang/web/main.css.map
 include ragang/web/service-worker.js

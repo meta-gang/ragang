@@ -47,7 +47,7 @@ git diff --check
 Frontend:
 
 ```bash
-npm test -- --runInBand
+npm test
 npm run typecheck
 npm run build
 git diff --check
@@ -55,6 +55,15 @@ git diff --check
 
 일반 regression test는 live API, paid model, Milvus를 요구하면 안 됩니다. Adapter failure,
 judge parsing, graph cycle은 deterministic fake로 검증합니다.
+
+백엔드·UI 검증을 함께 실행하고 결과를 JSON으로 남기려면 저장소 루트에서 실행합니다.
+
+```bash
+.venv/bin/python scripts/verify_usability.py --ui-path ../RAG-APP-UI
+```
+
+범위 선택·실패 해석·실제 사용성 과제는 [검증팩 안내](../validation/USABILITY_TASKS.md),
+WebSocket 요청 연결 계약은 [요청·결과 연결](DASHBOARD_REQUESTS.md)을 참고합니다.
 
 ## 구현 규칙
 
