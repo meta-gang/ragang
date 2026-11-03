@@ -1,5 +1,54 @@
 # 현재 설치된 프런트엔드 빌드
 
+검증일: 2026-11-03. Source repository: `meta-gang/RAG-APP-UI`.
+Source branch: `codex/ragang-ui-2026-modernization`.
+Exact source SHA: `e7b865a5645c28c1547c183d245f96cbdaa7e7cf`.
+
+Node 26.10.0 / npm 11.19.1에서 npm ci, UI 회귀 72개, 타입 검사와 production build를 통과했다.
+커밋한 동일 소스에서 연속 두 build의 전체 12개 파일 SHA-256이 일치했다.
+검증한 전체 파일 집합을 ragang/web/에 설치하고 MANIFEST.in을 같은 명시적 목록으로 갱신했다.
+이전 자산은 작업영역 밖에 보관한 뒤 교체했다. 원본 UI와 설치본의 파일 집합·각 해시가 같다.
+
+## 글꼴과 라이선스
+
+Pretendard Variable v1.3.9 원본 WOFF2를 사용한다. 현대한글 11,172자와 가변 글꼴 메타데이터를
+검사했으며 실행 시 외부 CDN을 호출하지 않는다. 빌드의 WOFF2가 검증한 원본과 byte-for-byte
+같고, licenses/Pretendard-LICENSE.txt도 원문과 같음을 확인했다. 해당 라이선스 파일을 패키지에
+포함한다. 소스 저장소의 fonts/Pretendard-metadata.json에 공식 출처와 분석 정보를 기록했다.
+
+## 실행·표시 계약
+
+밝은 패널·반응형 탐색·실행 비교·평가 근거·그래프 확대와 키보드 조작을 검증했다. 내부 계산은
+원래 단위와 canonical 평가자 식별자를 사용한다. UI용 이름은 원본 식별자를 바꾸지 않는다.
+문서 인용의 검증 여부를 보존하며 미평가를 숫자로 만들지 않는다.
+
+Index와 service worker의 모든 참조 파일이 같은 build 안에 있다. HTML과 동적
+ragang-session.js는 precache하지 않는다. 실행별 세션 bootstrap은 로컬 서버가 제공하며
+빌드 산출물에 토큰을 넣지 않는다. 과거 화면이 열린 창은 한 번 새로고침해야 할 수 있다.
+
+실제 화면·다섯 페르소나·검증 한계는 [디자인 검증 보고서](../validation/DASHBOARD_REDESIGN_2026.md)에 있다.
+
+## 설치 파일 SHA-256
+
+- `2bc582461caf4e05b51d42787b901205.woff2`: `9599f12fd42fc0bce1cd50b47a0c022e108d7aa64dd0d1bb0ed44f3282d900b4`
+- `819.46f14f5bd159e26a7397.js`: `75a20f6cca621140c93cf5428a354520611a5da1ded519a3527091654a5cc7c5`
+- `819.46f14f5bd159e26a7397.js.LICENSE.txt`: `45f66c349eb99046f368fd455c7823e4e588f47ca18338c95bec8aba27704134`
+- `819.46f14f5bd159e26a7397.js.map`: `241772c8b38fba77521141c60f642c869abdef8aee6a9f5d3920783edaa3f395`
+- `index.html`: `e4ea06219cb5bc6f7626c54721c96f36d76587bb0df8e5088cee0f4027837562`
+- `licenses/Pretendard-LICENSE.txt`: `d31ddd9f2bed32fd7e302a205cf2380ba0de6529152d239ef99cfb6f261bfc04`
+- `main.2fe35c8e4efeec85b029.js`: `d8db7f2d5f80170b47de0aa58e3d283c5f930ffa1b8b535ce9c3c9259d054f57`
+- `main.2fe35c8e4efeec85b029.js.map`: `028c26081db437007a32070d4d2a19991de3b282dbd282f15a78f643b600fde5`
+- `main.css`: `c0378f689e6834a74fc60720a80fba0d8ff90ceea3220a67af880fd1b6c2a8e6`
+- `main.css.map`: `6ec164b95531dc26b48c95f3a63cb86ee643a131a021e3b963e220cfc8ba313a`
+- `service-worker.js`: `df6a55d8bfeb8aa5e4304ce9fe5bcde825013e86a41dc488c618defa1c335ba6`
+- `workbox-39fa566e.js`: `4fc0e53b2aa52344aef1a9cd1935bb67122816a6cf52606ccfd1738d3eec9b1c`
+
+---
+
+## 이전 설치 기록
+
+# 현재 설치된 프런트엔드 빌드
+
 검증일: 2026-10-26. Source repository: `meta-gang/RAG-APP-UI`.
 Source branch: `codex/ragang-ui-2026-modernization`.
 Exact source SHA: `35e2829850a775fd60da183f2b66ba084dbe5563`.

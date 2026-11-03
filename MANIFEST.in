@@ -2,18 +2,14 @@ include setup.py build_support.py
 graft ragang/templates
 recursive-exclude ragang/templates __pycache__/* *.py[cod]
 recursive-exclude ragang/web *
-include ragang/web/12c5f3f90455943689153262702765ca.woff2
-include ragang/web/2ac864a194a4c2b8049b22eec5d89072.woff2
-include ragang/web/43b5c29006f365a91ccd1e8e9e0d04ee.woff2
-include ragang/web/908.24eb09d4117c06a5b1b1.js
-include ragang/web/908.24eb09d4117c06a5b1b1.js.LICENSE.txt
-include ragang/web/908.24eb09d4117c06a5b1b1.js.map
-include ragang/web/9a72164420c5bea92570652a34fd378f.woff2
-include ragang/web/a2b8ed27e25e7116ab30cab19b2fff77.woff2
-include ragang/web/d3283d226f8f74e7a8d573c221c95608.woff2
+include ragang/web/2bc582461caf4e05b51d42787b901205.woff2
+include ragang/web/819.46f14f5bd159e26a7397.js
+include ragang/web/819.46f14f5bd159e26a7397.js.LICENSE.txt
+include ragang/web/819.46f14f5bd159e26a7397.js.map
 include ragang/web/index.html
-include ragang/web/main.cf63212afe2a164df9e8.js
-include ragang/web/main.cf63212afe2a164df9e8.js.map
+include ragang/web/licenses/Pretendard-LICENSE.txt
+include ragang/web/main.2fe35c8e4efeec85b029.js
+include ragang/web/main.2fe35c8e4efeec85b029.js.map
 include ragang/web/main.css
 include ragang/web/main.css.map
 include ragang/web/service-worker.js

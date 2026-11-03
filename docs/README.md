@@ -27,6 +27,7 @@ Welcome to the comprehensive documentation repository for **RAGANG** (*Ground-Tr
 ---
 
 ## ✅ Validation & Acceptance Reports
+- [대시보드 디자인·한글·사용 흐름 검증 (2026-11-03)](validation/DASHBOARD_REDESIGN_2026.md) — 새 탐색·한글 글꼴·차트·복합 그래프·키보드 및 반응형 검증.
 - [표시 단순화·복합 그래프·첫 사용 안내 검증 (2026-10-26)](validation/USABILITY_GRAPH_ONBOARDING_2026.md) — 최신 사용자 흐름·그래프 결함 수정·오프라인 검증 범위.
 - [페르소나 기반 신뢰성 개선 (2026-10-25)](validation/PERSONA_HARDENING_2026.md) — 다섯 사용자 시나리오와 재현 문제·해결·한계.
 

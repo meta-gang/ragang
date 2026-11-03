@@ -1,26 +1,22 @@
 # 생성 자산 목록
 
-기준일: 2026-10-26. 설치한 frontend source SHA: `35e2829850a775fd60da183f2b66ba084dbe5563`.
+기준일: 2026-11-03. 설치한 frontend source SHA: `e7b865a5645c28c1547c183d245f96cbdaa7e7cf`.
 
-동일한 커밋과 lockfile의 production build 전체를 하나의 자산 집합으로 설치했다.
-현재 ragang/web/에는 아래 16개 파일만 있다. MANIFEST.in은 같은 명시적 목록을
-사용하므로 다른 빌드의 orphan 파일은 wheel에 포함되지 않는다.
+검증한 하나의 production build 전체 12개 파일을 설치했다. 이전 hashed 파일과
+사용하지 않는 과거 글꼴은 포함하지 않는다. 로컬 한글 글꼴 및 SIL OFL 원문을 함께 배포한다.
+MANIFEST.in은 같은 명시적 목록을 사용한다. 재사용 build/lib의 과거 웹 자산은 빌드 훅에서 정리한다.
 
-- `ragang/web/12c5f3f90455943689153262702765ca.woff2`
-- `ragang/web/2ac864a194a4c2b8049b22eec5d89072.woff2`
-- `ragang/web/43b5c29006f365a91ccd1e8e9e0d04ee.woff2`
-- `ragang/web/908.24eb09d4117c06a5b1b1.js`
-- `ragang/web/908.24eb09d4117c06a5b1b1.js.LICENSE.txt`
-- `ragang/web/908.24eb09d4117c06a5b1b1.js.map`
-- `ragang/web/9a72164420c5bea92570652a34fd378f.woff2`
-- `ragang/web/a2b8ed27e25e7116ab30cab19b2fff77.woff2`
-- `ragang/web/d3283d226f8f74e7a8d573c221c95608.woff2`
+- `ragang/web/2bc582461caf4e05b51d42787b901205.woff2`
+- `ragang/web/819.46f14f5bd159e26a7397.js`
+- `ragang/web/819.46f14f5bd159e26a7397.js.LICENSE.txt`
+- `ragang/web/819.46f14f5bd159e26a7397.js.map`
 - `ragang/web/index.html`
-- `ragang/web/main.cf63212afe2a164df9e8.js`
-- `ragang/web/main.cf63212afe2a164df9e8.js.map`
+- `ragang/web/licenses/Pretendard-LICENSE.txt`
+- `ragang/web/main.2fe35c8e4efeec85b029.js`
+- `ragang/web/main.2fe35c8e4efeec85b029.js.map`
 - `ragang/web/main.css`
 - `ragang/web/main.css.map`
 - `ragang/web/service-worker.js`
 - `ragang/web/workbox-39fa566e.js`
 
-전체 해시와 검증 방법은 FRONTEND_PROVENANCE.md에 기록했다. 생성 파일을 직접 수정하지 않는다.
+각 파일 해시와 검증 방법은 FRONTEND_PROVENANCE.md에 있다. 생성 자산을 직접 수정하지 않는다.

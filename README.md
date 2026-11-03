@@ -10,7 +10,7 @@ RAGANG은 사용자의 RAG를 모듈로 연결해 실행하고, **어떤 문서�
 
 대시보드에서 지표별 결과와 실패 원인을 확인하고, 같은 질문으로 실행을 비교해 다음 개선 대상을 고를 수 있습니다.
 
-![RAGANG 대시보드: 실행 선택, 질문 성공·실패, 평가 상태와 지표 결과](docs/images/dashboard.png)
+![RAGANG 대시보드: 실행 선택, 질문 성공·실패, 평가 상태와 지표 결과](docs/validation/images/redesign-2026/dashboard-desktop.png)
 
 *실제 실행 엔진과 대시보드로 촬영한 오프라인 예제입니다. 화면의 값은 연결·상태 표시 검증용이며 실제 모델의 성능 측정치가 아닙니다.*
 
@@ -168,7 +168,7 @@ flowchart LR
 
 **지식 그래프의 엔티티·관계·커뮤니티 정확성은 기본 제공 지표의 평가 범위와 다릅니다.** 외부 프레임워크 내부 단계를 모듈로 노출하지 않으면, RAGANG도 내부 실행을 볼 수 없습니다. 검증한 복합 흐름과 실행 경계는 [그래프 가이드](docs/graph-rag/execution-trace.md)에서 확인하세요.
 
-![복잡한 흐름의 실행 순서·반복·실패를 확인하는 대시보드](docs/images/graph-trace.png)
+![복잡한 흐름의 연결 방향과 순환을 확인하는 확대 화면](docs/validation/images/redesign-2026/graph-overview.png)
 
 다음 오프라인 예제는 두 검색기의 합류와 검증 후 재검색을 실제로 실행합니다.
 
@@ -215,6 +215,7 @@ ragang compare -F sample_rag --json
 - [Graph·Cycle 실행 계약](docs/graph-rag/execution-trace.md)
 - [페르소나 기반 개선·검증 보고서](docs/validation/PERSONA_HARDENING_2026.md)
 - [표시 단순화·복합 그래프·첫 사용 검증](docs/validation/USABILITY_GRAPH_ONBOARDING_2026.md)
+- [새 대시보드 디자인·한글·사용 흐름 검증](docs/validation/DASHBOARD_REDESIGN_2026.md)
 - [한계와 지원 범위](docs/research/limitations.md) · [재현 가능한 빌드](docs/development/RELEASE.md)
 
 개발 검증:
